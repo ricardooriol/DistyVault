@@ -15,17 +15,17 @@ function App() {
     e.preventDefault();
     let res;
     if (type === 'url') {
-      res = await axios.post('/api/summarize-url', { url: input });
+      res = await axios.post('/api/summarize-url', { url: input }, { timeout: 120000 });
     } else if (type === 'youtube') {
-      res = await axios.post('/api/summarize-youtube', { videoUrl: input });
+      res = await axios.post('/api/summarize-youtube', { videoUrl: input }, { timeout: 120000 });
     } else if (type === 'playlist') {
-      res = await axios.post('/api/summarize-playlist', { playlistUrl: input });
+      res = await axios.post('/api/summarize-playlist', { playlistUrl: input }, { timeout: 120000 });
     } else if (type === 'file' && file) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const fileType = file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.docx') ? 'docx' : 'txt';
         const fileData = ev.target.result;
-        res = await axios.post('/api/summarize-file', { fileData, fileType });
+        res = await axios.post('/api/summarize-file', { fileData, fileType }, { timeout: 120000 });
         setSummaries([{ id: res.data.id, summary: res.data.summary }, ...summaries]);
       };
       reader.readAsArrayBuffer(file);
