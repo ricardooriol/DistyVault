@@ -35,17 +35,17 @@ function App() {
     setSummaries([newSummary, ...summaries]);
     setLoadingId(newSummary.id);
     if (type === 'url') {
-      res = await axios.post('/api/summarize-url', { url: input }, { timeout: 120000 });
+      res = await axios.post('/api/summarize-url', { url: input }, { timeout: 300000 });
     } else if (type === 'youtube') {
-      res = await axios.post('/api/summarize-youtube', { videoUrl: input }, { timeout: 120000 });
+      res = await axios.post('/api/summarize-youtube', { videoUrl: input }, { timeout: 300000 });
     } else if (type === 'playlist') {
-      res = await axios.post('/api/summarize-playlist', { playlistUrl: input }, { timeout: 120000 });
+      res = await axios.post('/api/summarize-playlist', { playlistUrl: input }, { timeout: 300000 });
     } else if (type === 'file' && file) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const fileType = file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.docx') ? 'docx' : 'txt';
         const fileData = ev.target.result;
-        res = await axios.post('/api/summarize-file', { fileData, fileType }, { timeout: 120000 });
+        res = await axios.post('/api/summarize-file', { fileData, fileType });
         setSummaries([{ id: res.data.id, summary: res.data.summary, type, date: now, status: 'done' }, ...summaries.filter(s => s.id !== newSummary.id)]);
         setLoadingId(null);
       };

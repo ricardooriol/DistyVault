@@ -5,7 +5,8 @@ const { getYoutubeTranscript, getPlaylistTranscripts } = require('./youtube');
 const { parseFile } = require('./file');
 
 async function scrapeUrl(url) {
-  const { data } = await axios.get(url, { timeout: 120000 });
+  // 5 minute timeout for scraping
+  const { data } = await axios.get(url, { timeout: 300000 });
   const $ = cheerio.load(data);
   return $('body').text();
 }
