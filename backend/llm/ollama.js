@@ -5,7 +5,7 @@ async function summarizeText(text) {
   return new Promise((resolve, reject) => {
     const prompt = `Summarize the following text in a long, dense, and comprehensive way, extracting all key points and learnings.\n\n${text}`;
     console.log('[DEBUG] [Ollama] Starting summarization with prompt length:', prompt.length);
-    const ollama = spawn('ollama', ['run', 'llama3.1'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const ollama = spawn('ollama', ['run', 'phi4-mini'], { stdio: ['pipe', 'pipe', 'pipe'] });
     let output = '';
     let errorOutput = '';
 
