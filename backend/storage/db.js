@@ -3,15 +3,27 @@ const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./backend/storage/sawron.db');
 
 db.serialize(() => {
-  db.run('CREATE TABLE IF NOT EXISTS summaries (id INTEGER PRIMARY KEY, summary TEXT)');
+  db.run(`CREATE TABLE IF NOT EXISTS summaries (
+    id INTEGER PRIMARY KEY,
+    summary TEXT,
+    type TEXT,
+    date TEXT,
+    status TEXT,
+    name TEXT,
+    url TEXT
+  )`);
 });
 
-function saveSummary(summary) {
+function saveSummary({ summary, type, date, status, name, url }) {
   return new Promise((resolve, reject) => {
-    db.run('INSERT INTO summaries (summary) VALUES (?)', [summary], function (err) {
-      if (err) return reject(err);
-      resolve(this.lastID);
-    });
+    db.run(
+      'INSERT INTO summaries (summary, type, date, status, name, url) VALUES (?, ?, ?, ?, ?, ?)',
+      [summary, type, date, status, name, url],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.lastID);
+      }
+    );
   });
 }
 
@@ -24,4 +36,13 @@ function getSummaries() {
   });
 }
 
-module.exports = { saveSummary, getSummaries };
+function deleteSummary(id) {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM summaries WHERE id = ?', [id], function (err) {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
+
+module.exports = { saveSummary, getSummaries, deleteSummary };

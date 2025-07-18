@@ -13,12 +13,34 @@ app.use(bodyParser.json({ limit: '100mb' }));
 // Summarize raw text
 app.post('/api/summarize', async (req, res) => {
   const { text } = req.body;
+  // Auto-detect type
+  let type = 'text', url = '', name = '', status = 'done';
+  if (/^https?:\/\//.test(text)) {
+    type = 'url';
+    url = text;
+    name = text.split('/')[2] || 'Website';
+  } else if (/youtube\.com\/watch\?v=|youtu\.be\//.test(text)) {
+    type = 'youtube';
+    url = text;
+    name = 'YouTube Video';
+  } else if (/youtube\.com\/playlist\?list=/.test(text)) {
+    type = 'playlist';
+    url = text;
+    name = 'YouTube Playlist';
+  } else {
+    name = text.slice(0, 32).replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ');
+  }
+  const date = new Date().toISOString();
   console.log('[DEBUG] /api/summarize called with text length:', text?.length);
   try {
-    const summary = await summarizeText(text);
-    const id = await saveSummary(summary);
-    console.log('[DEBUG] /api/summarize completed, summary length:', summary?.length);
-    res.json({ id, summary });
+    // Save as in-progress first
+    const inProgress = { summary: '', type, date, status: 'loading', name, url };
+    const id = await saveSummary(inProgress);
+    // Start summarization
+    summarizeText(text).then(async summary => {
+      await saveSummary({ summary, type, date, status: 'done', name, url });
+    });
+    res.json({ id, summary: '', type, date, status: 'loading', name, url });
   } catch (err) {
     console.error('[ERROR] /api/summarize:', err);
     res.status(500).json({ error: err.message });
@@ -101,6 +123,17 @@ app.post('/api/summarize-file', async (req, res) => {
 app.get('/api/summaries', async (req, res) => {
   const summaries = await getSummaries();
   res.json({ summaries });
+});
+
+// Delete summary
+app.delete('/api/summaries/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await require('./storage/db').deleteSummary(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 5173;

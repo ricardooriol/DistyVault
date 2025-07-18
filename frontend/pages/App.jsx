@@ -1,148 +1,179 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
+  CircularProgress,
+  useMediaQuery
+} from '@mui/material';
+import { FileOpen, ContentPaste, Download, Delete, Info } from '@mui/icons-material';
 
 function App() {
   const [input, setInput] = useState('');
-  const [type, setType] = useState('url');
   const [summaries, setSummaries] = useState([]);
-  const [file, setFile] = useState(null);
   const [loadingId, setLoadingId] = useState(null);
   const [showDetail, setShowDetail] = useState(null);
+  const inputRef = useRef();
 
   useEffect(() => {
     axios.get('/api/summaries').then(res => {
-      // Add dummy tags for demo, real tags should come from backend
-      setSummaries(res.data.summaries.map(s => ({
-        ...s,
-        type: s.type || 'url',
-        date: s.date || new Date().toLocaleString(),
-        status: 'done',
-      })));
+      setSummaries(res.data.summaries);
     });
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    let res;
-    const now = new Date().toLocaleString();
-    let newSummary = {
-      id: Math.random().toString(36).slice(2),
-      summary: '',
-      type,
-      date: now,
-      status: 'loading',
-    };
-    setSummaries([newSummary, ...summaries]);
-    setLoadingId(newSummary.id);
-    if (type === 'url') {
-      res = await axios.post('/api/summarize-url', { url: input }, { timeout: 300000 });
-    } else if (type === 'youtube') {
-      res = await axios.post('/api/summarize-youtube', { videoUrl: input }, { timeout: 300000 });
-    } else if (type === 'playlist') {
-      res = await axios.post('/api/summarize-playlist', { playlistUrl: input }, { timeout: 300000 });
-    } else if (type === 'file' && file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const fileType = file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.docx') ? 'docx' : 'txt';
-        const fileData = ev.target.result;
-        res = await axios.post('/api/summarize-file', { fileData, fileType });
-        setSummaries([{ id: res.data.id, summary: res.data.summary, type, date: now, status: 'done' }, ...summaries.filter(s => s.id !== newSummary.id)]);
-        setLoadingId(null);
-      };
-      reader.readAsArrayBuffer(file);
-      return;
-    }
-    if (res) {
-      setSummaries([{ id: res.data.id, summary: res.data.summary, type, date: now, status: 'done' }, ...summaries.filter(s => s.id !== newSummary.id)]);
-      setLoadingId(null);
-    }
+    setLoadingId('pending');
+    const res = await axios.post('/api/summarize', { text: input });
+    setSummaries([res.data, ...summaries]);
+    setInput('');
+    setLoadingId(null);
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: 'auto', padding: 32 }}>
-      <h1>Sawron</h1>
-      <form onSubmit={handleSubmit}>
-        <select value={type} onChange={e => setType(e.target.value)}>
-          <option value="url">Website URL</option>
-          <option value="youtube">YouTube Video</option>
-          <option value="playlist">YouTube Playlist</option>
-          <option value="file">Upload File</option>
-        </select>
-        {type === 'file' ? (
-          <input type="file" onChange={e => setFile(e.target.files[0])} />
-        ) : (
-          <input
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder={type === 'url' ? 'Enter website URL' : type === 'youtube' ? 'Enter YouTube link' : 'Enter playlist link'}
-            style={{ width: '60%' }}
-          />
-        )}
-        <button type="submit">Summarize</button>
-      </form>
-      <h2>Saved Summaries</h2>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {summaries.map(s => (
-          <li key={s.id} style={{
-            marginBottom: 8,
-            background: '#f8f8f8',
-            borderRadius: 8,
-            padding: 12,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
-          }}>
-            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setShowDetail(s.id)}>
-              <span style={{ fontWeight: 'bold', marginRight: 8 }}>{s.type.toUpperCase()}</span>
-              <span style={{ color: '#888', marginRight: 8 }}>{s.date}</span>
-              {s.status === 'loading' ? (
-                <span style={{ color: '#007bff', marginRight: 8 }}>
-                  <span className="spinner" style={{ marginRight: 4, display: 'inline-block', width: 16, height: 16, border: '2px solid #007bff', borderRadius: '50%', borderTop: '2px solid #f8f8f8', animation: 'spin 1s linear infinite' }}></span>
-                  Processing...
-                </span>
-              ) : (
-                <span style={{ color: '#28a745', marginRight: 8 }}>Done</span>
-              )}
-            </div>
-            <div>
-              <button onClick={() => {
-                const blob = new Blob([s.summary], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `summary_${s.id}.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }} style={{ marginRight: 8 }}>Download</button>
-              <button onClick={() => setSummaries(summaries.filter(x => x.id !== s.id))} style={{ marginRight: 8, color: '#dc3545' }}>Delete</button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {showDetail && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.4)', zIndex: 1000 }} onClick={() => setShowDetail(null)}>
-          <div style={{ background: '#fff', maxWidth: 700, margin: '5vh auto', padding: 32, borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.12)', position: 'relative' }} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowDetail(null)} style={{ position: 'absolute', top: 16, right: 16, fontSize: 18, background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
-            <h2 style={{ marginBottom: 16 }}>Summary Details</h2>
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ fontWeight: 'bold', marginRight: 8 }}>{summaries.find(s => s.id === showDetail)?.type.toUpperCase()}</span>
-              <span style={{ color: '#888', marginRight: 8 }}>{summaries.find(s => s.id === showDetail)?.date}</span>
-            </div>
-            <div style={{ fontSize: 18, lineHeight: 1.7, color: '#222', background: '#f6f6f6', padding: 24, borderRadius: 8, whiteSpace: 'pre-wrap', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              {summaries.find(s => s.id === showDetail)?.summary}
-            </div>
-          </div>
-        </div>
-      )}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+    <Container maxWidth="md" sx={{ py: { xs: 2, md: 6 } }}>
+      {/* Title and slogan handled by Header.jsx */}
+      <Box component="form" onSubmit={handleSubmit} display="flex" flexDirection={{ xs: 'column', md: 'row' }} alignItems="center" gap={2} mb={5}>
+        <TextField
+          inputRef={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="Paste URL, YouTube link, playlist, or text"
+          variant="outlined"
+          fullWidth
+          size="large"
+        />
+        <Tooltip title="Paste from clipboard">
+          <IconButton color="primary" onClick={() => navigator.clipboard.readText().then(text => setInput(text))}>
+            <ContentPaste />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Upload file">
+          <IconButton color="primary" component="label">
+            <FileOpen />
+            <input type="file" hidden onChange={e => {
+              if (e.target.files[0]) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                  const fileType = file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.docx') ? 'docx' : 'txt';
+                  const fileData = ev.target.result;
+                  const res = await axios.post('/api/summarize-file', { fileData, fileType });
+                  setSummaries([res.data, ...summaries]);
+                };
+                reader.readAsArrayBuffer(file);
+              }
+            }} />
+          </IconButton>
+        </Tooltip>
+        <Button type="submit" variant="contained" size="large" sx={{ minWidth: 140, fontWeight: 600 }}>
+          Summarize
+        </Button>
+      </Box>
+      <Box mb={3}>
+        <Typography variant="h4" fontWeight={600} mb={2} color="primary.main">
+          Saved Summaries
+        </Typography>
+        <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 4 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Type</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>URL</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {summaries.map(s => (
+                <TableRow key={s.id} hover>
+                  <TableCell>{s.type?.toUpperCase()}</TableCell>
+                  <TableCell>{s.date ? new Date(s.date).toLocaleString() : ''}</TableCell>
+                  <TableCell>
+                    {s.status === 'loading' ? (
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <CircularProgress size={20} color="primary" /> Processing...
+                      </Box>
+                    ) : (
+                      <Typography color="success.main">Done</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>{s.name}</TableCell>
+                  <TableCell>{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'none' }}>{s.url}</a> : ''}</TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Download">
+                      <IconButton onClick={() => {
+                        const blob = new Blob([s.summary], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `summary_${s.id}.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}>
+                        <Download />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton color="error" onClick={async () => {
+                        await axios.delete(`/api/summaries/${s.id}`);
+                        setSummaries(summaries.filter(x => x.id !== s.id));
+                      }}>
+                        <Delete />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Details">
+                      <IconButton color="primary" onClick={() => setShowDetail(s.id)}>
+                        <Info />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+      <Dialog open={!!showDetail} onClose={() => setShowDetail(null)} maxWidth="sm" fullWidth>
+        {(() => {
+          const detail = summaries.find(s => s.id === showDetail);
+          if (!detail) return null;
+          return (
+            <>
+              <DialogTitle>Summary Details</DialogTitle>
+              <DialogContent dividers>
+                <Box mb={2}>
+                  <Typography variant="subtitle1" fontWeight={700}>{detail.type?.toUpperCase()}</Typography>
+                  <Typography variant="body2" color="text.secondary">{detail.date}</Typography>
+                </Box>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', fontSize: '1.1rem' }}>{detail.summary}</Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setShowDetail(null)} color="primary">Close</Button>
+              </DialogActions>
+            </>
+          );
+        })()}
+      </Dialog>
+    </Container>
   );
 }
 
