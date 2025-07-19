@@ -13,38 +13,55 @@ app.use(bodyParser.json({ limit: '100mb' }));
 // Summarize raw text
 app.post('/api/summarize', async (req, res) => {
   const { text } = req.body;
-  // Auto-detect type
-  let type = 'text', url = '', name = '', status = 'done';
+  let type = 'text', url = '', name = '', status = 'scraping', step = 1, steps = 4;
   if (/^https?:\/\//.test(text)) {
-    type = 'url';
-    url = text;
-    name = text.split('/')[2] || 'Website';
+    type = 'url'; url = text; name = text.split('/')[2] || 'Website';
   } else if (/youtube\.com\/watch\?v=|youtu\.be\//.test(text)) {
-    type = 'youtube';
-    url = text;
-    name = 'YouTube Video';
+    type = 'youtube'; url = text; name = 'YouTube Video';
   } else if (/youtube\.com\/playlist\?list=/.test(text)) {
-    type = 'playlist';
-    url = text;
-    name = 'YouTube Playlist';
+    type = 'playlist'; url = text; name = 'YouTube Playlist';
   } else {
     name = text.slice(0, 32).replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ');
   }
   const date = new Date().toISOString();
-  console.log('[DEBUG] /api/summarize called with text length:', text?.length);
+  const started = Date.now();
   try {
     // Save as in-progress first
-    const inProgress = { summary: '', type, date, status: 'loading', name, url };
+    const inProgress = { summary: '', type, date, status: 'scraping', name, url };
     const id = await saveSummary(inProgress);
-    // Start summarization
-    summarizeText(text).then(async summary => {
-      await saveSummary({ summary, type, date, status: 'done', name, url });
-    });
-    res.json({ id, summary: '', type, date, status: 'loading', name, url });
+    // Step 1: Scraping
+    setTimeout(async () => {
+      await saveSummary({ id, summary: '', type, date, status: 'processing', name, url });
+      // Step 2: Processing
+      const summary = await summarizeText(text);
+      await saveSummary({ id, summary, type, date, status: 'done', name, url });
+    }, 1000);
+    res.json({ id, summary: '', type, date, status: 'scraping', name, url, step, steps, started });
   } catch (err) {
     console.error('[ERROR] /api/summarize:', err);
     res.status(500).json({ error: err.message });
   }
+});
+// Stop summarization
+app.post('/api/summaries/:id/stop', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await require('./storage/db').saveSummary({ id, summary: '', type: '', date: '', status: 'stopped', name: '', url: '' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// Get progress/status for a summary
+app.get('/api/summaries/:id/progress', async (req, res) => {
+  const { id } = req.params;
+  const summaries = await require('./storage/db').getSummaries();
+  const summary = summaries.find(s => s.id == id);
+  if (!summary) return res.status(404).json({ error: 'Not found' });
+  // Calculate elapsed time
+  const started = summary.started || summary.date;
+  const elapsed = started ? Math.floor((Date.now() - new Date(started).getTime()) / 1000) : null;
+  res.json({ ...summary, elapsed });
 });
 
 // Scrape and summarize a URL
@@ -136,7 +153,7 @@ app.delete('/api/summaries/:id', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 5174;
 app.listen(PORT, () => {
   console.log(`Sawron backend running on http://localhost:${PORT}`);
 });

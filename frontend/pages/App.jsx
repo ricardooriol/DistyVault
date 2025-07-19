@@ -22,7 +22,8 @@ import {
   CircularProgress,
   useMediaQuery
 } from '@mui/material';
-import { FileOpen, ContentPaste, Download, Delete, Info } from '@mui/icons-material';
+import { FileOpen, ContentPaste, Download, Delete, Info, PictureAsPdf, Stop } from '@mui/icons-material';
+import jsPDF from 'jspdf';
 
 function App() {
   const [input, setInput] = useState('');
@@ -32,16 +33,20 @@ function App() {
   const inputRef = useRef();
 
   useEffect(() => {
-    axios.get('/api/summaries').then(res => {
+    const fetchSummaries = async () => {
+      const res = await axios.get('/api/summaries');
       setSummaries(res.data.summaries);
-    });
+    };
+    fetchSummaries();
+    const interval = setInterval(fetchSummaries, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoadingId('pending');
     const res = await axios.post('/api/summarize', { text: input });
-    setSummaries([res.data, ...summaries]);
+    setSummaries([res.data, ...summaries.filter(s => s.id !== res.data.id)]);
     setInput('');
     setLoadingId(null);
   };
@@ -97,6 +102,7 @@ function App() {
                 <TableCell>Type</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Elapsed</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>URL</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -108,18 +114,30 @@ function App() {
                   <TableCell>{s.type?.toUpperCase()}</TableCell>
                   <TableCell>{s.date ? new Date(s.date).toLocaleString() : ''}</TableCell>
                   <TableCell>
-                    {s.status === 'loading' ? (
+                    {s.status === 'scraping' && (
                       <Box display="flex" alignItems="center" gap={1}>
-                        <CircularProgress size={20} color="primary" /> Processing...
+                        <CircularProgress size={20} color="primary" /> Scraping / Step 1 of 4
                       </Box>
-                    ) : (
+                    )}
+                    {s.status === 'processing' && (
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <CircularProgress size={20} color="primary" /> Processing / Step 2 of 4
+                      </Box>
+                    )}
+                    {s.status === 'done' && (
                       <Typography color="success.main">Done</Typography>
                     )}
+                    {s.status === 'stopped' && (
+                      <Typography color="error.main">Stopped</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {s.date && <ElapsedTime start={s.date} />}
                   </TableCell>
                   <TableCell>{s.name}</TableCell>
                   <TableCell>{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'none' }}>{s.url}</a> : ''}</TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Download">
+                    <Tooltip title="Download TXT">
                       <IconButton onClick={() => {
                         const blob = new Blob([s.summary], { type: 'text/plain' });
                         const url = URL.createObjectURL(blob);
@@ -132,6 +150,29 @@ function App() {
                         <Download />
                       </IconButton>
                     </Tooltip>
+                    <Tooltip title="Download PDF">
+                      <IconButton onClick={() => {
+                        const doc = new jsPDF();
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(18);
+                        doc.text(s.name || 'Summary', 10, 20);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(12);
+                        doc.text(s.summary || '', 10, 40, { maxWidth: 180 });
+                        doc.save(`summary_${s.id}.pdf`);
+                      }}>
+                        <PictureAsPdf />
+                      </IconButton>
+                    </Tooltip>
+                    {(s.status === 'scraping' || s.status === 'processing') && (
+                      <Tooltip title="Stop">
+                        <IconButton color="error" onClick={async () => {
+                          await axios.post(`/api/summaries/${s.id}/stop`);
+                        }}>
+                          <Stop />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="Delete">
                       <IconButton color="error" onClick={async () => {
                         await axios.delete(`/api/summaries/${s.id}`);
@@ -148,6 +189,21 @@ function App() {
                   </TableCell>
                 </TableRow>
               ))}
+// Helper component for elapsed time
+function ElapsedTime({ start }) {
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    const update = () => {
+      setElapsed(Math.floor((Date.now() - new Date(start).getTime()) / 1000));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [start]);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return <span>{mins}:{secs.toString().padStart(2, '0')}</span>;
+}
             </TableBody>
           </Table>
         </TableContainer>

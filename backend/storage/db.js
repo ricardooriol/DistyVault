@@ -14,16 +14,27 @@ db.serialize(() => {
   )`);
 });
 
-function saveSummary({ summary, type, date, status, name, url }) {
+function saveSummary({ id, summary, type, date, status, name, url }) {
   return new Promise((resolve, reject) => {
-    db.run(
-      'INSERT INTO summaries (summary, type, date, status, name, url) VALUES (?, ?, ?, ?, ?, ?)',
-      [summary, type, date, status, name, url],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.lastID);
-      }
-    );
+    if (id) {
+      db.run(
+        'UPDATE summaries SET summary=?, type=?, date=?, status=?, name=?, url=? WHERE id=?',
+        [summary, type, date, status, name, url, id],
+        function (err) {
+          if (err) return reject(err);
+          resolve(id);
+        }
+      );
+    } else {
+      db.run(
+        'INSERT INTO summaries (summary, type, date, status, name, url) VALUES (?, ?, ?, ?, ?, ?)',
+        [summary, type, date, status, name, url],
+        function (err) {
+          if (err) return reject(err);
+          resolve(this.lastID);
+        }
+      );
+    }
   });
 }
 
