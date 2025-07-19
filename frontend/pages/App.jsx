@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ElapsedTime } from '../components/ElapsedTime';
 import axios from 'axios';
 import {
   Container,
@@ -189,21 +190,6 @@ function App() {
                   </TableCell>
                 </TableRow>
               ))}
-// Helper component for elapsed time
-function ElapsedTime({ start }) {
-  const [elapsed, setElapsed] = React.useState(0);
-  React.useEffect(() => {
-    const update = () => {
-      setElapsed(Math.floor((Date.now() - new Date(start).getTime()) / 1000));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [start]);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  return <span>{mins}:{secs.toString().padStart(2, '0')}</span>;
-}
             </TableBody>
           </Table>
         </TableContainer>
