@@ -54,7 +54,7 @@ function App() {
           inputRef={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Paste URL, YouTube link, playlist, or text"
+          placeholder="Paste URL or YouTube link"
           variant="outlined"
           fullWidth
           size="large"

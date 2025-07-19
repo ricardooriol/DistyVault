@@ -2,9 +2,9 @@
 
 ## Starting Sawron
 
-1. Make sure Ollama is installed and running locally with the Llama 3 model:
+1. Make sure Ollama is installed and running locally with the phi4-mini model:
    ```sh
-   ollama pull llama3
+   ollama pull phi4-mini
    ollama serve
    ```
 2. In the project root, run:
