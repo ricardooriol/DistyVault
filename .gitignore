@@ -1,2 +1,7 @@
+node_modules/
+data/
+uploads/
 .DS_Store
-backend/storage/sawron.db
+npm-debug.log
+yarn-error.log
+.env

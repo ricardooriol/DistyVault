@@ -1,16 +1,17 @@
 // SAWRON App JavaScript
 class SawronApp {
     constructor() {
-        this.summaries = [];
+        this.knowledgeBase = [];
         this.currentFilter = 'all';
         this.selectedFile = null;
-        this.currentUrlType = null;
+        this.refreshInterval = null;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        this.loadSummaries();
+        this.loadKnowledgeBase();
+        this.startAutoRefresh();
     }
 
     setupEventListeners() {
@@ -28,18 +29,30 @@ class SawronApp {
 
         // Search and filter
         document.getElementById('search-input').addEventListener('input', (e) => {
-            this.filterSummaries(e.target.value, this.currentFilter);
+            this.filterKnowledgeBase(e.target.value, this.currentFilter);
         });
         
         document.getElementById('filter-select').addEventListener('change', (e) => {
             this.currentFilter = e.target.value;
-            this.filterSummaries(document.getElementById('search-input').value, this.currentFilter);
+            this.filterKnowledgeBase(document.getElementById('search-input').value, this.currentFilter);
         });
 
         // Modal close
         document.getElementById('summary-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 this.closeSummaryModal();
+            }
+        });
+        
+        document.getElementById('raw-content-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                this.closeRawContentModal();
+            }
+        });
+        
+        document.getElementById('logs-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                this.closeLogsModal();
             }
         });
 
@@ -74,8 +87,6 @@ class SawronApp {
         // Update button states
         this.updateButtonStates();
     }
-
-
 
     handleFileSelection(files) {
         if (!files || files.length === 0) return;
@@ -140,8 +151,6 @@ class SawronApp {
         }
     }
 
-
-
     showStatus(message, progress = 0) {
         const statusSection = document.getElementById('status-section');
         const statusMessage = document.getElementById('status-message');
@@ -150,6 +159,8 @@ class SawronApp {
         statusSection.style.display = 'block';
         statusMessage.textContent = message;
         progressFill.style.width = `${progress}%`;
+        
+        console.log(`Status: ${message} (${progress}%)`);
     }
 
     hideStatus() {
@@ -169,194 +180,434 @@ class SawronApp {
             if (this.selectedFile) {
                 // Process file
                 this.showStatus(`Processing ${this.selectedFile.name}...`, 25);
-                await this.simulateProcessing();
                 
-                const summary = {
-                    id: Date.now().toString(),
-                    title: `${this.selectedFile.name} Summary`,
-                    content: this.generateMockSummary('file'),
-                    source: { type: 'file', filename: this.selectedFile.name },
-                    createdAt: new Date(),
-                    metadata: { wordCount: 250, processingTime: 4.1 }
-                };
+                const formData = new FormData();
+                formData.append('file', this.selectedFile);
                 
-                this.addSummary(summary);
+                console.log(`Uploading file: ${this.selectedFile.name} (${this.selectedFile.size} bytes)`);
+                
+                const response = await fetch('/api/process/file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to process file');
+                }
+                
+                const result = await response.json();
+                console.log('File processing started:', result);
+                
+                this.showStatus(`File uploaded. Processing in background...`, 100);
+                setTimeout(() => this.hideStatus(), 2000);
+                
                 this.removeFile();
+                this.loadKnowledgeBase();
                 
             } else if (url) {
-                // TODO: Detect URL type and validate URL
-                // For now, process as generic content
-                this.showStatus('Processing content...', 25);
-                await this.simulateProcessing();
+                // Process URL
+                this.showStatus('Processing URL...', 25);
                 
-                const summary = {
-                    id: Date.now().toString(),
-                    title: 'Content Summary',
-                    content: this.generateMockSummary('url'),
-                    source: { type: 'url', originalUrl: url },
-                    createdAt: new Date(),
-                    metadata: { wordCount: 200, processingTime: 3.2 }
-                };
+                console.log(`Processing URL: ${url}`);
                 
-                this.addSummary(summary);
+                const response = await fetch('/api/process/url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to process URL');
+                }
+                
+                const result = await response.json();
+                console.log('URL processing started:', result);
+                
+                this.showStatus(`URL submitted. Processing in background...`, 100);
+                setTimeout(() => this.hideStatus(), 2000);
+                
                 mainInput.value = '';
+                this.loadKnowledgeBase();
             }
             
-            this.hideStatus();
             this.updateButtonStates();
             
         } catch (error) {
             console.error('Error during summarization:', error);
-            alert('Error during processing. Please try again.');
+            alert('Error: ' + error.message);
             this.hideStatus();
         }
     }
 
-    generateMockSummary(type) {
-        const summaries = {
-            url: `1. The primary concept explored in this content demonstrates how information architecture influences user decision-making processes.
-
-This fundamental principle reveals that the way information is structured and presented directly impacts how users navigate, understand, and act upon content. When information is logically organized with clear hierarchies and intuitive pathways, users can more efficiently process complex data and make informed decisions. The architecture serves as a cognitive framework that reduces mental load and guides attention to the most relevant elements.
-
-2. Effective content strategy requires balancing comprehensive coverage with accessible presentation to maximize knowledge retention.
-
-The challenge lies in distilling complex topics into digestible formats without losing essential nuance or depth. This involves strategic use of progressive disclosure, where basic concepts are presented first, followed by more detailed explanations for those seeking deeper understanding. The goal is to create multiple entry points for different audience needs while maintaining coherence across all levels of detail.`,
-
-            youtube: `1. The speaker establishes that mastering any complex skill requires understanding the underlying principles rather than memorizing surface-level techniques.
-
-This approach shifts focus from rote learning to conceptual understanding, enabling learners to adapt their knowledge to new situations. When you grasp the fundamental principles governing a domain, you can derive specific techniques as needed rather than relying on memorized procedures. This creates more flexible, transferable knowledge that remains valuable even as specific tools and methods evolve.
-
-2. Consistent practice with immediate feedback creates the optimal learning environment for skill development and knowledge retention.
-
-The feedback loop between action and result allows for rapid adjustment and improvement. Without this immediate response, learners may reinforce incorrect patterns or miss opportunities for optimization. The key is creating systems that provide clear, actionable feedback that directly relates to the desired outcome, enabling continuous refinement of both understanding and execution.`,
-
-            playlist: `1. The series demonstrates that comprehensive learning requires systematic progression through interconnected concepts rather than isolated topic consumption.
-
-Each video builds upon previous knowledge while introducing new elements that expand understanding. This scaffolded approach ensures that complex ideas are properly supported by foundational concepts, preventing knowledge gaps that could undermine later learning. The sequential structure also allows for reinforcement of key principles across multiple contexts, strengthening retention and application ability.
-
-2. Effective educational content balances theoretical frameworks with practical applications to maximize both understanding and usability.
-
-The combination of conceptual explanation and real-world examples creates multiple pathways for comprehension. Theoretical frameworks provide the structural understanding necessary for principled thinking, while practical applications demonstrate relevance and utility. This dual approach accommodates different learning preferences and ensures that knowledge can be both understood intellectually and applied practically.`,
-
-            file: `1. The document establishes that systematic analysis of complex information requires structured approaches that break down overwhelming content into manageable components.
-
-This methodology involves identifying key themes, extracting essential arguments, and understanding the relationships between different concepts. By applying consistent analytical frameworks, readers can navigate dense material more effectively and retain important insights. The structure provides a cognitive scaffold that supports deeper comprehension and enables more effective knowledge synthesis.
-
-2. Critical evaluation of source material demands understanding both explicit content and implicit assumptions that shape the presented arguments.
-
-Every document contains underlying premises and contextual factors that influence its conclusions. Effective analysis requires identifying these foundational assumptions and evaluating their validity within the broader context. This deeper level of engagement reveals not just what the content says, but why it says it and what limitations might affect its applicability to different situations.`
-        };
-        
-        return summaries[type] || summaries.url;
+    startAutoRefresh() {
+        // Refresh knowledge base every 5 seconds to update status
+        this.refreshInterval = setInterval(() => {
+            this.loadKnowledgeBase();
+        }, 5000);
     }
 
-    async simulateProcessing(duration = 2000) {
-        return new Promise(resolve => setTimeout(resolve, duration));
-    }
-
-    addSummary(summary) {
-        this.summaries.unshift(summary);
-        this.saveSummaries();
-        this.renderSummaries();
-    }
-
-    loadSummaries() {
-        const saved = localStorage.getItem('sawron-summaries');
-        if (saved) {
-            this.summaries = JSON.parse(saved).map(s => ({
-                ...s,
-                createdAt: new Date(s.createdAt)
-            }));
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
         }
-        this.renderSummaries();
     }
 
-    saveSummaries() {
-        localStorage.setItem('sawron-summaries', JSON.stringify(this.summaries));
-    }
-
-    renderSummaries() {
-        const grid = document.getElementById('summaries-grid');
-        
-        if (this.summaries.length === 0) {
-            grid.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">🎯</div>
-                    <h3>Ready to Process Knowledge</h3>
-                    <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
-                </div>
-            `;
-            return;
+    async loadKnowledgeBase() {
+        try {
+            const response = await fetch('/api/summaries');
+            if (!response.ok) {
+                throw new Error('Failed to load knowledge base');
+            }
+            
+            this.knowledgeBase = await response.json();
+            this.renderKnowledgeBase();
+        } catch (error) {
+            console.error('Error loading knowledge base:', error);
         }
-
-        grid.innerHTML = this.summaries.map(summary => `
-            <div class="summary-card" onclick="app.showSummaryModal('${summary.id}')">
-                <div class="summary-header">
-                    <span class="summary-type">${this.getTypeLabel(summary.source.type)}</span>
-                    <span class="summary-date">${this.formatDate(summary.createdAt)}</span>
-                </div>
-                <h3 class="summary-title">${summary.title}</h3>
-                <p class="summary-preview">${summary.content.substring(0, 150)}...</p>
-            </div>
-        `).join('');
     }
 
-    filterSummaries(searchTerm, type) {
-        let filtered = this.summaries;
+    filterKnowledgeBase(searchTerm, type) {
+        let filtered = this.knowledgeBase;
         
         if (type !== 'all') {
-            filtered = filtered.filter(s => s.source.type === type);
+            filtered = filtered.filter(s => s.sourceType === type);
         }
         
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(s => 
-                s.title.toLowerCase().includes(term) ||
-                s.content.toLowerCase().includes(term)
+                (s.title && s.title.toLowerCase().includes(term)) ||
+                (s.content && s.content.toLowerCase().includes(term))
             );
         }
         
-        const grid = document.getElementById('summaries-grid');
-        if (filtered.length === 0) {
-            grid.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    <h3>No Results Found</h3>
-                    <p>Try adjusting your search or filter criteria.</p>
-                </div>
+        this.renderFilteredKnowledgeBase(filtered);
+    }
+
+    renderKnowledgeBase() {
+        const searchTerm = document.getElementById('search-input').value;
+        this.filterKnowledgeBase(searchTerm, this.currentFilter);
+    }
+
+    renderFilteredKnowledgeBase(items) {
+        const tbody = document.getElementById('knowledge-base-tbody');
+        
+        if (!items || items.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-state-cell">
+                        <div class="empty-state">
+                            <div class="empty-icon">🎯</div>
+                            <h3>Ready to Process Knowledge</h3>
+                            <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                        </div>
+                    </td>
+                </tr>
             `;
             return;
         }
-        
-        grid.innerHTML = filtered.map(summary => `
-            <div class="summary-card" onclick="app.showSummaryModal('${summary.id}')">
-                <div class="summary-header">
-                    <span class="summary-type">${this.getTypeLabel(summary.source.type)}</span>
-                    <span class="summary-date">${this.formatDate(summary.createdAt)}</span>
-                </div>
-                <h3 class="summary-title">${summary.title}</h3>
-                <p class="summary-preview">${summary.content.substring(0, 150)}...</p>
-            </div>
-        `).join('');
+
+        tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
     }
 
-    showSummaryModal(summaryId) {
-        const summary = this.summaries.find(s => s.id === summaryId);
-        if (!summary) return;
-
-        document.getElementById('modal-title').textContent = summary.title;
-        document.getElementById('summary-meta').innerHTML = `
-            <strong>Source:</strong> ${this.getSourceDisplay(summary.source)}<br>
-            <strong>Created:</strong> ${this.formatDate(summary.createdAt)}<br>
-            <strong>Word Count:</strong> ${summary.metadata.wordCount} words<br>
-            <strong>Processing Time:</strong> ${summary.metadata.processingTime}s
+    createTableRow(item) {
+        const status = item.status;
+        const isCompleted = status === 'completed';
+        const isProcessing = ['initializing', 'extracting', 'summarizing'].includes(status);
+        const isError = status === 'error';
+        
+        let statusClass = '';
+        let statusIcon = '';
+        
+        if (isCompleted) {
+            statusClass = 'status-completed';
+            statusIcon = '✅';
+        } else if (isProcessing) {
+            statusClass = 'status-processing';
+            statusIcon = '⏳';
+        } else if (isError) {
+            statusClass = 'status-error';
+            statusIcon = '❌';
+        }
+        
+        const title = item.title || 'Processing...';
+        
+        // Format source display
+        let sourceDisplay = '';
+        if (item.sourceUrl) {
+            sourceDisplay = `<a href="${item.sourceUrl}" target="_blank" class="source-link">${this.truncateText(item.sourceUrl, 30)}</a>`;
+        } else if (item.sourceFile) {
+            sourceDisplay = `<span class="file-source">${item.sourceFile.name}</span>`;
+        }
+        
+        // Format status display with step
+        const statusDisplay = `
+            <div class="status-cell ${statusClass}">
+                <span class="status-icon">${statusIcon}</span>
+                <span class="status-text">${status.toUpperCase()}</span>
+                ${item.processingStep ? `<div class="processing-step">${item.processingStep}</div>` : ''}
+            </div>
         `;
-        document.getElementById('summary-content').innerHTML = this.formatContent(summary.content);
-        document.getElementById('summary-modal').style.display = 'block';
+        
+        // Format elapsed time
+        let elapsedTimeDisplay = '-';
+        if (item.elapsedTime) {
+            const minutes = Math.floor(item.elapsedTime / 60);
+            const seconds = Math.floor(item.elapsedTime % 60);
+            elapsedTimeDisplay = `${minutes}m ${seconds}s`;
+        }
+        
+        // Format created date
+        const createdAt = new Date(item.createdAt);
+        const formattedDate = this.formatDate(createdAt);
+        
+        // Format actions
+        const actions = `
+            <div class="table-actions">
+                ${isCompleted ? `
+                    <button class="action-btn view-btn" onclick="app.showSummaryModal('${item.id}')">
+                        View
+                    </button>
+                    <button class="action-btn download-btn" onclick="app.downloadSummary('${item.id}')">
+                        Download
+                    </button>
+                ` : ''}
+                ${isProcessing ? `
+                    <button class="action-btn stop-btn" onclick="app.stopProcessing('${item.id}')">
+                        Stop
+                    </button>
+                ` : ''}
+                ${(isCompleted || isError) && item.rawContent ? `
+                    <button class="action-btn debug-btn" onclick="app.showRawContent('${item.id}')">
+                        Raw
+                    </button>
+                ` : ''}
+                ${item.logs && item.logs.length > 0 ? `
+                    <button class="action-btn debug-btn" onclick="app.showLogs('${item.id}')">
+                        Logs
+                    </button>
+                ` : ''}
+                <button class="action-btn delete-btn" onclick="app.deleteSummary('${item.id}')">
+                    Delete
+                </button>
+            </div>
+        `;
+        
+        return `
+            <tr data-id="${item.id}">
+                <td class="source-cell">${sourceDisplay}</td>
+                <td class="type-cell">${this.getTypeLabel(item.sourceType)}</td>
+                <td class="status-cell">${statusDisplay}</td>
+                <td class="time-cell">${elapsedTimeDisplay}</td>
+                <td class="date-cell">${formattedDate}</td>
+                <td class="actions-cell">${actions}</td>
+            </tr>
+        `;
+    }
+
+    async showSummaryModal(id) {
+        try {
+            const response = await fetch(`/api/summaries/${id}`);
+            if (!response.ok) {
+                throw new Error('Failed to load summary');
+            }
+            
+            const summary = await response.json();
+            
+            document.getElementById('modal-title').textContent = summary.title;
+            
+            let metaHtml = '';
+            
+            if (summary.sourceUrl) {
+                metaHtml += `<strong>Source:</strong> <a href="${summary.sourceUrl}" target="_blank">${summary.sourceUrl}</a><br>`;
+            } else if (summary.sourceFile) {
+                metaHtml += `<strong>Source:</strong> ${summary.sourceFile.name}<br>`;
+            }
+            
+            metaHtml += `<strong>Status:</strong> ${summary.status.toUpperCase()}<br>`;
+            
+            if (summary.processingStep) {
+                metaHtml += `<strong>Processing Step:</strong> ${summary.processingStep}<br>`;
+            }
+            
+            metaHtml += `<strong>Created:</strong> ${this.formatDate(new Date(summary.createdAt))}<br>`;
+            
+            if (summary.completedAt) {
+                metaHtml += `<strong>Completed:</strong> ${this.formatDate(new Date(summary.completedAt))}<br>`;
+            }
+            
+            if (summary.elapsedTime) {
+                const minutes = Math.floor(summary.elapsedTime / 60);
+                const seconds = Math.floor(summary.elapsedTime % 60);
+                metaHtml += `<strong>Elapsed Time:</strong> ${minutes}m ${seconds}s<br>`;
+            }
+            
+            if (summary.processingTime) {
+                metaHtml += `<strong>Processing Time:</strong> ${summary.processingTime.toFixed(1)}s<br>`;
+            }
+            
+            if (summary.wordCount) {
+                metaHtml += `<strong>Word Count:</strong> ${summary.wordCount} words<br>`;
+            }
+            
+            document.getElementById('summary-meta').innerHTML = metaHtml;
+            document.getElementById('summary-content').innerHTML = this.formatContent(summary.content || '');
+            document.getElementById('summary-modal').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error showing summary:', error);
+            alert('Error loading summary: ' + error.message);
+        }
+    }
+
+    async showRawContent(id) {
+        try {
+            const response = await fetch(`/api/summaries/${id}`);
+            if (!response.ok) {
+                throw new Error('Failed to load summary');
+            }
+            
+            const summary = await response.json();
+            
+            if (!summary.rawContent) {
+                alert('No raw content available for this summary');
+                return;
+            }
+            
+            document.getElementById('raw-content-title').textContent = `Raw Content: ${summary.title}`;
+            document.getElementById('raw-content-text').textContent = summary.rawContent;
+            document.getElementById('raw-content-modal').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error showing raw content:', error);
+            alert('Error loading raw content: ' + error.message);
+        }
+    }
+    
+    async showLogs(id) {
+        try {
+            const response = await fetch(`/api/summaries/${id}`);
+            if (!response.ok) {
+                throw new Error('Failed to load summary');
+            }
+            
+            const summary = await response.json();
+            
+            if (!summary.logs || summary.logs.length === 0) {
+                alert('No logs available for this summary');
+                return;
+            }
+            
+            document.getElementById('logs-title').textContent = `Processing Logs: ${summary.title}`;
+            
+            const logsHtml = summary.logs.map(log => {
+                const timestamp = new Date(log.timestamp);
+                const formattedTime = timestamp.toLocaleTimeString();
+                const levelClass = `log-${log.level}`;
+                
+                return `<div class="log-entry ${levelClass}">
+                    <span class="log-time">[${formattedTime}]</span>
+                    <span class="log-message">${log.message}</span>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('logs-content').innerHTML = logsHtml;
+            document.getElementById('logs-modal').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error showing logs:', error);
+            alert('Error loading logs: ' + error.message);
+        }
     }
 
     closeSummaryModal() {
         document.getElementById('summary-modal').style.display = 'none';
+    }
+    
+    closeRawContentModal() {
+        document.getElementById('raw-content-modal').style.display = 'none';
+    }
+    
+    closeLogsModal() {
+        document.getElementById('logs-modal').style.display = 'none';
+    }
+
+    async downloadSummary(id) {
+        try {
+            const response = await fetch(`/api/summaries/${id}/pdf`);
+            
+            if (response.status === 501) {
+                alert('PDF download not yet implemented');
+                return;
+            }
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to download summary');
+            }
+            
+            // Handle PDF download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `summary-${id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error('Error downloading summary:', error);
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async stopProcessing(id) {
+        try {
+            const response = await fetch(`/api/summaries/${id}/stop`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to stop processing');
+            }
+            
+            this.loadKnowledgeBase();
+            
+        } catch (error) {
+            console.error('Error stopping processing:', error);
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async deleteSummary(id) {
+        if (!confirm('Are you sure you want to delete this summary?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/summaries/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to delete summary');
+            }
+            
+            this.loadKnowledgeBase();
+            
+        } catch (error) {
+            console.error('Error deleting summary:', error);
+            alert('Error: ' + error.message);
+        }
     }
 
     getTypeLabel(type) {
@@ -369,21 +620,6 @@ Every document contains underlying premises and contextual factors that influenc
         return labels[type] || type;
     }
 
-    getSourceDisplay(source) {
-        switch (source.type) {
-            case 'url':
-                return source.originalUrl;
-            case 'youtube':
-                return `${source.videoTitle} (${source.originalUrl})`;
-            case 'playlist':
-                return `${source.videoTitle} from playlist`;
-            case 'file':
-                return source.filename;
-            default:
-                return 'Unknown';
-        }
-    }
-
     formatDate(date) {
         return new Intl.DateTimeFormat('en-US', {
             month: 'short',
@@ -394,12 +630,19 @@ Every document contains underlying premises and contextual factors that influenc
     }
 
     formatContent(content) {
+        if (!content) return '';
+        
         return content.split('\n').map(line => {
             if (line.match(/^\d+\./)) {
                 return `<p><strong>${line}</strong></p>`;
             }
             return `<p>${line}</p>`;
         }).join('');
+    }
+    
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
     }
 }
 
@@ -433,6 +676,18 @@ function removeFile() {
 
 function closeSummaryModal() {
     app.closeSummaryModal();
+}
+
+function closeRawContentModal() {
+    app.closeRawContentModal();
+}
+
+function closeLogsModal() {
+    app.closeLogsModal();
+}
+
+function refreshKnowledgeBase() {
+    app.loadKnowledgeBase();
 }
 
 // Initialize app

@@ -83,30 +83,70 @@
                 </div>
             </section>
 
-            <!-- Summaries Section -->
-            <section class="summaries-section">
-                <div class="summaries-header">
+            <!-- Knowledge Base Section -->
+            <section class="knowledge-base-section">
+                <div class="knowledge-base-header">
                     <h2 class="section-title">Knowledge Base</h2>
-                    <div class="summaries-controls">
-                        <input type="text" id="search-input" placeholder="Search summaries..." class="search-input">
+                    <div class="knowledge-base-controls">
+                        <input type="text" id="search-input" placeholder="Search knowledge base..." class="search-input">
                         <select id="filter-select" class="filter-select">
-                            <option value="all">All Summaries</option>
-                            <option value="file">Documents</option>
+                            <option value="all">All Types</option>
                             <option value="url">Web Pages</option>
                             <option value="youtube">YouTube Videos</option>
                             <option value="playlist">YouTube Playlists</option>
+                            <option value="file">Documents</option>
                         </select>
+                        <button class="refresh-btn" onclick="refreshKnowledgeBase()">
+                            <span class="btn-icon">🔄</span>
+                            <span class="btn-text">Refresh</span>
+                        </button>
                     </div>
                 </div>
-                <div class="summaries-grid" id="summaries-grid">
-                    <!-- Summaries will be populated here -->
-                    <div class="empty-state">
-                        <div class="empty-icon">🎯</div>
-                        <h3>Ready to Process Knowledge</h3>
-                        <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
-                    </div>
+                
+                <div class="knowledge-base-table-container">
+                    <table class="knowledge-base-table" id="knowledge-base-table">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Elapsed Time</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="knowledge-base-tbody">
+                            <!-- Table rows will be populated here -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
+            
+            <!-- Raw Content Modal -->
+            <div class="modal" id="raw-content-modal">
+                <div class="modal-content large-modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title" id="raw-content-title">Raw Content</h3>
+                        <button class="modal-close" onclick="closeRawContentModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <pre id="raw-content-text" class="raw-content"></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Logs Modal -->
+            <div class="modal" id="logs-modal">
+                <div class="modal-content large-modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title" id="logs-title">Processing Logs</h3>
+                        <button class="modal-close" onclick="closeLogsModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="logs-content" class="logs-content"></div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
