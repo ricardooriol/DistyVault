@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAWRON - Connect the Dots & Fill the Gaps</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">🧠</span>
+                    SAWRON
+                </h1>
+                <p class="tagline">Connect the Dots & Fill the Gaps</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="main-input-group">
+                    <div class="url-input-container">
+                        <input type="text" id="main-input" placeholder="Insert URL" class="main-input-field">
+                        <button class="paste-btn" id="paste-btn" onclick="pasteFromClipboard()">
+                            <span class="btn-icon">📋</span>
+                            <span class="btn-text">Paste</span>
+                        </button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="upload-btn" id="upload-btn" onclick="triggerFileUpload()">
+                            <span class="btn-icon">📄</span>
+                            <span class="btn-text">Upload File</span>
+                        </button>
+
+                        <button class="summarize-btn disabled" id="summarize-btn" onclick="startSummarization()">
+                            <span class="btn-icon">⚡</span>
+                            <span class="btn-text">Summarize</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hidden file input -->
+                <input type="file" id="file-input" accept=".pdf,.docx,.txt" hidden>
+
+                <!-- File display area -->
+                <div class="file-display" id="file-display" style="display: none;">
+                    <div class="file-info">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name" id="file-name"></span>
+                        <button class="remove-file-btn" onclick="removeFile()">×</button>
+                    </div>
+                </div>
+
+                <!-- URL type indicator -->
+                <div class="url-type-indicator" id="url-type-indicator" style="display: none;">
+                    <span class="type-icon" id="type-icon"></span>
+                    <span class="type-text" id="type-text"></span>
+                </div>
+            </section>
+
+            <!-- Processing Status -->
+            <section class="status-section" id="status-section" style="display: none;">
+                <div class="status-card">
+                    <div class="status-header">
+                        <div class="status-icon">⚡</div>
+                        <h3 class="status-title">Processing Content</h3>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p class="status-message" id="status-message">Initializing...</p>
+                </div>
+            </section>
+
+            <!-- Summaries Section -->
+            <section class="summaries-section">
+                <div class="summaries-header">
+                    <h2 class="section-title">Knowledge Base</h2>
+                    <div class="summaries-controls">
+                        <input type="text" id="search-input" placeholder="Search summaries..." class="search-input">
+                        <select id="filter-select" class="filter-select">
+                            <option value="all">All Types</option>
+                            <option value="url">Web Pages</option>
+                            <option value="youtube">YouTube Videos</option>
+                            <option value="playlist">Playlists</option>
+                            <option value="file">Documents</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="summaries-grid" id="summaries-grid">
+                    <!-- Summaries will be populated here -->
+                    <div class="empty-state">
+                        <div class="empty-icon">🎯</div>
+                        <h3>Ready to Process Knowledge</h3>
+                        <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Summary Modal -->
+    <div class="modal" id="summary-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Summary</h3>
+                <button class="modal-close" onclick="closeSummaryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="summary-meta" id="summary-meta"></div>
+                <div class="summary-content" id="summary-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
