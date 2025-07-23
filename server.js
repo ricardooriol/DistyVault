@@ -49,6 +49,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Serve static files
 app.use(express.static('public'));
 
+// Import AI settings routes
+const aiSettingsRoutes = require('./routes/ai-settings');
+app.use('/api', aiSettingsRoutes);
+
 // API Routes
 app.get('/api/health', async (req, res) => {
     try {

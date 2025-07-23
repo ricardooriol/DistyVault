@@ -1,0 +1,16 @@
+{
+  "mode": "online",
+  "offline": {
+    "model": "llama2",
+    "endpoint": "http://localhost:11434"
+  },
+  "online": {
+    "provider": "google",
+    "apiKey": "AIzaSyByL7LxUHu1JpHUJ9fwnpHS8rtgc0RkuC0",
+    "model": "gemini-2.5-flash",
+    "endpoint": ""
+  },
+  "lastUpdated": "2025-07-23T15:30:23.512Z",
+  "_encrypted": true,
+  "_encryptedAt": "2025-07-23T15:30:23.520Z"
+}

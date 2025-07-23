@@ -22,6 +22,12 @@
                 </h1>
                 <p class="tagline">Connect the Dots & Fill the Gaps</p>
             </div>
+            <div class="header-actions">
+                <button class="settings-btn" onclick="openAISettingsModal()">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">AI Settings</span>
+                </button>
+            </div>
         </header>
 
         <!-- Main Content -->
@@ -160,6 +166,112 @@
             <div class="modal-body">
                 <div class="summary-meta" id="summary-meta"></div>
                 <div class="summary-content" id="summary-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Settings Modal -->
+    <div class="modal" id="ai-settings-modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">AI Provider Settings</h3>
+                <button class="modal-close" onclick="closeAISettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="ai-provider-config">
+                    <!-- Mode Toggle -->
+                    <div class="config-section">
+                        <h4 class="config-section-title">AI Provider Mode</h4>
+                        <div class="mode-toggle-container">
+                            <div class="mode-toggle">
+                                <input type="checkbox" id="mode-toggle" onchange="handleModeToggle()">
+                                <label for="mode-toggle" class="toggle-slider"></label>
+                            </div>
+                            <div class="mode-labels">
+                                <span class="mode-label" id="offline-label">Offline (Ollama)</span>
+                                <span class="mode-label" id="online-label">Online (Cloud)</span>
+                            </div>
+                        </div>
+                        <p class="mode-description" id="mode-description">
+                            Use local Ollama installation for AI processing
+                        </p>
+                    </div>
+
+                    <!-- Offline Configuration -->
+                    <div class="config-section" id="offline-config">
+                        <h4 class="config-section-title">Ollama Configuration</h4>
+                        <div class="form-group">
+                            <label for="ollama-model" class="form-label">Model Name:</label>
+                            <input type="text" id="ollama-model" class="form-input" placeholder="llama2">
+                            <small class="form-help">Enter the name of the Ollama model to use</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ollama-endpoint" class="form-label">Endpoint:</label>
+                            <input type="text" id="ollama-endpoint" class="form-input" placeholder="http://localhost:11434">
+                            <small class="form-help">Ollama server endpoint URL</small>
+                        </div>
+                        <button class="test-btn" id="test-ollama-btn" onclick="testOllamaConnection()">
+                            <span class="btn-icon">🔍</span>
+                            <span class="btn-text">Test Connection</span>
+                        </button>
+                    </div>
+
+                    <!-- Online Configuration -->
+                    <div class="config-section hidden" id="online-config">
+                        <h4 class="config-section-title">Cloud AI Provider</h4>
+                        <div class="form-group">
+                            <label for="provider-select" class="form-label">AI Provider:</label>
+                            <select id="provider-select" class="form-select" onchange="handleProviderChange()">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic Claude</option>
+                                <option value="google">Google Gemini</option>
+                                <option value="microsoft">Microsoft Copilot</option>
+                                <option value="grok">Grok</option>
+                                <option value="deepseek">Deepseek</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="api-key" class="form-label">API Key:</label>
+                            <div class="api-key-input-container">
+                                <input type="password" id="api-key" class="form-input" placeholder="Enter your API key">
+                                <button class="toggle-visibility-btn" onclick="toggleApiKeyVisibility()">
+                                    <span id="visibility-icon">👁️</span>
+                                </button>
+                            </div>
+                            <small class="form-help" id="api-key-help">Enter your API key for the selected provider</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="model-select" class="form-label">Model:</label>
+                            <select id="model-select" class="form-select">
+                                <!-- Options populated based on provider selection -->
+                            </select>
+                        </div>
+
+                        <button class="test-btn" id="test-provider-btn" onclick="testProviderConnection()">
+                            <span class="btn-icon">🔍</span>
+                            <span class="btn-text">Test API Key</span>
+                        </button>
+                    </div>
+
+                    <!-- Test Results -->
+                    <div class="test-results" id="test-results" style="display: none;">
+                        <div class="test-result-content" id="test-result-content"></div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="modal-actions">
+                        <button class="save-btn" id="save-config-btn" onclick="saveAIConfiguration()">
+                            <span class="btn-icon">💾</span>
+                            <span class="btn-text">Save Configuration</span>
+                        </button>
+                        <button class="reset-btn" onclick="resetAIConfiguration()">
+                            <span class="btn-icon">🔄</span>
+                            <span class="btn-text">Reset to Defaults</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
