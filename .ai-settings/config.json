@@ -6,7 +6,7 @@
   },
   "online": {
     "provider": "google",
-    "apiKey": "AIzaSyByL7LxUHu1JpHUJ9fwnpHS8rtgc0RkuC0",
+    "apiKey": ".",
     "model": "gemini-2.5-flash",
     "endpoint": ""
   },
