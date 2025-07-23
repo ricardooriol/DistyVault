@@ -96,12 +96,33 @@ class OllamaProvider extends AIProvider {
 
             // Check if the specified model is available
             const availableModels = response.data.models.map(model => model.name);
-            if (!availableModels.some(model => model.includes(this.model))) {
+            console.log(`Available Ollama models: ${availableModels.join(', ')}`);
+            console.log(`Looking for model: ${this.model}`);
+            
+            // Check for exact match or partial match (handles :latest suffix)
+            const modelExists = availableModels.some(model => {
+                // Exact match
+                if (model === this.model) return true;
+                
+                // Check if model matches without :latest suffix
+                const modelBase = model.split(':')[0];
+                const requestedBase = this.model.split(':')[0];
+                if (modelBase === requestedBase) return true;
+                
+                // Check if requested model matches with :latest added
+                if (model === `${this.model}:latest`) return true;
+                
+                return false;
+            });
+            
+            if (!modelExists) {
                 return {
                     valid: false,
                     error: `Model "${this.model}" is not available. Available models: ${availableModels.join(', ')}`
                 };
             }
+            
+            console.log(`✅ Model "${this.model}" found in Ollama`);
 
             return { valid: true };
 

@@ -68,7 +68,7 @@ class AIProvider {
             // Test with a simple prompt
             const testText = "This is a test message to verify the AI provider connection.";
             await this.generateSummary(testText, { maxLength: 50 });
-            
+
             const latency = Date.now() - startTime;
             return {
                 success: true,
@@ -142,14 +142,39 @@ class AIProvider {
      * @returns {string} - The formatted prompt
      */
     createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `Please provide a ${style} summary of the following content in approximately ${maxLength} words or less:\n\n`;
-        prompt += `Content:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
+        return this.formatPrompt(text);
+    }
+
+    /**
+     * Format the prompt for knowledge distillation
+     * @param {string} text - The text to analyze
+     * @returns {string} - The formatted prompt
+     */
+    formatPrompt(text) {
+        return `Analyze the text I provide below. Your task is to distill its core knowledge, removing all fluff and focusing only on the essential concepts. Your output should be a lesson, not a summary. Present the information with the following strict structure and style:
+
+Style and Tone:
+Direct and Insightful: Begin immediately with the first key point. Do not use any introductory phrases like "Here is the summary" or other conversational filler.
+Clear and Simple: Explain concepts using plain language. Avoid jargon, buzzwords, and overly complex terminology. The goal is to make complex ideas intuitive and accessible.
+Confident and Educational: Write as an expert distilling knowledge for a capable learner. Your goal is to ensure the core ideas are not just listed, but are fully understood and remembered.
+
+Output Format:
+Organize your entire response as a numbered list. Each point in the list must follow this two-part structure precisely:
+
+The Core Idea Sentence
+Start with a single, memorable sentence that captures one complete, fundamental idea from the text. This sentence should be comprehensive and stand on its own as a key takeaway.
+
+Following that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its implications, and provide the necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works.
+
+The Next Core Idea Sentence
+This follows the same pattern as the first point—a single, impactful sentence summarizing the next fundamental concept.
+
+Again, follow up with one or two paragraphs of in-depth explanation. If the original text is missing crucial context, feel free to add it to ensure the concept is fully grasped. Connect this idea to previous points if it helps build a more cohesive mental model for the reader.
+
+Continue this pattern for as many points as are necessary to cover all the essential knowledge in the document. Do not summarize for the sake of brevity; distill for the sake of clarity and understanding.
+
+Text to Analyze:
+${text}`;
     }
 }
 

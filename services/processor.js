@@ -22,8 +22,13 @@ class Processor {
      */
     async getCurrentAIProvider() {
         try {
+            const settings = this.aiSettingsManager.loadSettings();
+            console.log('Loaded settings in processor:', JSON.stringify(settings, null, 2));
+            
             const config = this.aiSettingsManager.getCurrentProviderConfig();
             console.log(`Using AI provider: ${config.type} with model: ${config.model}`);
+            console.log('Full config:', JSON.stringify(config, null, 2));
+            
             return AIProviderFactory.createProvider(config);
         } catch (error) {
             console.warn(`Failed to create AI provider from settings: ${error.message}`);

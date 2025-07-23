@@ -1,18 +1,20 @@
 /**
  * AI Settings Manager
- * Handles persistent storage and management of AI provider configurations
+ * Handles in-memory storage and management of AI provider configurations
+ * Note: Settings are not persisted to disk for security reasons
  */
 const crypto = require('crypto');
 
+// Shared settings storage across all instances
+let sharedSettings = null;
+
 class AISettingsManager {
     constructor() {
-        this.storageKey = 'ai-provider-settings';
-        this.encryptionKey = this.getOrCreateEncryptionKey();
         this.algorithm = 'aes-256-gcm';
     }
 
     /**
-     * Save AI provider settings
+     * Save AI provider settings (in-memory only)
      * @param {Object} settings - Settings to save
      * @param {string} settings.mode - 'offline' or 'online'
      * @param {Object} settings.offline - Offline configuration
@@ -20,7 +22,7 @@ class AISettingsManager {
      */
     saveSettings(settings) {
         try {
-            console.log('Saving AI provider settings...');
+            console.log('Saving AI provider settings to shared memory...');
             
             // Validate settings structure
             const validation = this.validateSettings(settings);
@@ -28,27 +30,17 @@ class AISettingsManager {
                 throw new Error(`Invalid settings: ${validation.errors.join(', ')}`);
             }
 
-            // Encrypt sensitive data
-            const encryptedSettings = this.encryptSensitiveData(settings);
+            // Store in shared memory only (no disk persistence for security)
+            sharedSettings = { ...settings, lastUpdated: new Date().toISOString() };
             
-            // Save to localStorage (in browser) or file system (in Node.js)
-            if (typeof window !== 'undefined' && window.localStorage) {
-                localStorage.setItem(this.storageKey, JSON.stringify(encryptedSettings));
-            } else {
-                // For Node.js environment, we'll use a simple file-based storage
-                const fs = require('fs');
-                const path = require('path');
-                const settingsDir = path.join(process.cwd(), '.ai-settings');
-                
-                if (!fs.existsSync(settingsDir)) {
-                    fs.mkdirSync(settingsDir, { recursive: true });
+            console.log('AI provider settings saved to shared memory successfully');
+            console.log('Saved settings:', JSON.stringify(sharedSettings, (key, value) => {
+                // Hide API key in logs
+                if (key === 'apiKey' && value) {
+                    return '***HIDDEN***';
                 }
-                
-                const settingsFile = path.join(settingsDir, 'config.json');
-                fs.writeFileSync(settingsFile, JSON.stringify(encryptedSettings, null, 2));
-            }
-            
-            console.log('AI provider settings saved successfully');
+                return value;
+            }, 2));
         } catch (error) {
             console.error('Error saving AI provider settings:', error);
             throw new Error(`Failed to save settings: ${error.message}`);
@@ -56,40 +48,25 @@ class AISettingsManager {
     }
 
     /**
-     * Load AI provider settings
+     * Load AI provider settings (from memory or defaults)
      * @returns {Object} - Loaded settings or default settings
      */
     loadSettings() {
         try {
-            console.log('Loading AI provider settings...');
+            console.log('Loading AI provider settings from shared memory...');
             
-            let storedData = null;
-            
-            // Load from localStorage (in browser) or file system (in Node.js)
-            if (typeof window !== 'undefined' && window.localStorage) {
-                const stored = localStorage.getItem(this.storageKey);
-                if (stored) {
-                    storedData = JSON.parse(stored);
-                }
+            if (sharedSettings) {
+                console.log('AI provider settings loaded from shared memory successfully');
+                console.log('Loaded settings:', JSON.stringify(sharedSettings, (key, value) => {
+                    // Hide API key in logs
+                    if (key === 'apiKey' && value) {
+                        return '***HIDDEN***';
+                    }
+                    return value;
+                }, 2));
+                return sharedSettings;
             } else {
-                // For Node.js environment
-                const fs = require('fs');
-                const path = require('path');
-                const settingsFile = path.join(process.cwd(), '.ai-settings', 'config.json');
-                
-                if (fs.existsSync(settingsFile)) {
-                    const fileContent = fs.readFileSync(settingsFile, 'utf8');
-                    storedData = JSON.parse(fileContent);
-                }
-            }
-            
-            if (storedData) {
-                // Decrypt sensitive data
-                const decryptedSettings = this.decryptSensitiveData(storedData);
-                console.log('AI provider settings loaded successfully');
-                return decryptedSettings;
-            } else {
-                console.log('No stored settings found, using defaults');
+                console.log('No settings in shared memory, using defaults');
                 return this.getDefaultSettings();
             }
         } catch (error) {
@@ -167,193 +144,15 @@ class AISettingsManager {
         };
     }
 
-    /**
-     * Encrypt sensitive data in settings
-     * @param {Object} settings - Settings to encrypt
-     * @returns {Object} - Settings with encrypted sensitive data
-     */
-    encryptSensitiveData(settings) {
-        const encrypted = JSON.parse(JSON.stringify(settings)); // Deep clone
-        
-        // Encrypt API key if present
-        if (encrypted.online && encrypted.online.apiKey) {
-            encrypted.online.apiKey = this.encrypt(encrypted.online.apiKey);
-        }
-        
-        // Mark as encrypted
-        encrypted._encrypted = true;
-        encrypted._encryptedAt = new Date().toISOString();
-        
-        return encrypted;
-    }
+
 
     /**
-     * Decrypt sensitive data in settings
-     * @param {Object} encryptedSettings - Settings with encrypted data
-     * @returns {Object} - Settings with decrypted sensitive data
-     */
-    decryptSensitiveData(encryptedSettings) {
-        if (!encryptedSettings._encrypted) {
-            // Not encrypted, return as-is
-            return encryptedSettings;
-        }
-        
-        const decrypted = JSON.parse(JSON.stringify(encryptedSettings)); // Deep clone
-        
-        // Decrypt API key if present
-        if (decrypted.online && decrypted.online.apiKey) {
-            try {
-                decrypted.online.apiKey = this.decrypt(decrypted.online.apiKey);
-            } catch (error) {
-                console.warn('Failed to decrypt API key, clearing it');
-                decrypted.online.apiKey = '';
-            }
-        }
-        
-        // Remove encryption metadata
-        delete decrypted._encrypted;
-        delete decrypted._encryptedAt;
-        
-        return decrypted;
-    }
-
-    /**
-     * Encrypt a string
-     * @param {string} text - Text to encrypt
-     * @returns {string} - Encrypted text (base64 encoded)
-     */
-    encrypt(text) {
-        if (!text) return '';
-        
-        try {
-            const iv = crypto.randomBytes(16);
-            const cipher = crypto.createCipherGCM(this.algorithm, Buffer.from(this.encryptionKey, 'hex'), iv);
-            cipher.setAAD(Buffer.from('ai-settings'));
-            
-            let encrypted = cipher.update(text, 'utf8', 'hex');
-            encrypted += cipher.final('hex');
-            
-            const authTag = cipher.getAuthTag();
-            
-            // Combine iv, authTag, and encrypted data
-            const combined = iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-            return Buffer.from(combined).toString('base64');
-        } catch (error) {
-            console.error('Encryption error:', error);
-            return text; // Return original text if encryption fails
-        }
-    }
-
-    /**
-     * Decrypt a string
-     * @param {string} encryptedText - Encrypted text (base64 encoded)
-     * @returns {string} - Decrypted text
-     */
-    decrypt(encryptedText) {
-        if (!encryptedText) return '';
-        
-        try {
-            const combined = Buffer.from(encryptedText, 'base64').toString();
-            const parts = combined.split(':');
-            
-            if (parts.length !== 3) {
-                throw new Error('Invalid encrypted data format');
-            }
-            
-            const iv = Buffer.from(parts[0], 'hex');
-            const authTag = Buffer.from(parts[1], 'hex');
-            const encrypted = parts[2];
-            
-            const decipher = crypto.createDecipherGCM(this.algorithm, Buffer.from(this.encryptionKey, 'hex'), iv);
-            decipher.setAAD(Buffer.from('ai-settings'));
-            decipher.setAuthTag(authTag);
-            
-            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-            decrypted += decipher.final('utf8');
-            
-            return decrypted;
-        } catch (error) {
-            console.error('Decryption error:', error);
-            throw new Error('Failed to decrypt data');
-        }
-    }
-
-    /**
-     * Get or create encryption key
-     * @returns {string} - Encryption key
-     */
-    getOrCreateEncryptionKey() {
-        const keyStorageKey = 'ai-settings-key';
-        
-        try {
-            let key = null;
-            
-            if (typeof window !== 'undefined' && window.localStorage) {
-                key = localStorage.getItem(keyStorageKey);
-            } else {
-                // For Node.js environment
-                const fs = require('fs');
-                const path = require('path');
-                const keyFile = path.join(process.cwd(), '.ai-settings', 'key');
-                
-                if (fs.existsSync(keyFile)) {
-                    key = fs.readFileSync(keyFile, 'utf8');
-                }
-            }
-            
-            if (!key) {
-                // Generate new key
-                key = crypto.randomBytes(32).toString('hex');
-                
-                // Store the key
-                if (typeof window !== 'undefined' && window.localStorage) {
-                    localStorage.setItem(keyStorageKey, key);
-                } else {
-                    const fs = require('fs');
-                    const path = require('path');
-                    const settingsDir = path.join(process.cwd(), '.ai-settings');
-                    
-                    if (!fs.existsSync(settingsDir)) {
-                        fs.mkdirSync(settingsDir, { recursive: true });
-                    }
-                    
-                    const keyFile = path.join(settingsDir, 'key');
-                    fs.writeFileSync(keyFile, key);
-                }
-            }
-            
-            return key;
-        } catch (error) {
-            console.error('Error managing encryption key:', error);
-            // Fallback to a default key (not secure, but prevents crashes)
-            return 'default-fallback-key-not-secure';
-        }
-    }
-
-    /**
-     * Clear all stored settings
+     * Clear all stored settings (from memory)
      */
     clearSettings() {
         try {
-            console.log('Clearing AI provider settings...');
-            
-            if (typeof window !== 'undefined' && window.localStorage) {
-                localStorage.removeItem(this.storageKey);
-                localStorage.removeItem('ai-settings-key');
-            } else {
-                const fs = require('fs');
-                const path = require('path');
-                const settingsDir = path.join(process.cwd(), '.ai-settings');
-                
-                if (fs.existsSync(settingsDir)) {
-                    const files = fs.readdirSync(settingsDir);
-                    files.forEach(file => {
-                        fs.unlinkSync(path.join(settingsDir, file));
-                    });
-                    fs.rmdirSync(settingsDir);
-                }
-            }
-            
+            console.log('Clearing AI provider settings from shared memory...');
+            sharedSettings = null;
             console.log('AI provider settings cleared successfully');
         } catch (error) {
             console.error('Error clearing settings:', error);

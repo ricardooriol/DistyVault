@@ -728,7 +728,7 @@ class AISettingsManager {
                     return result.settings;
                 }
             }
-            
+
             // Fallback to localStorage
             const stored = localStorage.getItem('ai-provider-settings');
             if (stored) {
@@ -761,8 +761,8 @@ class AISettingsManager {
     async saveSettings(settings) {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
-            
-            // Save to backend
+
+            // Save to backend (in-memory only for security)
             const response = await fetch('/api/ai-settings', {
                 method: 'POST',
                 headers: {
@@ -770,13 +770,17 @@ class AISettingsManager {
                 },
                 body: JSON.stringify(this.settings)
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 if (result.success) {
-                    console.log('AI settings saved to backend successfully');
-                    // Also save to localStorage as backup
-                    localStorage.setItem('ai-provider-settings', JSON.stringify(this.settings));
+                    console.log('AI settings saved to backend memory successfully');
+                    // Save non-sensitive settings to localStorage for UI persistence
+                    const localSettings = { ...this.settings };
+                    if (localSettings.online && localSettings.online.apiKey) {
+                        localSettings.online.apiKey = ''; // Don't store API key locally
+                    }
+                    localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
                     return true;
                 } else {
                     throw new Error(result.error || 'Failed to save settings to backend');
@@ -786,11 +790,15 @@ class AISettingsManager {
             }
         } catch (error) {
             console.error('Error saving AI settings to backend:', error);
-            
-            // Fallback to localStorage only
+
+            // Fallback to localStorage only (without API key)
             try {
-                localStorage.setItem('ai-provider-settings', JSON.stringify(this.settings));
-                console.log('AI settings saved to localStorage as fallback');
+                const localSettings = { ...this.settings };
+                if (localSettings.online && localSettings.online.apiKey) {
+                    localSettings.online.apiKey = ''; // Don't store API key locally
+                }
+                localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
+                console.log('AI settings saved to localStorage as fallback (without API key)');
                 return true;
             } catch (localError) {
                 console.error('Error saving AI settings to localStorage:', localError);

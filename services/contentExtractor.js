@@ -6,13 +6,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const YoutubeTranscript = require('youtube-transcript');
 
-// Debug the YoutubeTranscript object at startup
-console.log('=== YouTube Transcript Library Debug ===');
-console.log('Type:', typeof YoutubeTranscript);
-console.log('Constructor:', YoutubeTranscript.constructor.name);
-console.log('Methods:', Object.getOwnPropertyNames(YoutubeTranscript));
-console.log('Prototype methods:', Object.getOwnPropertyNames(YoutubeTranscript.prototype || {}));
-console.log('========================================');
+// YouTube Transcript Library loaded successfully
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const fs = require('fs').promises;
@@ -274,120 +268,150 @@ class ContentExtractor {
      */
     async tryMultipleTranscriptMethods(videoId) {
         console.log(`Starting transcript extraction for video ID: ${videoId}`);
-        console.log(`YoutubeTranscript object type:`, typeof YoutubeTranscript);
-        console.log(`YoutubeTranscript methods:`, Object.getOwnPropertyNames(YoutubeTranscript));
-        console.log(`YoutubeTranscript prototype:`, Object.getOwnPropertyNames(YoutubeTranscript.prototype || {}));
 
         // The library exports YoutubeTranscript as a property of the module
         const YTTranscript = YoutubeTranscript.YoutubeTranscript;
-        console.log(`YTTranscript type:`, typeof YTTranscript);
-        console.log(`YTTranscript methods:`, Object.getOwnPropertyNames(YTTranscript || {}));
-        console.log(`YTTranscript prototype:`, Object.getOwnPropertyNames(YTTranscript?.prototype || {}));
 
+        // The logs show the library finds transcripts in 'en' but our calls return empty arrays
+        // This suggests the API might be different than expected. Let's try the correct approach.
         const strategies = [
             {
-                name: 'YoutubeTranscript.YoutubeTranscript.fetchTranscript',
+                name: 'correct-api-call',
                 execute: async () => {
-                    console.log(`Attempting YoutubeTranscript.YoutubeTranscript.fetchTranscript(${videoId})...`);
-                    if (YTTranscript && typeof YTTranscript.fetchTranscript === 'function') {
-                        return await YTTranscript.fetchTranscript(videoId);
-                    } else {
+                    console.log(`Attempting correct API call for ${videoId}...`);
+                    
+                    // Based on youtube-transcript v1.2.1 documentation, the correct usage is:
+                    // YoutubeTranscript.fetchTranscript(videoId, config)
+                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
                         throw new Error('YTTranscript.fetchTranscript method not available');
                     }
+                    
+                    // Try without any language specification first
+                    console.log('Calling YTTranscript.fetchTranscript with just videoId...');
+                    const result = await YTTranscript.fetchTranscript(videoId);
+                    
+                    console.log(`API call result:`, {
+                        type: typeof result,
+                        isArray: Array.isArray(result),
+                        length: Array.isArray(result) ? result.length : 'N/A',
+                        firstItem: Array.isArray(result) && result.length > 0 ? result[0] : null
+                    });
+                    
+                    return result;
                 }
             },
             {
-                name: 'YoutubeTranscript.YoutubeTranscript.get',
+                name: 'with-language-config',
                 execute: async () => {
-                    console.log(`Attempting YoutubeTranscript.YoutubeTranscript.get(${videoId})...`);
-                    if (YTTranscript && typeof YTTranscript.get === 'function') {
-                        return await YTTranscript.get(videoId);
-                    } else {
-                        throw new Error('YTTranscript.get method not available');
+                    console.log(`Attempting with language configuration...`);
+                    
+                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
+                        throw new Error('YTTranscript.fetchTranscript method not available');
                     }
+                    
+                    // Try with language configuration object
+                    console.log('Calling with language config...');
+                    const result = await YTTranscript.fetchTranscript(videoId, { lang: 'en' });
+                    
+                    console.log(`Language config result:`, {
+                        type: typeof result,
+                        isArray: Array.isArray(result),
+                        length: Array.isArray(result) ? result.length : 'N/A',
+                        firstItem: Array.isArray(result) && result.length > 0 ? result[0] : null
+                    });
+                    
+                    return result;
                 }
             },
             {
-                name: 'new-YoutubeTranscript.YoutubeTranscript',
+                name: 'try-different-video',
                 execute: async () => {
-                    console.log(`Attempting new YoutubeTranscript.YoutubeTranscript().fetchTranscript(${videoId})...`);
-                    if (YTTranscript && typeof YTTranscript === 'function') {
-                        const instance = new YTTranscript();
-                        console.log(`Instance methods:`, Object.getOwnPropertyNames(instance));
-                        if (typeof instance.fetchTranscript === 'function') {
-                            return await instance.fetchTranscript(videoId);
-                        } else if (typeof instance.get === 'function') {
-                            return await instance.get(videoId);
-                        } else if (typeof instance.fetch === 'function') {
-                            return await instance.fetch(videoId);
+                    console.log(`Testing with a known working video to verify library function...`);
+                    
+                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
+                        throw new Error('YTTranscript.fetchTranscript method not available');
+                    }
+                    
+                    // Test with a known video that should have transcripts
+                    const testVideoId = 'dQw4w9WgXcQ'; // Rick Roll - known to have captions
+                    console.log(`Testing with known video: ${testVideoId}`);
+                    
+                    try {
+                        const testResult = await YTTranscript.fetchTranscript(testVideoId);
+                        console.log(`Test video result:`, {
+                            type: typeof testResult,
+                            isArray: Array.isArray(testResult),
+                            length: Array.isArray(testResult) ? testResult.length : 'N/A'
+                        });
+                        
+                        if (Array.isArray(testResult) && testResult.length > 0) {
+                            console.log('✅ Library is working with test video, trying original video again...');
+                            // Library works, try original video again
+                            const originalResult = await YTTranscript.fetchTranscript(videoId);
+                            return originalResult;
                         } else {
-                            throw new Error('No suitable method found on YTTranscript instance');
+                            throw new Error('Test video also returned empty result - library issue');
                         }
-                    } else {
-                        throw new Error('YTTranscript is not a constructor');
+                    } catch (testError) {
+                        console.log(`Test video failed: ${testError.message}`);
+                        throw new Error(`Library test failed: ${testError.message}`);
                     }
                 }
             },
             {
-                name: 'fetchTranscript-with-options',
+                name: 'manual-language-detection',
                 execute: async () => {
-                    console.log(`Attempting YTTranscript.fetchTranscript with language options...`);
-                    if (YTTranscript && typeof YTTranscript.fetchTranscript === 'function') {
-                        // Try with language parameter
-                        const result = await YTTranscript.fetchTranscript(videoId, { lang: 'en' });
-                        console.log(`fetchTranscript with lang=en returned:`, result);
-                        return result;
-                    } else {
+                    console.log(`Attempting manual language detection approach...`);
+                    
+                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
                         throw new Error('YTTranscript.fetchTranscript method not available');
                     }
-                }
-            },
-            {
-                name: 'fetchTranscript-auto-generated',
-                execute: async () => {
-                    console.log(`Attempting YTTranscript.fetchTranscript for auto-generated captions...`);
-                    if (YTTranscript && typeof YTTranscript.fetchTranscript === 'function') {
-                        // Try with different language codes that might have auto-generated captions
-                        const languages = ['en', 'en-US', 'en-GB', 'auto'];
-                        for (const lang of languages) {
-                            try {
-                                console.log(`Trying language: ${lang}`);
-                                const result = await YTTranscript.fetchTranscript(videoId, { lang });
-                                if (result && result.length > 0) {
-                                    console.log(`Success with language ${lang}:`, result.length, 'items');
-                                    return result;
+                    
+                    // The error messages show available languages, let's try to parse that
+                    const languagesToTry = ['en', 'en-US', 'en-GB', 'auto'];
+                    
+                    for (const lang of languagesToTry) {
+                        try {
+                            console.log(`Trying language: ${lang}`);
+                            const result = await YTTranscript.fetchTranscript(videoId, { lang });
+                            
+                            if (Array.isArray(result) && result.length > 0) {
+                                console.log(`✅ Success with language ${lang}: ${result.length} items`);
+                                return result;
+                            } else {
+                                console.log(`Language ${lang} returned empty result`);
+                            }
+                        } catch (langError) {
+                            console.log(`Language ${lang} failed: ${langError.message}`);
+                            
+                            // Parse the error message to find available languages
+                            if (langError.message.includes('Available languages:')) {
+                                const availableMatch = langError.message.match(/Available languages: (.+)/);
+                                if (availableMatch) {
+                                    const availableLanguages = availableMatch[1].split(',').map(l => l.trim());
+                                    console.log(`Found available languages: ${availableLanguages.join(', ')}`);
+                                    
+                                    // Try the first available language
+                                    if (availableLanguages.length > 0) {
+                                        try {
+                                            const availableLang = availableLanguages[0];
+                                            console.log(`Trying detected available language: ${availableLang}`);
+                                            const result = await YTTranscript.fetchTranscript(videoId, { lang: availableLang });
+                                            
+                                            if (Array.isArray(result) && result.length > 0) {
+                                                console.log(`✅ Success with detected language ${availableLang}: ${result.length} items`);
+                                                return result;
+                                            }
+                                        } catch (detectedError) {
+                                            console.log(`Detected language failed: ${detectedError.message}`);
+                                        }
+                                    }
                                 }
-                            } catch (langError) {
-                                console.log(`Language ${lang} failed:`, langError.message);
                             }
                         }
-                        throw new Error('No transcripts found in any language');
-                    } else {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
                     }
-                }
-            },
-            {
-                name: 'fetchTranscript-no-params',
-                execute: async () => {
-                    console.log(`Attempting YTTranscript.fetchTranscript with no parameters...`);
-                    if (YTTranscript && typeof YTTranscript.fetchTranscript === 'function') {
-                        const result = await YTTranscript.fetchTranscript(videoId);
-                        console.log(`fetchTranscript (no params) returned array length:`, result?.length || 0);
-                        console.log(`First few items:`, result?.slice(0, 3));
-
-                        // Even if empty, let's check if it's the right structure
-                        if (Array.isArray(result)) {
-                            if (result.length === 0) {
-                                throw new Error(`Video ${videoId} has no available transcripts/captions`);
-                            }
-                            return result;
-                        } else {
-                            throw new Error(`Unexpected result format: ${typeof result}`);
-                        }
-                    } else {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
-                    }
+                    
+                    throw new Error('No working language found');
                 }
             }
         ];
@@ -402,24 +426,40 @@ class ContentExtractor {
                 console.log(`Strategy ${strategy.name} is array:`, Array.isArray(result));
                 console.log(`Strategy ${strategy.name} length:`, Array.isArray(result) ? result.length : 'N/A');
 
+                // Handle different result types more robustly
                 if (Array.isArray(result)) {
                     console.log(`Result is array with ${result.length} items`);
 
                     if (result.length > 0) {
-                        console.log(`First item structure:`, result[0]);
-                        console.log(`Sample items:`, result.slice(0, 3));
+                        console.log(`First item structure:`, JSON.stringify(result[0], null, 2));
+                        console.log(`Sample items:`, result.slice(0, 3).map(item => JSON.stringify(item)));
 
-                        // Try to extract text from the transcript items
+                        // Try to extract text from the transcript items with more robust handling
                         const transcript = result
                             .map(item => {
                                 // Handle different possible structures
-                                if (typeof item === 'string') return item;
-                                if (item.text) return item.text;
-                                if (item.snippet) return item.snippet;
-                                if (item.content) return item.content;
-                                if (item.transcript) return item.transcript;
-                                // Sometimes the whole item might be the text
-                                return String(item);
+                                if (typeof item === 'string') {
+                                    return item.trim();
+                                }
+                                if (typeof item === 'object' && item !== null) {
+                                    // Try common property names
+                                    const textProps = ['text', 'snippet', 'content', 'transcript', 'caption', 'subtitle'];
+                                    for (const prop of textProps) {
+                                        if (item[prop] && typeof item[prop] === 'string') {
+                                            return item[prop].trim();
+                                        }
+                                    }
+                                    
+                                    // If it's an object with unknown structure, try to stringify and extract meaningful content
+                                    const itemStr = JSON.stringify(item);
+                                    if (itemStr.length > 10 && itemStr !== '{}') {
+                                        return itemStr;
+                                    }
+                                }
+                                
+                                // Last resort - convert to string
+                                const str = String(item).trim();
+                                return str.length > 0 ? str : null;
                             })
                             .filter(text => text && text.length > 0)
                             .join(' ')
@@ -434,19 +474,49 @@ class ContentExtractor {
                                 fallbackUsed: false
                             };
                         } else {
-                            console.warn(`⚠️ Strategy ${strategy.name} returned insufficient content: ${transcript.length} chars`);
-                            console.warn(`Raw items:`, result.slice(0, 5));
+                            console.warn(`⚠️ Strategy ${strategy.name} returned insufficient content: ${transcript?.length || 0} chars`);
+                            console.warn(`Raw items sample:`, result.slice(0, 3));
+                            
+                            // Even if we got little content, let's not completely discard it
+                            if (transcript && transcript.length > 0) {
+                                console.log(`Keeping minimal content: "${transcript}"`);
+                                return {
+                                    text: transcript,
+                                    method: strategy.name + '-minimal',
+                                    fallbackUsed: false
+                                };
+                            }
                         }
                     } else {
-                        console.warn(`⚠️ Strategy ${strategy.name} returned empty array - video may not have transcripts available`);
+                        console.warn(`⚠️ Strategy ${strategy.name} returned empty array`);
                     }
-                } else if (typeof result === 'string' && result.length > 10) {
-                    console.log(`✅ Transcript extracted as string using ${strategy.name}: ${result.length} characters`);
-                    return {
-                        text: result,
-                        method: strategy.name,
-                        fallbackUsed: false
-                    };
+                } else if (typeof result === 'string') {
+                    const cleanResult = result.trim();
+                    if (cleanResult.length > 0) {
+                        console.log(`✅ Transcript extracted as string using ${strategy.name}: ${cleanResult.length} characters`);
+                        return {
+                            text: cleanResult,
+                            method: strategy.name,
+                            fallbackUsed: false
+                        };
+                    } else {
+                        console.warn(`⚠️ Strategy ${strategy.name} returned empty string`);
+                    }
+                } else if (result && typeof result === 'object') {
+                    console.log(`Strategy ${strategy.name} returned object:`, JSON.stringify(result, null, 2));
+                    
+                    // Maybe the result is wrapped in an object
+                    const possibleArrayProps = ['transcripts', 'captions', 'items', 'data', 'results'];
+                    for (const prop of possibleArrayProps) {
+                        if (Array.isArray(result[prop]) && result[prop].length > 0) {
+                            console.log(`Found array in property '${prop}', retrying with that data...`);
+                            // Recursively process the found array
+                            const nestedResult = { ...result, [prop]: result[prop] };
+                            return await this.processTranscriptResult(nestedResult[prop], strategy.name + '-nested');
+                        }
+                    }
+                    
+                    console.warn(`⚠️ Strategy ${strategy.name} returned object but no usable array found`);
                 } else {
                     console.warn(`⚠️ Strategy ${strategy.name} returned unexpected format:`, typeof result, result);
                 }
@@ -458,6 +528,51 @@ class ContentExtractor {
         // If all strategies fail, create fallback content
         console.log(`❌ All transcript extraction strategies failed, creating fallback content`);
         return await this.createYoutubeFallbackContent(videoId);
+    }
+
+    /**
+     * Helper method to process transcript results consistently
+     * @param {Array} result - The transcript array result
+     * @param {string} methodName - The method name for logging
+     * @returns {Object} - Processed transcript result
+     */
+    async processTranscriptResult(result, methodName) {
+        if (!Array.isArray(result) || result.length === 0) {
+            throw new Error('Invalid or empty transcript result');
+        }
+
+        console.log(`Processing ${result.length} transcript items with method ${methodName}`);
+        console.log(`First item:`, JSON.stringify(result[0], null, 2));
+
+        const transcript = result
+            .map(item => {
+                if (typeof item === 'string') {
+                    return item.trim();
+                }
+                if (typeof item === 'object' && item !== null) {
+                    const textProps = ['text', 'snippet', 'content', 'transcript', 'caption', 'subtitle'];
+                    for (const prop of textProps) {
+                        if (item[prop] && typeof item[prop] === 'string') {
+                            return item[prop].trim();
+                        }
+                    }
+                }
+                return String(item).trim();
+            })
+            .filter(text => text && text.length > 0)
+            .join(' ')
+            .trim();
+
+        if (transcript && transcript.length > 10) {
+            console.log(`✅ Successfully processed transcript: ${transcript.length} characters`);
+            return {
+                text: transcript,
+                method: methodName,
+                fallbackUsed: false
+            };
+        } else {
+            throw new Error(`Processed transcript too short: ${transcript?.length || 0} characters`);
+        }
     }
 
     /**

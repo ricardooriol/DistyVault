@@ -404,7 +404,15 @@ body {
 .knowledge-base-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
+
+.knowledge-base-table th:nth-child(1) { width: 30%; } /* Source */
+.knowledge-base-table th:nth-child(2) { width: 10%; } /* Type */
+.knowledge-base-table th:nth-child(3) { width: 15%; } /* Status */
+.knowledge-base-table th:nth-child(4) { width: 10%; } /* Time */
+.knowledge-base-table th:nth-child(5) { width: 15%; } /* Date */
+.knowledge-base-table th:nth-child(6) { width: 20%; } /* Actions */
 
 .knowledge-base-table th {
     background: var(--bg-tertiary);
@@ -421,6 +429,19 @@ body {
     border-bottom: 1px solid var(--border-color);
     color: var(--text-secondary);
     font-size: 0.9rem;
+    vertical-align: top;
+}
+
+.source-cell {
+    max-width: 250px;
+}
+
+.source-cell a,
+.source-cell span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .knowledge-base-table tbody tr:hover {
@@ -497,13 +518,37 @@ body {
 }
 
 .actions-cell {
-    width: 200px;
+    min-width: 200px;
+    width: auto;
 }
 
 .table-actions {
+    /* Fallback for older browsers */
+    display: block;
+    text-align: right;
+    
+    /* Modern flexbox layout */
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    min-width: 0;
+}
+
+/* Fallback spacing for older browsers */
+.table-actions .action-btn {
+    margin-left: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Reset margin when flexbox is supported */
+.table-actions {
+    gap: 0.5rem;
+}
+
+.table-actions .action-btn {
+    margin: 0;
 }
 
 /* Empty state in table */
@@ -514,31 +559,50 @@ body {
 
 /* Action buttons */
 .action-btn {
-    padding: 0.5rem 0.75rem;
+    padding: 0.4rem 0.6rem;
     border-radius: 6px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
     border: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.action-btn:focus:not(:focus-visible) {
+    outline: none;
 }
 
 .view-btn {
     background: var(--primary-orange);
     color: white;
+    order: 1;
 }
 
 .view-btn:hover {
     background: var(--orange-hover);
+    transform: translateY(-1px);
 }
 
 .download-btn {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    order: 2;
 }
 
 .download-btn:hover {
     background: var(--border-color);
+    transform: translateY(-1px);
 }
 
 .stop-btn {
@@ -553,23 +617,31 @@ body {
 .debug-btn {
     background: var(--bg-tertiary);
     color: var(--text-secondary);
+    order: 3;
 }
 
 .debug-btn:hover {
     background: var(--border-color);
     color: var(--text-primary);
+    transform: translateY(-1px);
 }
 
 .delete-btn {
     background: transparent;
     color: var(--text-muted);
     border: 1px solid var(--border-color);
+    order: 5;
 }
 
 .delete-btn:hover {
     background: var(--status-error);
     color: white;
     border-color: var(--status-error);
+    transform: translateY(-1px);
+}
+
+.stop-btn {
+    order: 4;
 }
 
 /* Modal */
@@ -775,8 +847,54 @@ body {
     .knowledge-base-table {
         display: block;
         overflow-x: auto;
+        white-space: nowrap;
     }
     
+    .knowledge-base-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .table-actions {
+        gap: 0.25rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .action-btn {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.7rem;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .actions-cell {
+        min-width: 80px;
+    }
+}
+
+/* Tablet responsive styles */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .knowledge-base-table {
+        font-size: 0.9rem;
+    }
+    
+    .table-actions {
+        gap: 0.3rem;
+    }
+    
+    .action-btn {
+        padding: 0.35rem 0.55rem;
+        font-size: 0.75rem;
+    }
+    
+    .actions-cell {
+        min-width: 160px;
+    }
+}
+
+@media (max-width: 768px) {
     .modal-content {
         width: 95%;
         margin: 2.5% auto;
@@ -991,6 +1109,27 @@ input:checked + .toggle-slider:before {
     margin-top: 0.25rem;
 }
 
+.security-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.security-icon {
+    font-size: 0.875rem;
+}
+
+.security-text {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
 /* API Key Input */
 .api-key-input-container {
     position: relative;
@@ -1104,10 +1243,13 @@ input:checked + .toggle-slider:before {
     cursor: pointer;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     font-size: 0.9rem;
     font-weight: 500;
     transition: all 0.2s ease;
+    min-width: 180px;
+    width: 180px;
 }
 
 .save-btn:hover {
