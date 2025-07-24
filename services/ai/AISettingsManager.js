@@ -84,7 +84,7 @@ class AISettingsManager {
         return {
             mode: 'offline',
             offline: {
-                model: 'llama2',
+                model: '',
                 endpoint: 'http://localhost:11434'
             },
             online: {

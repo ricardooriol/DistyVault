@@ -8,7 +8,7 @@ const axios = require('axios');
 class OllamaProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
-        this.model = config.model || 'llama2';
+        this.model = config.model;
         this.endpoint = config.endpoint || 'http://localhost:11434';
         this.timeout = config.timeout || 300000; // 5 minutes default
     }
@@ -63,11 +63,11 @@ class OllamaProvider extends AIProvider {
 
         } catch (error) {
             console.error('Error generating summary with Ollama:', error);
-            
+
             if (error.code === 'ECONNREFUSED') {
                 throw new Error('Cannot connect to Ollama. Please ensure Ollama is running on ' + this.endpoint);
             }
-            
+
             if (error.code === 'ETIMEDOUT') {
                 throw new Error('Ollama request timed out. The text might be too long or the model is slow.');
             }
@@ -94,34 +94,81 @@ class OllamaProvider extends AIProvider {
                 };
             }
 
+            // Check if model is specified
+            if (!this.model) {
+                return {
+                    valid: false,
+                    error: 'No model specified. Please select a model from the available options.'
+                };
+            }
+
             // Check if the specified model is available
             const availableModels = response.data.models.map(model => model.name);
             console.log(`Available Ollama models: ${availableModels.join(', ')}`);
-            console.log(`Looking for model: ${this.model}`);
-            
-            // Check for exact match or partial match (handles :latest suffix)
+            console.log(`Looking for model: "${this.model}"`);
+
+            // Check for exact match or partial match (handles different suffixes)
+            let matchedModel = null;
             const modelExists = availableModels.some(model => {
+                console.log(`Comparing "${this.model}" with "${model}"`);
+
                 // Exact match
-                if (model === this.model) return true;
-                
-                // Check if model matches without :latest suffix
+                if (model === this.model) {
+                    console.log(`✅ Exact match found: ${model}`);
+                    matchedModel = model;
+                    return true;
+                }
+
+                // Check if model matches without suffix (handles :latest, :instruct, etc.)
                 const modelBase = model.split(':')[0];
                 const requestedBase = this.model.split(':')[0];
-                if (modelBase === requestedBase) return true;
-                
+                console.log(`Comparing bases: "${requestedBase}" with "${modelBase}"`);
+                if (modelBase === requestedBase) {
+                    console.log(`✅ Base match found: ${modelBase} -> using ${model}`);
+                    matchedModel = model;
+                    return true;
+                }
+
                 // Check if requested model matches with :latest added
-                if (model === `${this.model}:latest`) return true;
-                
+                if (model === `${this.model}:latest`) {
+                    console.log(`✅ Match with :latest suffix: ${model}`);
+                    matchedModel = model;
+                    return true;
+                }
+
                 return false;
             });
-            
+
+            if (modelExists && matchedModel) {
+                // Update the model name to the exact match found in Ollama
+                console.log(`🔄 Updating model name from "${this.model}" to "${matchedModel}"`);
+                this.model = matchedModel;
+            }
+
             if (!modelExists) {
+                // Provide helpful suggestions for common mistakes
+                const suggestions = [];
+                const requestedBase = this.model.split(':')[0];
+
+                availableModels.forEach(model => {
+                    const modelBase = model.split(':')[0];
+                    if (modelBase.includes(requestedBase) || requestedBase.includes(modelBase)) {
+                        suggestions.push(model);
+                    }
+                });
+
+                let errorMsg = `Model "${this.model}" is not available.\n\nAvailable models: ${availableModels.join(', ')}`;
+
+                if (suggestions.length > 0) {
+                    errorMsg += `\n\nDid you mean: ${suggestions.join(', ')}?`;
+                }
+
                 return {
                     valid: false,
-                    error: `Model "${this.model}" is not available. Available models: ${availableModels.join(', ')}`
+                    error: errorMsg
                 };
             }
-            
+
             console.log(`✅ Model "${this.model}" found in Ollama`);
 
             return { valid: true };
@@ -150,7 +197,7 @@ class OllamaProvider extends AIProvider {
             model: {
                 type: 'string',
                 required: true,
-                default: 'llama2',
+                placeholder: 'Enter model name (e.g., llama3, phi4-mini)',
                 description: 'Ollama model name'
             },
             endpoint: {
@@ -179,7 +226,7 @@ class OllamaProvider extends AIProvider {
             return [];
         } catch (error) {
             console.warn('Could not fetch available Ollama models:', error.message);
-            return ['llama2', 'llama3', 'mistral', 'codellama']; // Default fallback
+            return []; // Return empty array - no fallback models
         }
     }
 
@@ -200,24 +247,7 @@ class OllamaProvider extends AIProvider {
         return 50000; // 50k characters
     }
 
-    /**
-     * Create Ollama-specific summarization prompt
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
-     * @returns {string} - The formatted prompt
-     */
-    createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `You are a helpful AI assistant that creates ${style} summaries. `;
-        prompt += `Please summarize the following content in approximately ${maxLength} words or less. `;
-        prompt += `Focus on the main points and key information.\n\n`;
-        prompt += `Content to summarize:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
-    }
+
 
     /**
      * Test connection to Ollama with a simple request
@@ -225,7 +255,7 @@ class OllamaProvider extends AIProvider {
      */
     async testConnection() {
         const startTime = Date.now();
-        
+
         try {
             // First check if Ollama is running
             const validation = await this.validateConfiguration();

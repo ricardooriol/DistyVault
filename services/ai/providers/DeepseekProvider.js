@@ -204,23 +204,7 @@ class DeepseekProvider extends AIProvider {
         return 60000; // ~15k tokens, conservative estimate
     }
 
-    /**
-     * Create Deepseek-specific summarization prompt
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
-     * @returns {string} - The formatted prompt
-     */
-    createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `Please provide a ${style} summary of the following content. `;
-        prompt += `The summary should be approximately ${maxLength} words or less and should highlight the main points and key information.\n\n`;
-        prompt += `Content:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
-    }
+
 
     /**
      * Test connection to Deepseek with a simple request

@@ -30,7 +30,7 @@ class AIProviderFactory {
         switch (type.toLowerCase()) {
             case 'ollama':
                 return new OllamaProvider({
-                    model: model || 'llama2',
+                    model: model,
                     endpoint: endpoint || 'http://localhost:11434',
                     ...otherOptions
                 });
@@ -116,8 +116,8 @@ class AIProviderFactory {
                 name: 'Ollama (Local)',
                 category: 'offline',
                 requiresApiKey: false,
-                defaultModel: 'llama2',
-                models: ['llama2', 'llama3', 'mistral', 'codellama', 'phi', 'neural-chat']
+                defaultModel: null,
+                models: []
             },
             {
                 type: 'openai',
@@ -217,8 +217,8 @@ class AIProviderFactory {
                     errors.push('Grok API key should start with "xai-"');
                 }
 
-                // Validate model
-                if (config.model && providerInfo.models && !providerInfo.models.includes(config.model)) {
+                // Validate model (skip for Ollama since it validates against actual installation)
+                if (config.model && providerInfo.models && providerInfo.models.length > 0 && !providerInfo.models.includes(config.model)) {
                     errors.push(`Model "${config.model}" is not supported by ${providerInfo.name}`);
                 }
             }

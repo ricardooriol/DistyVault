@@ -290,23 +290,7 @@ class GoogleProvider extends AIProvider {
         return 800000; // ~1M tokens
     }
 
-    /**
-     * Create Google Gemini-specific summarization prompt
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
-     * @returns {string} - The formatted prompt
-     */
-    createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `Please provide a ${style} summary of the following content. `;
-        prompt += `The summary should be approximately ${maxLength} words or less and should highlight the main points, key insights, and important information.\n\n`;
-        prompt += `Content to summarize:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
-    }
+
 
     /**
      * Test connection to Google Gemini with a simple request

@@ -204,23 +204,7 @@ class GrokProvider extends AIProvider {
         return 100000; // ~25k tokens, conservative estimate
     }
 
-    /**
-     * Create Grok-specific summarization prompt
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
-     * @returns {string} - The formatted prompt
-     */
-    createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `Please provide a ${style} summary of the following content. `;
-        prompt += `The summary should be approximately ${maxLength} words or less and should capture the main points and key insights.\n\n`;
-        prompt += `Content:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
-    }
+
 
     /**
      * Test connection to Grok with a simple request

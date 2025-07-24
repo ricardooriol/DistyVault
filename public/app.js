@@ -745,7 +745,7 @@ class AISettingsManager {
         return {
             mode: 'offline',
             offline: {
-                model: 'llama2',
+                model: '',
                 endpoint: 'http://localhost:11434'
             },
             online: {
@@ -850,7 +850,8 @@ async function loadAISettingsUI() {
     updateModeUI(settings.mode);
 
     // Load offline settings
-    document.getElementById('ollama-model').value = settings.offline.model || 'llama2';
+    document.getElementById('ollama-model').value = settings.offline.model || '';
+    document.getElementById('ollama-model').placeholder = 'Enter model name (e.g., llama3, phi4-mini)';
     document.getElementById('ollama-endpoint').value = settings.offline.endpoint || 'http://localhost:11434';
 
     // Load online settings
@@ -932,7 +933,7 @@ function toggleApiKeyVisibility() {
 
 async function testOllamaConnection() {
     const testBtn = document.getElementById('test-ollama-btn');
-    const model = document.getElementById('ollama-model').value || 'llama2';
+    const model = document.getElementById('ollama-model').value;
     const endpoint = document.getElementById('ollama-endpoint').value || 'http://localhost:11434';
 
     setTestButtonState(testBtn, 'testing');
@@ -1066,7 +1067,7 @@ async function saveAIConfiguration() {
     const settings = {
         mode: modeToggle.checked ? 'online' : 'offline',
         offline: {
-            model: document.getElementById('ollama-model').value || 'llama2',
+            model: document.getElementById('ollama-model').value,
             endpoint: document.getElementById('ollama-endpoint').value || 'http://localhost:11434'
         },
         online: {

@@ -211,23 +211,6 @@ class OpenAIProvider extends AIProvider {
         return 12000; // ~3k tokens for input, leaving room for output
     }
 
-    /**
-     * Create OpenAI-specific summarization prompt
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
-     * @returns {string} - The formatted prompt
-     */
-    createSummarizationPrompt(text, options = {}) {
-        const maxLength = options.maxLength || 500;
-        const style = options.style || 'concise';
-        
-        let prompt = `Please provide a ${style} summary of the following content. `;
-        prompt += `The summary should be approximately ${maxLength} words or less and capture the main points and key information.\n\n`;
-        prompt += `Content:\n${text}\n\n`;
-        prompt += `Summary:`;
-        
-        return prompt;
-    }
 
     /**
      * Test connection to OpenAI with a simple request
