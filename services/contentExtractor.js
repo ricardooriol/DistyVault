@@ -226,13 +226,7 @@ class ContentExtractor {
 
         const videoId = this.extractYoutubeId(url);
         if (!videoId) {
-            return {
-                text: `Unable to extract video ID from YouTube URL: ${url}. Please check if the URL is valid.`,
-                title: 'Invalid YouTube URL',
-                contentType: 'youtube-video',
-                extractionMethod: 'error',
-                fallbackUsed: true
-            };
+            throw new Error(`Unable to extract video ID from YouTube URL: ${url}. Please check if the URL is valid.`);
         }
 
         console.log(`Extracted video ID: ${videoId}`);
@@ -240,294 +234,176 @@ class ContentExtractor {
         // Get enhanced video metadata
         const metadata = await this.extractYoutubeMetadata(videoId);
 
-        // Try multiple transcript extraction strategies
-        const transcriptResult = await this.tryMultipleTranscriptMethods(videoId);
+        try {
+            // Try multiple transcript extraction strategies
+            const transcriptResult = await this.tryMultipleTranscriptMethods(videoId);
 
-        const duration = (Date.now() - startTime) / 1000;
-        console.log(`YouTube processing completed in ${duration.toFixed(2)}s`);
+            const duration = (Date.now() - startTime) / 1000;
+            console.log(`YouTube processing completed in ${duration.toFixed(2)}s`);
 
-        return {
-            text: transcriptResult.text,
-            title: metadata.title,
-            contentType: 'youtube-video',
-            extractionMethod: transcriptResult.method,
-            fallbackUsed: transcriptResult.fallbackUsed,
-            metadata: {
-                videoId: videoId,
-                channelName: metadata.channelName,
-                description: metadata.description,
-                duration: duration
-            }
-        };
+            return {
+                text: transcriptResult.text,
+                title: metadata.title,
+                contentType: 'youtube-video',
+                extractionMethod: transcriptResult.method,
+                fallbackUsed: transcriptResult.fallbackUsed,
+                metadata: {
+                    videoId: videoId,
+                    channelName: metadata.channelName,
+                    description: metadata.description,
+                    duration: duration
+                }
+            };
+        } catch (error) {
+            const duration = (Date.now() - startTime) / 1000;
+            console.error(`YouTube transcript extraction failed after ${duration.toFixed(2)}s: ${error.message}`);
+            
+            // Throw the error instead of returning fallback content
+            throw new Error(`Failed to extract transcript from YouTube video "${metadata.title}" (${videoId}): ${error.message}`);
+        }
     }
 
     /**
-     * Try multiple methods to extract YouTube transcript
+     * Try multiple methods to extract YouTube transcript using strategy pattern with enhanced logging
      * @param {string} videoId - The YouTube video ID
      * @returns {Promise<{text: string, method: string, fallbackUsed: boolean}>} - Extraction result
      */
     async tryMultipleTranscriptMethods(videoId) {
-        console.log(`Starting transcript extraction for video ID: ${videoId}`);
+        // Initialize enhanced logger
+        const TranscriptLogger = require('./transcript/TranscriptLogger');
+        const logger = new TranscriptLogger('YouTubeTranscriptExtraction');
+        
+        logger.logSystemInfo();
+        const extractionOp = logger.startOperation('TranscriptExtraction', { videoId });
 
-        // The library exports YoutubeTranscript as a property of the module
-        const YTTranscript = YoutubeTranscript.YoutubeTranscript;
+        try {
+            logger.log('info', `🎬 Starting transcript extraction for video ID: ${videoId}`);
 
-        // The logs show the library finds transcripts in 'en' but our calls return empty arrays
-        // This suggests the API might be different than expected. Let's try the correct approach.
-        const strategies = [
-            {
-                name: 'correct-api-call',
-                execute: async () => {
-                    console.log(`Attempting correct API call for ${videoId}...`);
+            // Import the strategy classes
+            const LangChainYoutubeStrategy = require('./transcript/LangChainYoutubeStrategy');
+            const YouTubePageScrapingStrategy = require('./transcript/YouTubePageScrapingStrategy');
+            const AlternativePageParsingStrategy = require('./transcript/AlternativePageParsingStrategy');
+            const LibraryFallbackStrategy = require('./transcript/LibraryFallbackStrategy');
+
+            // Initialize strategies in priority order (LangChain first since it works!)
+            const strategies = [
+                new LangChainYoutubeStrategy(),
+                new YouTubePageScrapingStrategy(),
+                new AlternativePageParsingStrategy(),
+                new LibraryFallbackStrategy()
+            ];
+
+            logger.log('info', `📋 Initialized ${strategies.length} extraction strategies`, {
+                strategies: strategies.map(s => ({ name: s.name, priority: s.priority }))
+            });
+
+            // Try each strategy in order
+            for (let i = 0; i < strategies.length; i++) {
+                const strategy = strategies[i];
+                const strategyOp = logger.startOperation(`Strategy_${strategy.name}`, { 
+                    strategyName: strategy.name, 
+                    priority: strategy.priority,
+                    attempt: i + 1,
+                    totalStrategies: strategies.length
+                });
+
+                try {
+                    logger.logStrategyAttempt(strategy.name, videoId);
                     
-                    // Based on youtube-transcript v1.2.1 documentation, the correct usage is:
-                    // YoutubeTranscript.fetchTranscript(videoId, config)
-                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
-                    }
+                    // Execute the strategy
+                    const startTime = Date.now();
+                    const result = await strategy.execute(videoId);
+                    const executionTime = Date.now() - startTime;
                     
-                    // Try without any language specification first
-                    console.log('Calling YTTranscript.fetchTranscript with just videoId...');
-                    const result = await YTTranscript.fetchTranscript(videoId);
+                    logger.logPerformance(`${strategy.name}_execution`, executionTime);
                     
-                    console.log(`API call result:`, {
-                        type: typeof result,
-                        isArray: Array.isArray(result),
-                        length: Array.isArray(result) ? result.length : 'N/A',
-                        firstItem: Array.isArray(result) && result.length > 0 ? result[0] : null
-                    });
-                    
-                    return result;
-                }
-            },
-            {
-                name: 'with-language-config',
-                execute: async () => {
-                    console.log(`Attempting with language configuration...`);
-                    
-                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
-                    }
-                    
-                    // Try with language configuration object
-                    console.log('Calling with language config...');
-                    const result = await YTTranscript.fetchTranscript(videoId, { lang: 'en' });
-                    
-                    console.log(`Language config result:`, {
-                        type: typeof result,
-                        isArray: Array.isArray(result),
-                        length: Array.isArray(result) ? result.length : 'N/A',
-                        firstItem: Array.isArray(result) && result.length > 0 ? result[0] : null
-                    });
-                    
-                    return result;
-                }
-            },
-            {
-                name: 'try-different-video',
-                execute: async () => {
-                    console.log(`Testing with a known working video to verify library function...`);
-                    
-                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
-                    }
-                    
-                    // Test with a known video that should have transcripts
-                    const testVideoId = 'dQw4w9WgXcQ'; // Rick Roll - known to have captions
-                    console.log(`Testing with known video: ${testVideoId}`);
-                    
-                    try {
-                        const testResult = await YTTranscript.fetchTranscript(testVideoId);
-                        console.log(`Test video result:`, {
-                            type: typeof testResult,
-                            isArray: Array.isArray(testResult),
-                            length: Array.isArray(testResult) ? testResult.length : 'N/A'
+                    if (result.success && result.data) {
+                        logger.log('info', `🔍 Strategy ${strategy.name} succeeded, validating data...`, {
+                            dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
+                            dataLength: Array.isArray(result.data) ? result.data.length : 'N/A'
                         });
                         
-                        if (Array.isArray(testResult) && testResult.length > 0) {
-                            console.log('✅ Library is working with test video, trying original video again...');
-                            // Library works, try original video again
-                            const originalResult = await YTTranscript.fetchTranscript(videoId);
-                            return originalResult;
-                        } else {
-                            throw new Error('Test video also returned empty result - library issue');
-                        }
-                    } catch (testError) {
-                        console.log(`Test video failed: ${testError.message}`);
-                        throw new Error(`Library test failed: ${testError.message}`);
-                    }
-                }
-            },
-            {
-                name: 'manual-language-detection',
-                execute: async () => {
-                    console.log(`Attempting manual language detection approach...`);
-                    
-                    if (!YTTranscript || typeof YTTranscript.fetchTranscript !== 'function') {
-                        throw new Error('YTTranscript.fetchTranscript method not available');
-                    }
-                    
-                    // The error messages show available languages, let's try to parse that
-                    const languagesToTry = ['en', 'en-US', 'en-GB', 'auto'];
-                    
-                    for (const lang of languagesToTry) {
-                        try {
-                            console.log(`Trying language: ${lang}`);
-                            const result = await YTTranscript.fetchTranscript(videoId, { lang });
+                        // Validate the extracted data
+                        const validationStart = Date.now();
+                        const validation = await strategy.validate(result.data);
+                        const validationTime = Date.now() - validationStart;
+                        
+                        logger.logPerformance(`${strategy.name}_validation`, validationTime);
+                        
+                        if (validation.valid) {
+                            const totalTime = Date.now() - startTime;
                             
-                            if (Array.isArray(result) && result.length > 0) {
-                                console.log(`✅ Success with language ${lang}: ${result.length} items`);
-                                return result;
-                            } else {
-                                console.log(`Language ${lang} returned empty result`);
-                            }
-                        } catch (langError) {
-                            console.log(`Language ${lang} failed: ${langError.message}`);
+                            logger.logStrategySuccess(strategy.name, {
+                                transcript: validation.transcript,
+                                segments: validation.segments,
+                                processingTime: totalTime,
+                                stats: validation.stats
+                            });
                             
-                            // Parse the error message to find available languages
-                            if (langError.message.includes('Available languages:')) {
-                                const availableMatch = langError.message.match(/Available languages: (.+)/);
-                                if (availableMatch) {
-                                    const availableLanguages = availableMatch[1].split(',').map(l => l.trim());
-                                    console.log(`Found available languages: ${availableLanguages.join(', ')}`);
-                                    
-                                    // Try the first available language
-                                    if (availableLanguages.length > 0) {
-                                        try {
-                                            const availableLang = availableLanguages[0];
-                                            console.log(`Trying detected available language: ${availableLang}`);
-                                            const result = await YTTranscript.fetchTranscript(videoId, { lang: availableLang });
-                                            
-                                            if (Array.isArray(result) && result.length > 0) {
-                                                console.log(`✅ Success with detected language ${availableLang}: ${result.length} items`);
-                                                return result;
-                                            }
-                                        } catch (detectedError) {
-                                            console.log(`Detected language failed: ${detectedError.message}`);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    throw new Error('No working language found');
-                }
-            }
-        ];
-
-        // Try each strategy
-        for (const strategy of strategies) {
-            try {
-                console.log(`Trying strategy: ${strategy.name}`);
-                const result = await strategy.execute();
-
-                console.log(`Strategy ${strategy.name} result type:`, typeof result);
-                console.log(`Strategy ${strategy.name} is array:`, Array.isArray(result));
-                console.log(`Strategy ${strategy.name} length:`, Array.isArray(result) ? result.length : 'N/A');
-
-                // Handle different result types more robustly
-                if (Array.isArray(result)) {
-                    console.log(`Result is array with ${result.length} items`);
-
-                    if (result.length > 0) {
-                        console.log(`First item structure:`, JSON.stringify(result[0], null, 2));
-                        console.log(`Sample items:`, result.slice(0, 3).map(item => JSON.stringify(item)));
-
-                        // Try to extract text from the transcript items with more robust handling
-                        const transcript = result
-                            .map(item => {
-                                // Handle different possible structures
-                                if (typeof item === 'string') {
-                                    return item.trim();
-                                }
-                                if (typeof item === 'object' && item !== null) {
-                                    // Try common property names
-                                    const textProps = ['text', 'snippet', 'content', 'transcript', 'caption', 'subtitle'];
-                                    for (const prop of textProps) {
-                                        if (item[prop] && typeof item[prop] === 'string') {
-                                            return item[prop].trim();
-                                        }
-                                    }
-                                    
-                                    // If it's an object with unknown structure, try to stringify and extract meaningful content
-                                    const itemStr = JSON.stringify(item);
-                                    if (itemStr.length > 10 && itemStr !== '{}') {
-                                        return itemStr;
-                                    }
-                                }
-                                
-                                // Last resort - convert to string
-                                const str = String(item).trim();
-                                return str.length > 0 ? str : null;
-                            })
-                            .filter(text => text && text.length > 0)
-                            .join(' ')
-                            .trim();
-
-                        if (transcript && transcript.length > 10) {
-                            console.log(`✅ Transcript extracted successfully using ${strategy.name}: ${transcript.length} characters`);
-                            console.log(`Preview: ${transcript.substring(0, 200)}...`);
+                            logger.endOperation(true, {
+                                strategy: strategy.name,
+                                transcriptLength: validation.transcript.length,
+                                segmentCount: validation.segments?.length || 0,
+                                processingTime: totalTime
+                            });
+                            
+                            logger.log('info', `✅ Transcript extracted successfully using ${strategy.name}`, {
+                                length: validation.transcript.length,
+                                segments: validation.segments?.length || 0,
+                                preview: validation.transcript.substring(0, 200) + '...'
+                            });
+                            
+                            const summary = logger.generateSummary();
+                            
                             return {
-                                text: transcript,
+                                text: validation.transcript,
                                 method: strategy.name,
-                                fallbackUsed: false
+                                fallbackUsed: false,
+                                stats: validation.stats,
+                                processingTime: totalTime,
+                                summary: summary
                             };
                         } else {
-                            console.warn(`⚠️ Strategy ${strategy.name} returned insufficient content: ${transcript?.length || 0} chars`);
-                            console.warn(`Raw items sample:`, result.slice(0, 3));
-                            
-                            // Even if we got little content, let's not completely discard it
-                            if (transcript && transcript.length > 0) {
-                                console.log(`Keeping minimal content: "${transcript}"`);
-                                return {
-                                    text: transcript,
-                                    method: strategy.name + '-minimal',
-                                    fallbackUsed: false
-                                };
-                            }
+                            logger.logStrategyFailure(strategy.name, validation.error, {
+                                code: validation.code,
+                                details: validation.details
+                            });
+                            logger.endOperation(false, { error: validation.error, code: validation.code });
                         }
                     } else {
-                        console.warn(`⚠️ Strategy ${strategy.name} returned empty array`);
+                        logger.logStrategyFailure(strategy.name, result.error || 'Unknown error', result);
+                        logger.endOperation(false, { error: result.error });
                     }
-                } else if (typeof result === 'string') {
-                    const cleanResult = result.trim();
-                    if (cleanResult.length > 0) {
-                        console.log(`✅ Transcript extracted as string using ${strategy.name}: ${cleanResult.length} characters`);
-                        return {
-                            text: cleanResult,
-                            method: strategy.name,
-                            fallbackUsed: false
-                        };
-                    } else {
-                        console.warn(`⚠️ Strategy ${strategy.name} returned empty string`);
-                    }
-                } else if (result && typeof result === 'object') {
-                    console.log(`Strategy ${strategy.name} returned object:`, JSON.stringify(result, null, 2));
-                    
-                    // Maybe the result is wrapped in an object
-                    const possibleArrayProps = ['transcripts', 'captions', 'items', 'data', 'results'];
-                    for (const prop of possibleArrayProps) {
-                        if (Array.isArray(result[prop]) && result[prop].length > 0) {
-                            console.log(`Found array in property '${prop}', retrying with that data...`);
-                            // Recursively process the found array
-                            const nestedResult = { ...result, [prop]: result[prop] };
-                            return await this.processTranscriptResult(nestedResult[prop], strategy.name + '-nested');
-                        }
-                    }
-                    
-                    console.warn(`⚠️ Strategy ${strategy.name} returned object but no usable array found`);
-                } else {
-                    console.warn(`⚠️ Strategy ${strategy.name} returned unexpected format:`, typeof result, result);
+                } catch (error) {
+                    logger.logError(error, `Strategy_${strategy.name}`);
+                    logger.logStrategyFailure(strategy.name, error.message, { stack: error.stack });
+                    logger.endOperation(false, { error: error.message });
                 }
-            } catch (error) {
-                console.error(`❌ Strategy ${strategy.name} failed:`, error.message);
             }
-        }
 
-        // If all strategies fail, create fallback content
-        console.log(`❌ All transcript extraction strategies failed, creating fallback content`);
-        return await this.createYoutubeFallbackContent(videoId);
+            // If all strategies fail, log comprehensive failure and throw error
+            const failureMessage = `No transcript available for video ${videoId}. All ${strategies.length} extraction methods failed.`;
+            logger.log('error', `💥 All transcript extraction strategies failed`, {
+                videoId,
+                strategiesAttempted: strategies.length,
+                strategies: strategies.map(s => s.name)
+            });
+            
+            logger.endOperation(false, { 
+                error: failureMessage,
+                strategiesAttempted: strategies.length 
+            });
+            
+            const summary = logger.generateSummary();
+            console.log('📊 Final Summary:', JSON.stringify(summary, null, 2));
+            
+            throw new Error(failureMessage);
+
+        } catch (error) {
+            logger.logError(error, 'TranscriptExtraction');
+            logger.endOperation(false, { error: error.message });
+            throw error;
+        }
     }
 
     /**
@@ -631,35 +507,7 @@ class ContentExtractor {
         return { title, channelName, description };
     }
 
-    /**
-     * Create fallback content for YouTube videos when transcript extraction fails
-     * @param {string} videoId - The YouTube video ID
-     * @returns {Promise<{text: string, method: string, fallbackUsed: boolean}>} - Fallback content
-     */
-    async createYoutubeFallbackContent(videoId) {
-        const metadata = await this.extractYoutubeMetadata(videoId);
 
-        let fallbackText = `This is a YouTube video titled "${metadata.title}"`;
-
-        if (metadata.channelName) {
-            fallbackText += ` by ${metadata.channelName}`;
-        }
-
-        fallbackText += `. No transcript is available for this video.`;
-
-        if (metadata.description) {
-            fallbackText += ` The video description is: ${metadata.description}`;
-        }
-
-        fallbackText += ` The video ID is ${videoId} and can be viewed at https://www.youtube.com/watch?v=${videoId}.`;
-        fallbackText += ` This video may not have captions enabled, the captions may be in a language that couldn't be automatically detected, or the video may be restricted.`;
-
-        return {
-            text: fallbackText,
-            method: 'metadata-fallback',
-            fallbackUsed: true
-        };
-    }
 
     /**
      * Extract content from a file
@@ -1083,29 +931,94 @@ class ContentExtractor {
     extractYoutubeId(url) {
         console.log(`Extracting video ID from URL: ${url}`);
 
-        // Handle different YouTube URL formats
+        if (!url || typeof url !== 'string') {
+            console.error('Invalid URL provided: must be a non-empty string');
+            return null;
+        }
+
+        // Normalize URL
+        const normalizedUrl = url.trim().toLowerCase();
+        
+        // Check if it's a YouTube URL
+        if (!this._isValidYouTubeUrl(normalizedUrl)) {
+            console.error(`Not a valid YouTube URL: ${url}`);
+            return null;
+        }
+
         let videoId = null;
 
         try {
-            // youtu.be format: https://youtu.be/VIDEO_ID?t=123
-            if (url.includes('youtu.be/')) {
-                const match = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-                videoId = match ? match[1] : null;
-            }
-            // youtube.com/watch format: https://www.youtube.com/watch?v=VIDEO_ID&list=PLAYLIST_ID
-            else if (url.includes('youtube.com/watch') || url.includes('m.youtube.com/watch')) {
-                const urlObj = new URL(url);
-                videoId = urlObj.searchParams.get('v');
-            }
-            // youtube.com/embed format: https://www.youtube.com/embed/VIDEO_ID
-            else if (url.includes('youtube.com/embed/')) {
-                const match = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
-                videoId = match ? match[1] : null;
+            // Comprehensive URL pattern matching
+            const patterns = [
+                // youtu.be format: https://youtu.be/VIDEO_ID?t=123
+                {
+                    regex: /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtu.be'
+                },
+                // youtube.com/watch format: https://www.youtube.com/watch?v=VIDEO_ID&list=PLAYLIST_ID
+                {
+                    regex: /(?:youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtube.com/watch'
+                },
+                // youtube.com/embed format: https://www.youtube.com/embed/VIDEO_ID
+                {
+                    regex: /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtube.com/embed'
+                },
+                // youtube.com/v format: https://www.youtube.com/v/VIDEO_ID
+                {
+                    regex: /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtube.com/v'
+                },
+                // youtube.com/e format: https://www.youtube.com/e/VIDEO_ID
+                {
+                    regex: /(?:youtube\.com\/e\/)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtube.com/e'
+                },
+                // Mobile format: https://m.youtube.com/watch?v=VIDEO_ID
+                {
+                    regex: /(?:m\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+                    name: 'm.youtube.com/watch'
+                },
+                // Gaming format: https://gaming.youtube.com/watch?v=VIDEO_ID
+                {
+                    regex: /(?:gaming\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+                    name: 'gaming.youtube.com'
+                },
+                // YouTube Music format: https://music.youtube.com/watch?v=VIDEO_ID
+                {
+                    regex: /(?:music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+                    name: 'music.youtube.com'
+                }
+            ];
+
+            // Try each pattern
+            for (const pattern of patterns) {
+                const match = url.match(pattern.regex);
+                if (match && match[1]) {
+                    videoId = match[1];
+                    console.log(`Video ID extracted using ${pattern.name} pattern: ${videoId}`);
+                    break;
+                }
             }
 
-            // Validate video ID (should be exactly 11 characters and alphanumeric with - and _)
-            if (videoId && videoId.length === 11 && /^[a-zA-Z0-9_-]+$/.test(videoId)) {
-                console.log(`Successfully extracted video ID: ${videoId}`);
+            // Fallback: try URL parsing for query parameters
+            if (!videoId) {
+                try {
+                    const urlObj = new URL(url);
+                    const vParam = urlObj.searchParams.get('v');
+                    if (vParam && this._isValidVideoId(vParam)) {
+                        videoId = vParam;
+                        console.log(`Video ID extracted from URL parameters: ${videoId}`);
+                    }
+                } catch (urlError) {
+                    console.warn(`URL parsing failed: ${urlError.message}`);
+                }
+            }
+
+            // Validate extracted video ID
+            if (videoId && this._isValidVideoId(videoId)) {
+                console.log(`Successfully extracted and validated video ID: ${videoId}`);
                 return videoId;
             }
 
@@ -1115,6 +1028,54 @@ class ContentExtractor {
 
         console.error(`Could not extract valid video ID from URL: ${url}`);
         return null;
+    }
+
+    /**
+     * Check if URL is a valid YouTube URL
+     * @param {string} url - URL to check
+     * @returns {boolean} - True if valid YouTube URL
+     * @private
+     */
+    _isValidYouTubeUrl(url) {
+        const youtubeHosts = [
+            'youtube.com',
+            'www.youtube.com',
+            'm.youtube.com',
+            'gaming.youtube.com',
+            'music.youtube.com',
+            'youtu.be'
+        ];
+
+        return youtubeHosts.some(host => url.includes(host));
+    }
+
+    /**
+     * Validate YouTube video ID format
+     * @param {string} videoId - Video ID to validate
+     * @returns {boolean} - True if valid video ID
+     * @private
+     */
+    _isValidVideoId(videoId) {
+        if (!videoId || typeof videoId !== 'string') {
+            return false;
+        }
+
+        // YouTube video IDs are exactly 11 characters long
+        if (videoId.length !== 11) {
+            return false;
+        }
+
+        // Must contain only alphanumeric characters, hyphens, and underscores
+        if (!/^[a-zA-Z0-9_-]+$/.test(videoId)) {
+            return false;
+        }
+
+        // Should not be all the same character (likely invalid)
+        if (/^(.)\1{10}$/.test(videoId)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
