@@ -14,6 +14,17 @@ class AISettingsManager {
     }
 
     /**
+     * Get singleton instance of AISettingsManager
+     * @returns {AISettingsManager} - Singleton instance
+     */
+    static getInstance() {
+        if (!AISettingsManager.instance) {
+            AISettingsManager.instance = new AISettingsManager();
+        }
+        return AISettingsManager.instance;
+    }
+
+    /**
      * Save AI provider settings (in-memory only)
      * @param {Object} settings - Settings to save
      * @param {string} settings.mode - 'offline' or 'online'
@@ -23,7 +34,7 @@ class AISettingsManager {
     saveSettings(settings) {
         try {
             console.log('Saving AI provider settings to shared memory...');
-            
+
             // Validate settings structure
             const validation = this.validateSettings(settings);
             if (!validation.valid) {
@@ -32,7 +43,7 @@ class AISettingsManager {
 
             // Store in shared memory only (no disk persistence for security)
             sharedSettings = { ...settings, lastUpdated: new Date().toISOString() };
-            
+
             console.log('AI provider settings saved to shared memory successfully');
             console.log('Saved settings:', JSON.stringify(sharedSettings, (key, value) => {
                 // Hide API key in logs
@@ -54,7 +65,7 @@ class AISettingsManager {
     loadSettings() {
         try {
             console.log('Loading AI provider settings from shared memory...');
-            
+
             if (sharedSettings) {
                 console.log('AI provider settings loaded from shared memory successfully');
                 console.log('Loaded settings:', JSON.stringify(sharedSettings, (key, value) => {
@@ -116,18 +127,18 @@ class AISettingsManager {
             errors.push('Mode must be either "offline" or "online"');
         }
 
-        // Validate offline settings
-        if (settings.offline) {
+        // Validate offline settings (only when in offline mode)
+        if (settings.mode === 'offline' && settings.offline) {
             if (!settings.offline.model || typeof settings.offline.model !== 'string') {
-                errors.push('Offline model must be a non-empty string');
+                errors.push('Offline model must be a non-empty string when in offline mode');
             }
             if (settings.offline.endpoint && typeof settings.offline.endpoint !== 'string') {
                 errors.push('Offline endpoint must be a string');
             }
         }
 
-        // Validate online settings
-        if (settings.online) {
+        // Validate online settings (only when in online mode)
+        if (settings.mode === 'online' && settings.online) {
             const validProviders = ['openai', 'anthropic', 'google', 'microsoft', 'grok', 'deepseek'];
             if (!settings.online.provider || !validProviders.includes(settings.online.provider)) {
                 errors.push(`Online provider must be one of: ${validProviders.join(', ')}`);
@@ -167,24 +178,24 @@ class AISettingsManager {
      */
     updateSetting(path, value) {
         const settings = this.loadSettings();
-        
+
         // Navigate to the setting path
         const pathParts = path.split('.');
         let current = settings;
-        
+
         for (let i = 0; i < pathParts.length - 1; i++) {
             if (!current[pathParts[i]]) {
                 current[pathParts[i]] = {};
             }
             current = current[pathParts[i]];
         }
-        
+
         // Set the value
         current[pathParts[pathParts.length - 1]] = value;
-        
+
         // Update timestamp
         settings.lastUpdated = new Date().toISOString();
-        
+
         // Save updated settings
         this.saveSettings(settings);
     }
@@ -195,7 +206,7 @@ class AISettingsManager {
      */
     getCurrentProviderConfig() {
         const settings = this.loadSettings();
-        
+
         if (settings.mode === 'offline') {
             return {
                 type: 'ollama',
@@ -223,9 +234,9 @@ class AISettingsManager {
             settings.version = '1.0.0';
             settings.lastUpdated = new Date().toISOString();
         }
-        
+
         // Add future migration logic here
-        
+
         return settings;
     }
 }

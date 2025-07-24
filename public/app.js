@@ -761,6 +761,7 @@ class AISettingsManager {
     async saveSettings(settings) {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
+            console.log('Frontend: About to save settings to backend:', this.settings);
 
             // Save to backend (in-memory only for security)
             const response = await fetch('/api/ai-settings', {
@@ -770,6 +771,8 @@ class AISettingsManager {
                 },
                 body: JSON.stringify(this.settings)
             });
+            
+            console.log('Frontend: Backend response status:', response.status);
 
             if (response.ok) {
                 const result = await response.json();
@@ -832,6 +835,7 @@ const aiSettingsManager = new AISettingsManager();
 async function openAISettingsModal() {
     const modal = document.getElementById('ai-settings-modal');
     modal.style.display = 'flex';
+    console.log('Opening AI settings modal, loading settings...');
     await loadAISettingsUI();
 }
 
@@ -843,10 +847,13 @@ function closeAISettingsModal() {
 async function loadAISettingsUI() {
     const settings = await aiSettingsManager.loadSettings();
     aiSettingsManager.settings = settings;
+    
+    console.log('Loading AI settings UI with settings:', settings);
 
     // Set mode toggle
     const modeToggle = document.getElementById('mode-toggle');
     modeToggle.checked = settings.mode === 'online';
+    console.log('Setting mode toggle to:', settings.mode, 'checked:', modeToggle.checked);
     updateModeUI(settings.mode);
 
     // Load offline settings
@@ -1086,7 +1093,10 @@ async function saveAIConfiguration() {
     }
 
     // Save settings
+    console.log('Saving AI settings:', settings);
     const saveSuccess = await aiSettingsManager.saveSettings(settings);
+    console.log('Save result:', saveSuccess);
+    
     if (saveSuccess) {
         saveBtn.disabled = true;
         saveBtn.querySelector('.btn-text').textContent = 'Saved!';

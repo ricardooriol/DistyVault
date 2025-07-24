@@ -13,7 +13,7 @@ const fs = require('fs').promises;
 
 class Processor {
     constructor() {
-        this.aiSettingsManager = new AISettingsManager();
+        this.aiSettingsManager = AISettingsManager.getInstance();
     }
 
     /**

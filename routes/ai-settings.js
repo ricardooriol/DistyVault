@@ -149,20 +149,23 @@ router.post('/validate-ai-config', (req, res) => {
     }
 });
 
+// Use singleton instance of AISettingsManager
+const AISettingsManager = require('../services/ai/AISettingsManager');
+const sharedSettingsManager = AISettingsManager.getInstance();
+
 /**
  * Save AI provider settings
  * POST /api/ai-settings
  */
 router.post('/ai-settings', (req, res) => {
     try {
-        const AISettingsManager = require('../services/ai/AISettingsManager');
-        const settingsManager = new AISettingsManager();
-        
         const settings = req.body;
         
         // Validate settings
-        const validation = settingsManager.validateSettings(settings);
+        const validation = sharedSettingsManager.validateSettings(settings);
+        console.log('Backend: Validation result:', validation);
         if (!validation.valid) {
+            console.log('Backend: Validation failed with errors:', validation.errors);
             return res.status(400).json({
                 success: false,
                 error: validation.errors.join(', ')
@@ -170,7 +173,9 @@ router.post('/ai-settings', (req, res) => {
         }
         
         // Save settings
-        settingsManager.saveSettings(settings);
+        console.log('Backend: Saving AI settings:', JSON.stringify(settings, null, 2));
+        sharedSettingsManager.saveSettings(settings);
+        console.log('Backend: Settings saved successfully');
         
         res.json({
             success: true,
@@ -191,10 +196,8 @@ router.post('/ai-settings', (req, res) => {
  */
 router.get('/ai-settings', (req, res) => {
     try {
-        const AISettingsManager = require('../services/ai/AISettingsManager');
-        const settingsManager = new AISettingsManager();
-        
-        const settings = settingsManager.loadSettings();
+        const settings = sharedSettingsManager.loadSettings();
+        console.log('Backend: Loading AI settings:', JSON.stringify(settings, null, 2));
         
         res.json({
             success: true,
