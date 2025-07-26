@@ -949,12 +949,11 @@ ol.manual-numbered li .list-number {
     text-align: left !important;
 }
 
-/* Debug: Add a background to see if the span is being rendered */
+/* Numbered list styling */
 .modal-body ol.manual-numbered li .list-number {
-    background: rgba(255, 107, 53, 0.2) !important;
-    border: 1px solid var(--primary-orange) !important;
-    padding: 0.1rem 0.3rem !important;
-    border-radius: 3px !important;
+    color: var(--primary-orange);
+    font-weight: bold;
+    margin-right: 0.5rem;
 }
 
 /* Ultimate fix - use hardcoded color values to avoid any variable issues */
@@ -973,19 +972,7 @@ ol.manual-numbered li .list-number,
     border-radius: 3px !important;
 }
 
-/* Test marker - if you see this, CSS is loading */
-body::before {
-    content: "CSS LOADED - NUMBERED LIST FIX ACTIVE";
-    position: fixed;
-    top: 0;
-    left: 0;
-    background: #ff6b35;
-    color: white;
-    padding: 0.5rem;
-    z-index: 9999;
-    font-size: 12px;
-    font-weight: bold;
-}
+/* Removed debug marker */
 
 .modal-body ul {
     padding-left: 1.5rem;
@@ -1954,10 +1941,9 @@ ol.manual-numbered li .list-number {
     background: none !important;
     border: none !important;
     padding: 0 !important;
-}/* =
-==== CSS LOADING VERIFICATION & DEBUG ===== */
+}
 
-/* Clean styling without debug indicator */
+/* Clean numbered list styling */
 
 /* Clean numbered list styling */
 ol.manual-numbered {
@@ -1969,7 +1955,7 @@ ol.manual-numbered li {
     position: relative !important;
 }
 
-/* Clean list-number styling without debug elements */
+/* List number styling */
 
 /* Fallback CSS rules with multiple specificity levels */
 html body .modal-body ol.manual-numbered li .list-number,

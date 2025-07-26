@@ -199,7 +199,7 @@ app.get('/api/summaries/:id/pdf', async (req, res) => {
             });
         }
         
-        console.log(`Generating PDF for summary: ${summary.title}`);
+        // Generate PDF for the requested summary
         
         // Generate PDF
         const { buffer, filename } = await processor.generatePdf(req.params.id);
@@ -234,7 +234,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
             });
         }
         
-        console.log(`Bulk download requested for ${ids.length} items`);
+        // Process bulk download request for multiple items
         
         // If only one item, redirect to single PDF download
         if (ids.length === 1) {
@@ -293,7 +293,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         // Process each ID sequentially to avoid overwhelming the system
         for (const id of ids) {
             try {
-                console.log(`Processing summary ${id} for bulk download...`);
+                // Process individual summary for bulk download
                 
                 const summary = await database.getSummary(id);
                 if (!summary) {
@@ -342,7 +342,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 
                 const finalFilename = filename || `summary-${id}.pdf`;
                 
-                console.log(`Adding ${finalFilename} to ZIP (${finalBuffer.length} bytes)`);
+                // Add PDF to ZIP archive
                 
                 // Add to archive
                 archive.append(finalBuffer, { name: finalFilename });
@@ -354,7 +354,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
             }
         }
         
-        console.log(`Bulk download processing complete: ${successCount} successful, ${errorCount} errors`);
+        // Bulk download processing completed
         
         // Finalize the archive (this will trigger the download)
         archive.finalize();
@@ -382,7 +382,7 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
             });
         }
         
-        console.log(`Bulk delete requested for ${ids.length} items`);
+        // Process bulk delete request
         
         let deletedCount = 0;
         const errors = [];
@@ -408,7 +408,7 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
             }
         }
         
-        console.log(`Bulk delete completed: ${deletedCount} deleted, ${errors.length} errors`);
+        // Bulk delete operation completed
         
         res.json({
             deletedCount: deletedCount,
@@ -459,8 +459,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
+// Start the Express server
 app.listen(PORT, () => {
-    console.log(`🚀 SAWRON running at http://localhost:${PORT}`);
-    console.log('📚 Ready to process knowledge!');
+    console.log(`SAWRON server running on http://localhost:${PORT}`);
 });

@@ -161,7 +161,6 @@ class SawronApp {
         statusMessage.textContent = message;
         progressFill.style.width = `${progress}%`;
 
-        console.log(`Status: ${message} (${progress}%)`);
     }
 
     hideStatus() {
@@ -185,8 +184,6 @@ class SawronApp {
                 const formData = new FormData();
                 formData.append('file', this.selectedFile);
 
-                console.log(`Uploading file: ${this.selectedFile.name} (${this.selectedFile.size} bytes)`);
-
                 const response = await fetch('/api/process/file', {
                     method: 'POST',
                     body: formData
@@ -198,8 +195,6 @@ class SawronApp {
                 }
 
                 const result = await response.json();
-                console.log('File processing started:', result);
-
                 this.showStatus(`File uploaded. Processing in background...`, 100);
                 setTimeout(() => this.hideStatus(), 2000);
 
@@ -209,8 +204,6 @@ class SawronApp {
             } else if (url) {
                 // Process URL
                 this.showStatus('Processing URL...', 25);
-
-                console.log(`Processing URL: ${url}`);
 
                 const response = await fetch('/api/process/url', {
                     method: 'POST',
@@ -226,8 +219,6 @@ class SawronApp {
                 }
 
                 const result = await response.json();
-                console.log('URL processing started:', result);
-
                 this.showStatus(`URL submitted. Processing in background...`, 100);
                 setTimeout(() => this.hideStatus(), 2000);
 
@@ -654,8 +645,6 @@ class SawronApp {
 
     async downloadSummary(id) {
         try {
-            console.log(`Downloading PDF for summary ${id}...`);
-
             const response = await fetch(`/api/summaries/${id}/pdf`);
 
             if (!response.ok) {
@@ -676,8 +665,6 @@ class SawronApp {
 
             // Handle PDF download with proper blob type
             const blob = await response.blob();
-            console.log(`PDF blob received, size: ${blob.size} bytes, type: ${blob.type}`);
-
             // Ensure blob is treated as PDF
             const pdfBlob = new Blob([blob], { type: 'application/pdf' });
 
@@ -695,8 +682,6 @@ class SawronApp {
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
             }, 100);
-
-            console.log(`PDF downloaded successfully: ${filename}`);
 
         } catch (error) {
             console.error('Error downloading summary:', error);
@@ -774,9 +759,7 @@ class SawronApp {
     markdownToHtml(markdown) {
         if (!markdown) return '';
 
-        console.log(`[NUMBERED LIST DEBUG] SIMPLE SOLUTION - Starting processing...`);
-
-        // SIMPLE SOLUTION: Just find all numbered items and replace them with sequential numbers
+        // Process markdown and convert numbered lists to sequential numbering
         let numberedItemCounter = 0;
         const lines = markdown.split('\n');
         const result = [];
@@ -850,8 +833,6 @@ class SawronApp {
             // SIMPLE NUMBERED LIST SOLUTION - Just increment counter for ANY numbered item
             const orderedMatch = trimmedLine.match(/^\d+\. (.+)$/);
             if (orderedMatch) {
-                console.log(`[NUMBERED LIST DEBUG] Found numbered item: "${trimmedLine}"`);
-
                 if (currentParagraph.length > 0) {
                     result.push(`<p>${currentParagraph.join('<br>')}</p>`);
                     currentParagraph = [];
@@ -866,12 +847,8 @@ class SawronApp {
                 }
 
                 numberedItemCounter++;
-                console.log(`[NUMBERED LIST DEBUG] Using sequential number: ${numberedItemCounter}`);
-
                 const content = this.processInlineMarkdown(orderedMatch[1]);
                 const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
-                console.log(`[NUMBERED LIST DEBUG] Generated: ${listItem}`);
-
                 result.push(listItem);
                 continue;
             }
@@ -891,9 +868,7 @@ class SawronApp {
         // Flush any remaining content
         this.flushParagraph(result, currentParagraph, inList, listType);
 
-        const finalResult = result.join('\n');
-        console.log(`[NUMBERED LIST DEBUG] Final result with sequential numbering`);
-        return finalResult;
+        return result.join('\n');
     }
 
     /**
@@ -905,7 +880,6 @@ class SawronApp {
             currentParagraph.length = 0;
         }
         if (inList) {
-            console.log(`[NUMBERED LIST DEBUG] flushParagraph - closing list type: ${listType}`);
             result.push(`</${listType}>`);
             inList = false;
             listType = null;
@@ -958,7 +932,6 @@ class SawronApp {
             
             // Ensure all elements exist
             if (!bulkActionsBar || !selectedCount || !selectAllBtn || !headerCheckbox) {
-                console.warn('Some bulk action elements not found in DOM');
                 return;
             }
             
@@ -1002,7 +975,7 @@ class SawronApp {
                 selectAllBtn.innerHTML = '<span class="btn-icon">☑️</span><span class="btn-text">Select All</span>';
             }
         } catch (error) {
-            console.error('Error in handleRowSelection:', error);
+            // Handle selection errors silently
         }
     }
 
@@ -1020,7 +993,7 @@ class SawronApp {
             
             this.handleRowSelection();
         } catch (error) {
-            console.error('Error in toggleSelectAll:', error);
+            // Handle toggle errors silently
         }
     }
 
@@ -1043,8 +1016,6 @@ class SawronApp {
         downloadBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
         
         try {
-            console.log(`Downloading ${selectedIds.length} items...`);
-            
             const response = await fetch('/api/summaries/bulk-download', {
                 method: 'POST',
                 headers: {
@@ -1102,8 +1073,6 @@ class SawronApp {
                 window.URL.revokeObjectURL(url);
             }, 100);
             
-            console.log(`Download completed: ${filename}`);
-            
             // Show success feedback
             const itemText = selectedIds.length === 1 ? 'item' : 'items';
             this.showTemporaryMessage(`Successfully downloaded ${selectedIds.length} ${itemText}`, 'success');
@@ -1151,8 +1120,6 @@ class SawronApp {
         deleteBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Deleting...</span>';
         
         try {
-            console.log(`Deleting ${selectedIds.length} items...`);
-            
             const response = await fetch('/api/summaries/bulk-delete', {
                 method: 'POST',
                 headers: {
@@ -1173,8 +1140,6 @@ class SawronApp {
             }
             
             const result = await response.json();
-            console.log(`Successfully deleted ${result.deletedCount} items`);
-            
             // Show success/partial success feedback
             if (result.deletedCount === selectedIds.length) {
                 const itemText = result.deletedCount === 1 ? 'item' : 'items';
@@ -1185,9 +1150,7 @@ class SawronApp {
                 this.showTemporaryMessage('No items were deleted. Please try again.', 'error');
             }
             
-            if (result.errors && result.errors.length > 0) {
-                console.warn(`${result.errors.length} items could not be deleted:`, result.errors);
-            }
+            // Handle any deletion errors silently
             
             // Refresh the knowledge base
             this.loadKnowledgeBase();
@@ -1348,8 +1311,6 @@ class AISettingsManager {
     async saveSettings(settings) {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
-            console.log('Frontend: About to save settings to backend:', this.settings);
-
             // Save to backend (in-memory only for security)
             const response = await fetch('/api/ai-settings', {
                 method: 'POST',
@@ -1359,12 +1320,9 @@ class AISettingsManager {
                 body: JSON.stringify(this.settings)
             });
 
-            console.log('Frontend: Backend response status:', response.status);
-
             if (response.ok) {
                 const result = await response.json();
                 if (result.success) {
-                    console.log('AI settings saved to backend memory successfully');
                     // Save non-sensitive settings to localStorage for UI persistence
                     const localSettings = { ...this.settings };
                     if (localSettings.online && localSettings.online.apiKey) {
@@ -1388,7 +1346,6 @@ class AISettingsManager {
                     localSettings.online.apiKey = ''; // Don't store API key locally
                 }
                 localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
-                console.log('AI settings saved to localStorage as fallback (without API key)');
                 return true;
             } catch (localError) {
                 console.error('Error saving AI settings to localStorage:', localError);
@@ -1422,7 +1379,6 @@ const aiSettingsManager = new AISettingsManager();
 async function openAISettingsModal() {
     const modal = document.getElementById('ai-settings-modal');
     modal.style.display = 'flex';
-    console.log('Opening AI settings modal, loading settings...');
     await loadAISettingsUI();
 }
 
@@ -1435,12 +1391,9 @@ async function loadAISettingsUI() {
     const settings = await aiSettingsManager.loadSettings();
     aiSettingsManager.settings = settings;
 
-    console.log('Loading AI settings UI with settings:', settings);
-
     // Set mode toggle
     const modeToggle = document.getElementById('mode-toggle');
     modeToggle.checked = settings.mode === 'online';
-    console.log('Setting mode toggle to:', settings.mode, 'checked:', modeToggle.checked);
     updateModeUI(settings.mode);
 
     // Load offline settings
@@ -1680,7 +1633,6 @@ async function saveAIConfiguration() {
     }
 
     // Save settings
-    console.log('Saving AI settings:', settings);
     const saveSuccess = await aiSettingsManager.saveSettings(settings);
     console.log('Save result:', saveSuccess);
 

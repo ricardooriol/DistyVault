@@ -16,8 +16,6 @@ class ProcessingQueue {
      */
     setMaxConcurrent(limit) {
         this.maxConcurrent = Math.max(1, Math.min(10, limit));
-        console.log(`Processing queue limit set to: ${this.maxConcurrent}`);
-        
         // Process any queued items if we increased the limit
         if (!this.isProcessing) {
             this.processQueue();
@@ -41,8 +39,6 @@ class ProcessingQueue {
             };
 
             this.queue.push(task);
-            console.log(`[ProcessingQueue] Added task ${id} to queue. Queue length: ${this.queue.length}`);
-
             // Start processing if not already running
             if (!this.isProcessing) {
                 this.processQueue();
@@ -61,8 +57,6 @@ class ProcessingQueue {
         while (this.queue.length > 0 && this.activeProcessing.size < this.maxConcurrent) {
             const task = this.queue.shift();
             
-            console.log(`[ProcessingQueue] Starting task ${task.id}. Active: ${this.activeProcessing.size}/${this.maxConcurrent}`);
-            
             this.activeProcessing.add(task.id);
             
             // Execute the task
@@ -80,10 +74,8 @@ class ProcessingQueue {
         try {
             const result = await task.processingFunction();
             task.resolve(result);
-            console.log(`[ProcessingQueue] Task ${task.id} completed successfully`);
         } catch (error) {
             task.reject(error);
-            console.error(`[ProcessingQueue] Task ${task.id} failed:`, error.message);
         } finally {
             this.activeProcessing.delete(task.id);
             
@@ -111,8 +103,6 @@ class ProcessingQueue {
      * Clear the queue (for emergency stops)
      */
     clearQueue() {
-        console.log(`[ProcessingQueue] Clearing queue. ${this.queue.length} tasks cancelled.`);
-        
         // Reject all queued tasks
         this.queue.forEach(task => {
             task.reject(new Error('Processing queue cleared'));

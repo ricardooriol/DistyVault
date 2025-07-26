@@ -47,7 +47,7 @@ class Database {
                 )
             `);
         });
-        console.log('Database initialized with enhanced debugging fields');
+        // Database initialized successfully
     }
 
     async saveSummary(summary) {
@@ -79,10 +79,8 @@ class Database {
                 JSON.stringify(summary.logs || []),
                 function (err) {
                     if (err) {
-                        console.error(`Database error saving summary ${summary.id}:`, err);
                         reject(err);
                     } else {
-                        console.log(`Summary ${summary.id} saved successfully. Status: ${summary.status}, Step: ${summary.processingStep || 'N/A'}`);
                         resolve(summary);
                     }
                 }
@@ -156,19 +154,14 @@ class Database {
                 const setClauses = Object.keys(updates).map(key => `${key} = ?`).join(', ');
                 const values = [...Object.values(updates), id];
 
-                console.log(`Updating summary ${id} status to ${status}${processingStep ? `, step: ${processingStep}` : ''}`);
-
                 this.db.run(`UPDATE summaries SET ${setClauses} WHERE id = ?`, values, function (err) {
                     if (err) {
-                        console.error(`Error updating summary status ${id}:`, err);
                         reject(err);
                     } else {
-                        console.log(`Summary ${id} status updated successfully. Changes: ${this.changes}`);
                         resolve(this.changes > 0);
                     }
                 });
             } catch (error) {
-                console.error(`Error in updateSummaryStatus for ${id}:`, error);
                 reject(error);
             }
         });
@@ -182,23 +175,18 @@ class Database {
                 const now = new Date();
                 const elapsedTime = summary && summary.startTime ? (now - summary.startTime) / 1000 : 0;
 
-                console.log(`Updating summary ${id} content. Processing time: ${processingTime}s, Elapsed time: ${elapsedTime}s, Word count: ${wordCount}`);
-
                 this.db.run(
                     'UPDATE summaries SET content = ?, rawContent = ?, processingTime = ?, elapsedTime = ?, wordCount = ?, status = ?, processingStep = ?, completedAt = ? WHERE id = ?',
                     [content, rawContent, processingTime, elapsedTime, wordCount, 'completed', 'Summary completed', now.toISOString(), id],
                     function (err) {
                         if (err) {
-                            console.error(`Error updating summary content ${id}:`, err);
                             reject(err);
                         } else {
-                            console.log(`Summary ${id} content updated successfully. Changes: ${this.changes}`);
                             resolve(this.changes > 0);
                         }
                     }
                 );
             } catch (error) {
-                console.error(`Error in updateSummaryContent for ${id}:`, error);
                 reject(error);
             }
         });

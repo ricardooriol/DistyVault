@@ -26,9 +26,7 @@ class Processor {
             const settings = this.aiSettingsManager.loadSettings();
             const concurrentLimit = settings.concurrentProcessing || 1;
             processingQueue.setMaxConcurrent(concurrentLimit);
-            console.log(`Processor initialized with concurrent processing limit: ${concurrentLimit}`);
         } catch (error) {
-            console.warn('Failed to load concurrent processing setting, using default:', error.message);
             processingQueue.setMaxConcurrent(1);
         }
     }
@@ -40,16 +38,10 @@ class Processor {
     async getCurrentAIProvider() {
         try {
             const settings = this.aiSettingsManager.loadSettings();
-            console.log('Loaded settings in processor:', JSON.stringify(settings, null, 2));
-            
             const config = this.aiSettingsManager.getCurrentProviderConfig();
-            console.log(`Using AI provider: ${config.type} with model: ${config.model}`);
-            console.log('Full config:', JSON.stringify(config, null, 2));
-            
             return AIProviderFactory.createProvider(config);
         } catch (error) {
-            console.warn(`Failed to create AI provider from settings: ${error.message}`);
-            console.log('Falling back to Ollama with default settings');
+            // Fallback to Ollama with default settings
             
             // Fallback to Ollama with default settings
             return AIProviderFactory.createProvider({
@@ -66,7 +58,7 @@ class Processor {
      * @returns {Promise<Summary>} - The created summary object
      */
     async processUrl(url) {
-        console.log(`Starting URL processing: ${url}`);
+        // Start URL processing
 
         // Check if this is a YouTube playlist
         if (contentExtractor.isYoutubeUrl(url) && contentExtractor.classifyYoutubeUrl(url) === 'playlist') {
@@ -596,7 +588,7 @@ class Processor {
                 throw new Error('Summary is not yet completed');
             }
 
-            console.log(`Generating PDF for summary: ${summary.title}`);
+            // Generate PDF for summary
 
             const puppeteer = require('puppeteer');
             
@@ -630,14 +622,14 @@ class Processor {
                 displayHeaderFooter: false
             });
 
-            console.log(`PDF buffer generated, size: ${pdfBuffer.length} bytes`);
+            // PDF buffer generated successfully
 
             await browser.close();
 
             // Generate filename from title
             const filename = this.generatePdfFilename(summary.title);
 
-            console.log(`PDF generated successfully: ${filename}`);
+            // PDF generated successfully
             return { buffer: pdfBuffer, filename };
 
         } catch (error) {
@@ -884,9 +876,7 @@ class Processor {
     markdownToHtml(markdown) {
         if (!markdown) return '';
 
-        console.log(`[PDF NUMBERED LIST DEBUG] Starting processing...`);
-        
-        // SIMPLE SOLUTION: Just find all numbered items and replace them with sequential numbers
+        // Process markdown and convert numbered lists to sequential numbering
         let numberedItemCounter = 0;
         const lines = markdown.split('\n');
         const result = [];
@@ -960,8 +950,6 @@ class Processor {
             // SIMPLE NUMBERED LIST SOLUTION - Just increment counter for ANY numbered item
             const orderedMatch = trimmedLine.match(/^\d+\. (.+)$/);
             if (orderedMatch) {
-                console.log(`[PDF NUMBERED LIST DEBUG] Found numbered item: "${trimmedLine}"`);
-                
                 if (currentParagraph.length > 0) {
                     result.push(`<p>${currentParagraph.join('<br>')}</p>`);
                     currentParagraph = [];
@@ -976,12 +964,8 @@ class Processor {
                 }
                 
                 numberedItemCounter++;
-                console.log(`[PDF NUMBERED LIST DEBUG] Using sequential number: ${numberedItemCounter}`);
-                
                 const content = this.processInlineMarkdown(orderedMatch[1]);
                 const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
-                console.log(`[PDF NUMBERED LIST DEBUG] Generated: ${listItem}`);
-                
                 result.push(listItem);
                 continue;
             }
@@ -1000,8 +984,6 @@ class Processor {
 
         // Flush any remaining content
         this.flushParagraph(result, currentParagraph, inList, listType);
-
-        console.log(`[PDF NUMBERED LIST DEBUG] Final result with sequential numbering`);
         return result.join('\n');
     }
 
