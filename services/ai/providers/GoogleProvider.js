@@ -61,10 +61,13 @@ class GoogleProvider extends AIProvider {
                 const duration = (endTime - startTime) / 1000;
 
                 if (response && response.text) {
-                    const summary = response.text().trim();
+                    const rawSummary = response.text().trim();
                     console.log(`Google Gemini response received in ${duration.toFixed(2)}s`);
-                    console.log(`Summary length: ${summary.length} characters`);
-                    return summary;
+                    console.log(`Summary length: ${rawSummary.length} characters`);
+                    
+                    // Apply post-processing to fix numbering and other issues
+                    const processedSummary = this.postProcessSummary(rawSummary);
+                    return processedSummary;
                 } else {
                     throw new Error('Invalid response format from Google Gemini');
                 }

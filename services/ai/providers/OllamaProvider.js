@@ -53,10 +53,13 @@ class OllamaProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.response) {
-                const summary = response.data.response.trim();
+                const rawSummary = response.data.response.trim();
                 console.log(`Ollama response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${summary.length} characters`);
-                return summary;
+                console.log(`Summary length: ${rawSummary.length} characters`);
+                
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid response format from Ollama');
             }

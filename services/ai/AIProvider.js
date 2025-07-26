@@ -2,6 +2,8 @@
  * Abstract base class for AI providers
  * Defines the common interface that all AI providers must implement
  */
+const NumberingProcessor = require('./NumberingProcessor');
+
 class AIProvider {
     constructor(config = {}) {
         this.config = config;
@@ -15,7 +17,40 @@ class AIProvider {
      * @returns {Promise<string>} - The generated summary
      */
     async generateSummary(text, options = {}) {
+        // This method should be overridden by subclasses to call the AI provider
+        // and then call this.postProcessSummary() on the result
         throw new Error(`generateSummary must be implemented by ${this.name}`);
+    }
+
+    /**
+     * Post-process the AI-generated summary to fix common issues
+     * @param {string} rawSummary - The raw summary from the AI provider
+     * @returns {string} - The processed summary with fixes applied
+     */
+    postProcessSummary(rawSummary) {
+        if (!rawSummary || typeof rawSummary !== 'string') {
+            return rawSummary;
+        }
+
+        try {
+            // Apply numbering fixes
+            const fixedSummary = NumberingProcessor.fixNumbering(rawSummary);
+            
+            // Log if numbering issues were detected and fixed
+            if (fixedSummary !== rawSummary) {
+                const stats = NumberingProcessor.getNumberingStats(rawSummary);
+                console.log(`[${this.name}] Fixed numbering issues:`, {
+                    totalPoints: stats.totalPoints,
+                    issueTypes: stats.issueTypes,
+                    originalNumbers: stats.numbers
+                });
+            }
+            
+            return fixedSummary;
+        } catch (error) {
+            console.warn(`[${this.name}] Error in post-processing summary:`, error.message);
+            return rawSummary; // Return original if processing fails
+        }
     }
 
     /**

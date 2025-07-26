@@ -61,12 +61,15 @@ class AnthropicProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.content && response.data.content[0]) {
-                const summary = response.data.content[0].text.trim();
+                const rawSummary = response.data.content[0].text.trim();
                 console.log(`Anthropic response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${summary.length} characters`);
+                console.log(`Summary length: ${rawSummary.length} characters`);
                 console.log(`Input tokens: ${response.data.usage?.input_tokens || 'unknown'}`);
                 console.log(`Output tokens: ${response.data.usage?.output_tokens || 'unknown'}`);
-                return summary;
+                
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid response format from Anthropic');
             }

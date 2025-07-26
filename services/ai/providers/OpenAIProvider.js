@@ -60,11 +60,14 @@ class OpenAIProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.choices && response.data.choices[0]) {
-                const summary = response.data.choices[0].message.content.trim();
+                const rawSummary = response.data.choices[0].message.content.trim();
                 console.log(`OpenAI response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${summary.length} characters`);
+                console.log(`Summary length: ${rawSummary.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
-                return summary;
+                
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid response format from OpenAI');
             }
