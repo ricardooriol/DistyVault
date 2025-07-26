@@ -238,17 +238,9 @@ class Processor {
                     }
                 }
 
-                // Complete the tracking summary
-                const processingTime = (Date.now() - trackingSummary.startTime) / 1000;
-                await database.updateSummaryContent(
-                    trackingSummary.id,
-                    `Playlist processing completed. Successfully processed ${processedVideos.length} out of ${videoUrls.length} videos.`,
-                    `Playlist URL: ${playlistUrl}\nVideos processed: ${processedVideos.length}/${videoUrls.length}`,
-                    processingTime,
-                    50 // Approximate word count for playlist summary
-                );
-
-                await this.updateSummaryTitle(trackingSummary.id, `YouTube Playlist (${processedVideos.length} videos processed)`);
+                // Delete the tracking summary since all individual videos are now processed
+                await database.deleteSummary(trackingSummary.id);
+                console.log(`[${trackingSummary.id}] Playlist processing completed and tracking summary deleted. Successfully processed ${processedVideos.length} out of ${videoUrls.length} videos.`);
 
                 return { success: true, processedVideos: processedVideos.length };
             } catch (error) {

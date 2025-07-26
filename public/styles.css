@@ -398,7 +398,7 @@ body {
     background: var(--bg-secondary);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    overflow: visible;
+    overflow: hidden;
     width: 100%;
 }
 
@@ -406,6 +406,8 @@ body {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
 .knowledge-base-table th:nth-child(1) { width: 40px; } /* Checkbox */
@@ -427,6 +429,14 @@ body {
     font-size: 0.9rem;
 }
 
+.knowledge-base-table th:first-child {
+    border-top-left-radius: 12px;
+}
+
+.knowledge-base-table th:last-child {
+    border-top-right-radius: 12px;
+}
+
 .knowledge-base-table td {
     padding: 0.75rem 0.5rem;
     border-bottom: 1px solid var(--border-color);
@@ -437,16 +447,7 @@ body {
     overflow: hidden;
 }
 
-.knowledge-base-table th {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    font-weight: 600;
-    padding: 0.75rem 0.5rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    height: 50px;
-}
+
 
 /* Checkbox column */
 .checkbox-column {

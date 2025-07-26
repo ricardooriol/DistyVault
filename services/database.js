@@ -41,11 +41,22 @@ class Database {
                     processingTime REAL,
                     elapsedTime REAL,
                     startTime TEXT,
+                    summarizingStartTime TEXT,
                     wordCount INTEGER,
                     error TEXT,
                     logs TEXT
                 )
             `);
+
+            // Add summarizingStartTime column if it doesn't exist (for existing databases)
+            this.db.run(`
+                ALTER TABLE summaries ADD COLUMN summarizingStartTime TEXT
+            `, (err) => {
+                // Ignore error if column already exists
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.warn('Warning adding summarizingStartTime column:', err.message);
+                }
+            });
         });
         // Database initialized successfully
     }
@@ -55,8 +66,8 @@ class Database {
             const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO summaries 
                 (id, title, content, sourceUrl, sourceType, sourceFile, status, processingStep, rawContent,
-                createdAt, completedAt, processingTime, elapsedTime, startTime, wordCount, error, logs)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                createdAt, completedAt, processingTime, elapsedTime, startTime, summarizingStartTime, wordCount, error, logs)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
 
             stmt.run(
@@ -74,6 +85,7 @@ class Database {
                 summary.processingTime,
                 summary.elapsedTime || 0,
                 summary.startTime ? summary.startTime.toISOString() : null,
+                summary.summarizingStartTime ? summary.summarizingStartTime.toISOString() : null,
                 summary.wordCount,
                 summary.error,
                 JSON.stringify(summary.logs || []),
@@ -145,9 +157,17 @@ class Database {
                     updates.error = error;
                 }
 
-                // Update elapsed time
+                // Update elapsed time and start time for summarizing status
                 const summary = await this.getSummary(id);
-                if (summary && summary.startTime) {
+                if (status === 'summarizing' && summary && !summary.summarizingStartTime) {
+                    // Set the summarizing start time when status first changes to summarizing
+                    updates.summarizingStartTime = new Date().toISOString();
+                    updates.elapsedTime = 0; // Reset elapsed time
+                } else if (summary && summary.summarizingStartTime) {
+                    // Calculate elapsed time from when summarizing started
+                    updates.elapsedTime = (new Date() - new Date(summary.summarizingStartTime)) / 1000;
+                } else if (summary && summary.startTime && status !== 'summarizing') {
+                    // For non-summarizing statuses, use original logic
                     updates.elapsedTime = (new Date() - summary.startTime) / 1000;
                 }
 
@@ -173,7 +193,10 @@ class Database {
                 // Get current summary to calculate elapsed time
                 const summary = await this.getSummary(id);
                 const now = new Date();
-                const elapsedTime = summary && summary.startTime ? (now - summary.startTime) / 1000 : 0;
+                // Use summarizing start time if available, otherwise fall back to start time
+                const elapsedTime = summary && summary.summarizingStartTime ? 
+                    (now - summary.summarizingStartTime) / 1000 : 
+                    (summary && summary.startTime ? (now - summary.startTime) / 1000 : 0);
 
                 this.db.run(
                     'UPDATE summaries SET content = ?, rawContent = ?, processingTime = ?, elapsedTime = ?, wordCount = ?, status = ?, processingStep = ?, completedAt = ? WHERE id = ?',
@@ -225,6 +248,7 @@ class Database {
             processingTime: row.processingTime,
             elapsedTime: row.elapsedTime,
             startTime: row.startTime ? new Date(row.startTime) : null,
+            summarizingStartTime: row.summarizingStartTime ? new Date(row.summarizingStartTime) : null,
             wordCount: row.wordCount,
             error: row.error,
             logs: row.logs ? JSON.parse(row.logs) : []
