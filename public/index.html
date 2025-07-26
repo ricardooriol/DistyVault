@@ -51,7 +51,7 @@
 
                         <button class="summarize-btn disabled" id="summarize-btn" onclick="startSummarization()">
                             <span class="btn-icon">⚡</span>
-                            <span class="btn-text">Summarize</span>
+                            <span class="btn-text">Distill</span>
                         </button>
                     </div>
                 </div>
@@ -99,7 +99,6 @@
                             <option value="all">All Types</option>
                             <option value="url">Web Pages</option>
                             <option value="youtube">YouTube Videos</option>
-                            <option value="playlist">YouTube Playlists</option>
                             <option value="file">Documents</option>
                         </select>
                         <button class="refresh-btn" onclick="refreshKnowledgeBase()">
@@ -109,10 +108,35 @@
                     </div>
                 </div>
                 
+                <!-- Bulk Actions Bar -->
+                <div class="bulk-actions-bar" id="bulk-actions-bar" style="display: none;">
+                    <div class="bulk-actions-left">
+                        <button class="bulk-action-btn select-all-btn" id="select-all-btn" onclick="toggleSelectAll()">
+                            <span class="btn-icon">☑️</span>
+                            <span class="btn-text">Select All</span>
+                        </button>
+                        <span class="selected-count" id="selected-count">0 selected</span>
+                    </div>
+                    <div class="bulk-actions-right">
+                        <button class="bulk-action-btn download-btn" id="bulk-download-btn" onclick="bulkDownload()">
+                            <span class="btn-icon">📥</span>
+                            <span class="btn-text">Download</span>
+                        </button>
+                        <button class="bulk-action-btn delete-btn" id="bulk-delete-btn" onclick="bulkDelete()">
+                            <span class="btn-icon">🗑️</span>
+                            <span class="btn-text">Delete</span>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="knowledge-base-table-container">
                     <table class="knowledge-base-table" id="knowledge-base-table">
                         <thead>
                             <tr>
+                                <th class="checkbox-column">
+                                    <input type="checkbox" id="header-checkbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th>Name</th>
                                 <th>Source</th>
                                 <th>Type</th>
                                 <th>Status</th>
@@ -184,21 +208,36 @@
                         <h4 class="config-section-title">AI Provider Mode</h4>
                         <div class="mode-toggle-container">
                             <div class="mode-toggle">
-                                <input type="checkbox" id="mode-toggle" onchange="handleModeToggle()">
+                                <input type="checkbox" id="mode-toggle" onchange="handleModeToggle()" checked>
                                 <label for="mode-toggle" class="toggle-slider"></label>
                             </div>
                             <div class="mode-labels">
                                 <span class="mode-label" id="offline-label">Offline (Ollama)</span>
-                                <span class="mode-label" id="online-label">Online (Cloud)</span>
+                                <span class="mode-label active" id="online-label">Online (Cloud)</span>
                             </div>
                         </div>
                         <p class="mode-description" id="mode-description">
-                            Use local Ollama installation for AI processing
+                            Use cloud-based AI providers for processing
                         </p>
                     </div>
 
+                    <!-- Processing Queue Configuration -->
+                    <div class="config-section">
+                        <h4 class="config-section-title">Processing Queue Settings</h4>
+                        <div class="form-group">
+                            <label for="concurrent-processing" class="form-label">Simultaneous Processing Limit:</label>
+                            <div class="number-input-container">
+                                <button type="button" class="number-btn number-down" onclick="adjustConcurrentProcessing(-1)">−</button>
+                                <input type="number" id="concurrent-processing" class="form-input number-input" 
+                                       min="1" max="10" value="1" step="1">
+                                <button type="button" class="number-btn number-up" onclick="adjustConcurrentProcessing(1)">+</button>
+                            </div>
+                            <small class="form-help">Maximum number of items that can be processed simultaneously. Lower values reduce API rate limit issues.</small>
+                        </div>
+                    </div>
+
                     <!-- Offline Configuration -->
-                    <div class="config-section" id="offline-config">
+                    <div class="config-section hidden" id="offline-config">
                         <h4 class="config-section-title">Ollama Configuration</h4>
                         <div class="form-group">
                             <label for="ollama-model" class="form-label">Model Name:</label>
@@ -217,7 +256,7 @@
                     </div>
 
                     <!-- Online Configuration -->
-                    <div class="config-section hidden" id="online-config">
+                    <div class="config-section" id="online-config">
                         <h4 class="config-section-title">Cloud AI Provider</h4>
                         <div class="form-group">
                             <label for="provider-select" class="form-label">AI Provider:</label>

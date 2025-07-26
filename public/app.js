@@ -5,6 +5,7 @@ class SawronApp {
         this.currentFilter = 'all';
         this.selectedFile = null;
         this.refreshInterval = null;
+        this.selectedItems = new Set(); // Track selected item IDs
         this.init();
     }
 
@@ -300,7 +301,7 @@ class SawronApp {
         if (!items || items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-state-cell">
+                    <td colspan="8" class="empty-state-cell">
                         <div class="empty-state">
                             <div class="empty-icon">🎯</div>
                             <h3>Ready to Process Knowledge</h3>
@@ -309,10 +310,115 @@ class SawronApp {
                     </td>
                 </tr>
             `;
+            // Hide bulk actions bar when empty
+            const bulkActionsBar = document.getElementById('bulk-actions-bar');
+            if (bulkActionsBar) bulkActionsBar.style.display = 'none';
             return;
         }
 
         tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
+        
+        // Restore checkbox states after rendering
+        this.restoreCheckboxStates();
+    }
+    
+    restoreCheckboxStates() {
+        // Restore selected states for checkboxes
+        this.selectedItems.forEach(id => {
+            const checkbox = document.querySelector(`.row-checkbox[data-id="${id}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+        
+        // Update UI based on current selection
+        this.handleRowSelection();
+    }
+    
+    showTemporaryMessage(message, type = 'info') {
+        // Create or get existing message container
+        let messageContainer = document.getElementById('temp-message-container');
+        if (!messageContainer) {
+            messageContainer = document.createElement('div');
+            messageContainer.id = 'temp-message-container';
+            messageContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 400px;
+            `;
+            document.body.appendChild(messageContainer);
+        }
+        
+        // Create message element
+        const messageElement = document.createElement('div');
+        messageElement.style.cssText = `
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+            background: ${type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : type === 'error' ? '#f44336' : '#2196f3'};
+        `;
+        
+        messageElement.textContent = message;
+        messageContainer.appendChild(messageElement);
+        
+        // Add slide-in animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        if (!document.getElementById('temp-message-styles')) {
+            style.id = 'temp-message-styles';
+            document.head.appendChild(style);
+        }
+        
+        // Remove message after 4 seconds
+        setTimeout(() => {
+            messageElement.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.parentNode.removeChild(messageElement);
+                }
+            }, 300);
+        }, 4000);
+    }
+
+    extractItemName(item) {
+        // Extract name from title, URL, or file
+        let name = 'Unknown';
+        
+        if (item.title && item.title !== 'Processing...' && !item.title.includes('Processing')) {
+            name = item.title;
+        } else if (item.sourceUrl) {
+            // Extract name from URL
+            try {
+                const url = new URL(item.sourceUrl);
+                if (url.hostname.includes('youtube.com') || url.hostname.includes('youtu.be')) {
+                    name = 'YouTube Video';
+                } else {
+                    name = url.hostname.replace('www.', '');
+                }
+            } catch {
+                name = 'Web Page';
+            }
+        } else if (item.sourceFile) {
+            // Remove extension from file name
+            name = item.sourceFile.name.replace(/\.[^/.]+$/, '');
+        }
+        
+        return name;
     }
 
     createTableRow(item) {
@@ -336,6 +442,9 @@ class SawronApp {
         }
 
         const title = item.title || 'Processing...';
+        
+        // Extract name for display
+        const name = this.extractItemName(item);
 
         // Format source display
         let sourceDisplay = '';
@@ -400,6 +509,10 @@ class SawronApp {
 
         return `
             <tr data-id="${item.id}">
+                <td class="checkbox-column">
+                    <input type="checkbox" class="row-checkbox" data-id="${item.id}" onchange="app.handleRowSelection()">
+                </td>
+                <td class="name-cell" title="${name}">${this.truncateText(name, 30)}</td>
                 <td class="source-cell">${sourceDisplay}</td>
                 <td class="type-cell">${this.getTypeLabel(item.sourceType)}</td>
                 <td class="status-cell">${statusDisplay}</td>
@@ -458,6 +571,8 @@ class SawronApp {
             document.getElementById('summary-meta').innerHTML = metaHtml;
             document.getElementById('summary-content').innerHTML = this.formatContent(summary.content || '');
             document.getElementById('summary-modal').style.display = 'block';
+
+
 
         } catch (error) {
             console.error('Error showing summary:', error);
@@ -539,32 +654,53 @@ class SawronApp {
 
     async downloadSummary(id) {
         try {
-            const response = await fetch(`/api/summaries/${id}/pdf`);
+            console.log(`Downloading PDF for summary ${id}...`);
 
-            if (response.status === 501) {
-                alert('PDF download not yet implemented');
-                return;
-            }
+            const response = await fetch(`/api/summaries/${id}/pdf`);
 
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.message || 'Failed to download summary');
             }
 
-            // Handle PDF download
+            // Get filename from Content-Disposition header
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `summary-${id}.pdf`;
+
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            // Handle PDF download with proper blob type
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
+            console.log(`PDF blob received, size: ${blob.size} bytes, type: ${blob.type}`);
+
+            // Ensure blob is treated as PDF
+            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+
+            const url = window.URL.createObjectURL(pdfBlob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `summary-${id}.pdf`;
+            a.download = filename;
+            a.target = '_blank'; // Also try to open in new tab as fallback
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
+
+            // Clean up after a delay
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+
+            console.log(`PDF downloaded successfully: ${filename}`);
 
         } catch (error) {
             console.error('Error downloading summary:', error);
-            alert('Error: ' + error.message);
+            alert('Error downloading PDF: ' + error.message);
         }
     }
 
@@ -614,7 +750,6 @@ class SawronApp {
         const labels = {
             'url': '🌐 Web',
             'youtube': '📺 YouTube',
-            'playlist': '📋 YouTube Playlist',
             'file': '📄 Document'
         };
         return labels[type] || type;
@@ -632,17 +767,456 @@ class SawronApp {
     formatContent(content) {
         if (!content) return '';
 
-        return content.split('\n').map(line => {
-            if (line.match(/^\d+\./)) {
-                return `<p><strong>${line}</strong></p>`;
+        // Convert markdown to HTML
+        return this.markdownToHtml(content);
+    }
+
+    markdownToHtml(markdown) {
+        if (!markdown) return '';
+
+        console.log(`[NUMBERED LIST DEBUG] SIMPLE SOLUTION - Starting processing...`);
+
+        // SIMPLE SOLUTION: Just find all numbered items and replace them with sequential numbers
+        let numberedItemCounter = 0;
+        const lines = markdown.split('\n');
+        const result = [];
+        let currentParagraph = [];
+        let inList = false;
+        let listType = null;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmedLine = line.trim();
+
+            // Empty line - end current paragraph or list
+            if (!trimmedLine) {
+                if (currentParagraph.length > 0) {
+                    result.push(`<p>${currentParagraph.join('<br>')}</p>`);
+                    currentParagraph = [];
+                }
+                if (inList) {
+                    result.push(`</${listType}>`);
+                    inList = false;
+                    listType = null;
+                    numberedItemCounter = 0; // Reset counter when list ends
+                }
+                continue;
             }
-            return `<p>${line}</p>`;
-        }).join('');
+
+            // Headers
+            if (trimmedLine.startsWith('### ')) {
+                const state = this.flushParagraph(result, currentParagraph, inList, listType);
+                inList = state.inList;
+                listType = state.listType;
+                numberedItemCounter = 0; // Reset counter after headers
+                result.push(`<h3>${trimmedLine.substring(4)}</h3>`);
+                continue;
+            }
+            if (trimmedLine.startsWith('## ')) {
+                const state = this.flushParagraph(result, currentParagraph, inList, listType);
+                inList = state.inList;
+                listType = state.listType;
+                numberedItemCounter = 0; // Reset counter after headers
+                result.push(`<h2>${trimmedLine.substring(3)}</h2>`);
+                continue;
+            }
+            if (trimmedLine.startsWith('# ')) {
+                const state = this.flushParagraph(result, currentParagraph, inList, listType);
+                inList = state.inList;
+                listType = state.listType;
+                numberedItemCounter = 0; // Reset counter after headers
+                result.push(`<h1>${trimmedLine.substring(2)}</h1>`);
+                continue;
+            }
+
+            // Unordered list items
+            if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+                if (currentParagraph.length > 0) {
+                    result.push(`<p>${currentParagraph.join('<br>')}</p>`);
+                    currentParagraph = [];
+                }
+                if (!inList || listType !== 'ul') {
+                    if (inList) result.push(`</${listType}>`);
+                    result.push('<ul>');
+                    inList = true;
+                    listType = 'ul';
+                    numberedItemCounter = 0; // Reset counter for unordered lists
+                }
+                const content = this.processInlineMarkdown(trimmedLine.substring(2));
+                result.push(`<li>${content}</li>`);
+                continue;
+            }
+
+            // SIMPLE NUMBERED LIST SOLUTION - Just increment counter for ANY numbered item
+            const orderedMatch = trimmedLine.match(/^\d+\. (.+)$/);
+            if (orderedMatch) {
+                console.log(`[NUMBERED LIST DEBUG] Found numbered item: "${trimmedLine}"`);
+
+                if (currentParagraph.length > 0) {
+                    result.push(`<p>${currentParagraph.join('<br>')}</p>`);
+                    currentParagraph = [];
+                }
+
+                if (!inList || listType !== 'ol') {
+                    if (inList) result.push(`</${listType}>`);
+                    result.push('<ol class="manual-numbered">');
+                    inList = true;
+                    listType = 'ol';
+                    // DON'T reset counter here - keep incrementing across the entire document
+                }
+
+                numberedItemCounter++;
+                console.log(`[NUMBERED LIST DEBUG] Using sequential number: ${numberedItemCounter}`);
+
+                const content = this.processInlineMarkdown(orderedMatch[1]);
+                const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
+                console.log(`[NUMBERED LIST DEBUG] Generated: ${listItem}`);
+
+                result.push(listItem);
+                continue;
+            }
+
+            // Regular paragraph line
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+                listType = null;
+                // DON'T reset numberedItemCounter here - keep it going
+            }
+
+            const processedLine = this.processInlineMarkdown(trimmedLine);
+            currentParagraph.push(processedLine);
+        }
+
+        // Flush any remaining content
+        this.flushParagraph(result, currentParagraph, inList, listType);
+
+        const finalResult = result.join('\n');
+        console.log(`[NUMBERED LIST DEBUG] Final result with sequential numbering`);
+        return finalResult;
+    }
+
+    /**
+     * Helper method to flush current paragraph and close lists
+     */
+    flushParagraph(result, currentParagraph, inList, listType) {
+        if (currentParagraph.length > 0) {
+            result.push(`<p>${currentParagraph.join('<br>')}</p>`);
+            currentParagraph.length = 0;
+        }
+        if (inList) {
+            console.log(`[NUMBERED LIST DEBUG] flushParagraph - closing list type: ${listType}`);
+            result.push(`</${listType}>`);
+            inList = false;
+            listType = null;
+        }
+        return { inList: false, listType: null };
+    }
+
+    /**
+     * Process inline markdown (bold, italic, code, links)
+     * @param {string} text - Text to process
+     * @returns {string} - Processed text
+     */
+    processInlineMarkdown(text) {
+        if (!text) return '';
+
+        let processed = text;
+
+        // Code blocks (do first to avoid processing markdown inside code)
+        processed = processed.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        processed = processed.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Bold text
+        processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        processed = processed.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+        // Italic text (avoid conflicts with bold)
+        processed = processed.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+        processed = processed.replace(/(?<!_)_([^_]+)_(?!_)/g, '<em>$1</em>');
+
+        // Links
+        processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+        return processed;
     }
 
     truncateText(text, maxLength) {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
+    }
+
+    // Bulk Actions Methods
+    handleRowSelection() {
+        try {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+            const bulkActionsBar = document.getElementById('bulk-actions-bar');
+            const selectedCount = document.getElementById('selected-count');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            const headerCheckbox = document.getElementById('header-checkbox');
+            
+            // Ensure all elements exist
+            if (!bulkActionsBar || !selectedCount || !selectAllBtn || !headerCheckbox) {
+                console.warn('Some bulk action elements not found in DOM');
+                return;
+            }
+            
+            const selectedCount_num = checkedBoxes.length;
+            const totalCount = checkboxes.length;
+            
+            // Update selected items set
+            this.selectedItems.clear();
+            checkedBoxes.forEach(checkbox => {
+                if (checkbox.dataset.id) {
+                    this.selectedItems.add(checkbox.dataset.id);
+                }
+            });
+            
+            // Update selected count
+            selectedCount.textContent = `${selectedCount_num} selected`;
+            
+            // Show/hide bulk actions bar
+            if (selectedCount_num > 0) {
+                bulkActionsBar.style.display = 'flex';
+            } else {
+                bulkActionsBar.style.display = 'none';
+            }
+            
+            // Update header checkbox state
+            if (selectedCount_num === 0) {
+                headerCheckbox.indeterminate = false;
+                headerCheckbox.checked = false;
+            } else if (selectedCount_num === totalCount && totalCount > 0) {
+                headerCheckbox.indeterminate = false;
+                headerCheckbox.checked = true;
+            } else {
+                headerCheckbox.indeterminate = true;
+                headerCheckbox.checked = false;
+            }
+            
+            // Update select all button text
+            if (selectedCount_num === totalCount && totalCount > 0) {
+                selectAllBtn.innerHTML = '<span class="btn-icon">☐</span><span class="btn-text">Unselect All</span>';
+            } else {
+                selectAllBtn.innerHTML = '<span class="btn-icon">☑️</span><span class="btn-text">Select All</span>';
+            }
+        } catch (error) {
+            console.error('Error in handleRowSelection:', error);
+        }
+    }
+
+    toggleSelectAll() {
+        try {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+            const shouldSelectAll = checkedBoxes.length !== checkboxes.length;
+            
+            checkboxes.forEach(checkbox => {
+                if (checkbox) {
+                    checkbox.checked = shouldSelectAll;
+                }
+            });
+            
+            this.handleRowSelection();
+        } catch (error) {
+            console.error('Error in toggleSelectAll:', error);
+        }
+    }
+
+    getSelectedIds() {
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        return Array.from(checkedBoxes).map(checkbox => checkbox.dataset.id);
+    }
+
+    async bulkDownload() {
+        const selectedIds = this.getSelectedIds();
+        if (selectedIds.length === 0) {
+            alert('Please select items to download');
+            return;
+        }
+        
+        // Disable download button during operation
+        const downloadBtn = document.getElementById('bulk-download-btn');
+        const originalText = downloadBtn.innerHTML;
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
+        
+        try {
+            console.log(`Downloading ${selectedIds.length} items...`);
+            
+            const response = await fetch('/api/summaries/bulk-download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: selectedIds })
+            });
+            
+            if (!response.ok) {
+                let errorMessage = 'Failed to download items';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+            
+            // Handle download
+            const blob = await response.blob();
+            
+            if (blob.size === 0) {
+                throw new Error('Downloaded file is empty. Please try again.');
+            }
+            
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `download-${new Date().toISOString().split('T')[0]}`;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            } else {
+                // Determine file extension based on content type
+                const contentType = response.headers.get('Content-Type');
+                if (contentType === 'application/pdf') {
+                    filename += '.pdf';
+                } else if (contentType === 'application/zip') {
+                    filename += '.zip';
+                }
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            console.log(`Download completed: ${filename}`);
+            
+            // Show success feedback
+            const itemText = selectedIds.length === 1 ? 'item' : 'items';
+            this.showTemporaryMessage(`Successfully downloaded ${selectedIds.length} ${itemText}`, 'success');
+            
+        } catch (error) {
+            console.error('Error downloading items:', error);
+            
+            // Show user-friendly error message
+            let userMessage = 'Failed to download items. ';
+            if (error.message.includes('network') || error.message.includes('fetch')) {
+                userMessage += 'Please check your internet connection and try again.';
+            } else if (error.message.includes('Server error: 5')) {
+                userMessage += 'Server error occurred. Please try again later.';
+            } else {
+                userMessage += error.message;
+            }
+            
+            alert(userMessage);
+        } finally {
+            // Re-enable download button
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = originalText;
+        }
+    }
+
+    async bulkDelete() {
+        const selectedIds = this.getSelectedIds();
+        if (selectedIds.length === 0) {
+            alert('Please select items to delete');
+            return;
+        }
+        
+        const confirmMessage = selectedIds.length === 1 
+            ? 'Are you sure you want to delete this item? This action cannot be undone.' 
+            : `Are you sure you want to delete ${selectedIds.length} items? This action cannot be undone.`;
+            
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Disable delete button during operation
+        const deleteBtn = document.getElementById('bulk-delete-btn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Deleting...</span>';
+        
+        try {
+            console.log(`Deleting ${selectedIds.length} items...`);
+            
+            const response = await fetch('/api/summaries/bulk-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: selectedIds })
+            });
+            
+            if (!response.ok) {
+                let errorMessage = 'Failed to delete items';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const result = await response.json();
+            console.log(`Successfully deleted ${result.deletedCount} items`);
+            
+            // Show success/partial success feedback
+            if (result.deletedCount === selectedIds.length) {
+                const itemText = result.deletedCount === 1 ? 'item' : 'items';
+                this.showTemporaryMessage(`Successfully deleted ${result.deletedCount} ${itemText}`, 'success');
+            } else if (result.deletedCount > 0) {
+                this.showTemporaryMessage(`Deleted ${result.deletedCount} of ${selectedIds.length} items. Some items could not be deleted.`, 'warning');
+            } else {
+                this.showTemporaryMessage('No items were deleted. Please try again.', 'error');
+            }
+            
+            if (result.errors && result.errors.length > 0) {
+                console.warn(`${result.errors.length} items could not be deleted:`, result.errors);
+            }
+            
+            // Refresh the knowledge base
+            this.loadKnowledgeBase();
+            
+            // Hide bulk actions bar
+            document.getElementById('bulk-actions-bar').style.display = 'none';
+            
+            // Clear selection
+            this.selectedItems.clear();
+            
+        } catch (error) {
+            console.error('Error deleting items:', error);
+            
+            // Show user-friendly error message
+            let userMessage = 'Failed to delete items. ';
+            if (error.message.includes('network') || error.message.includes('fetch')) {
+                userMessage += 'Please check your internet connection and try again.';
+            } else if (error.message.includes('Server error: 5')) {
+                userMessage += 'Server error occurred. Please try again later.';
+            } else {
+                userMessage += error.message;
+            }
+            
+            alert(userMessage);
+        } finally {
+            // Re-enable delete button
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalText;
+        }
     }
 }
 
@@ -688,6 +1262,18 @@ function closeLogsModal() {
 
 function refreshKnowledgeBase() {
     app.loadKnowledgeBase();
+}
+
+function toggleSelectAll() {
+    app.toggleSelectAll();
+}
+
+function bulkDownload() {
+    app.bulkDownload();
+}
+
+function bulkDelete() {
+    app.bulkDelete();
 }
 
 // Initialize app
@@ -744,6 +1330,7 @@ class AISettingsManager {
     getDefaultSettings() {
         return {
             mode: 'offline',
+            concurrentProcessing: 1,
             offline: {
                 model: '',
                 endpoint: 'http://localhost:11434'
@@ -771,7 +1358,7 @@ class AISettingsManager {
                 },
                 body: JSON.stringify(this.settings)
             });
-            
+
             console.log('Frontend: Backend response status:', response.status);
 
             if (response.ok) {
@@ -847,7 +1434,7 @@ function closeAISettingsModal() {
 async function loadAISettingsUI() {
     const settings = await aiSettingsManager.loadSettings();
     aiSettingsManager.settings = settings;
-    
+
     console.log('Loading AI settings UI with settings:', settings);
 
     // Set mode toggle
@@ -1096,7 +1683,7 @@ async function saveAIConfiguration() {
     console.log('Saving AI settings:', settings);
     const saveSuccess = await aiSettingsManager.saveSettings(settings);
     console.log('Save result:', saveSuccess);
-    
+
     if (saveSuccess) {
         saveBtn.disabled = true;
         saveBtn.querySelector('.btn-text').textContent = 'Saved!';
@@ -1233,4 +1820,93 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load initial settings
     const settings = await aiSettingsManager.loadSettings();
     aiSettingsManager.settings = settings;
-});
+    
+});// Processing Queue Configuration Functions
+function adjustConcurrentProcessing(delta) {
+    const input = document.getElementById('concurrent-processing');
+    const currentValue = parseInt(input.value) || 1;
+    const newValue = Math.max(1, Math.min(10, currentValue + delta));
+    input.value = newValue;
+}
+
+// Update the loadAISettingsUI function to include concurrent processing
+const originalLoadAISettingsUI = loadAISettingsUI;
+loadAISettingsUI = async function () {
+    await originalLoadAISettingsUI();
+
+    // Load concurrent processing setting
+    const settings = aiSettingsManager.settings;
+    const concurrentProcessing = settings.concurrentProcessing || 1;
+    document.getElementById('concurrent-processing').value = concurrentProcessing;
+};
+
+// Update the saveAIConfiguration function to include concurrent processing
+async function saveAIConfiguration() {
+    try {
+        const modeToggle = document.getElementById('mode-toggle');
+        const mode = modeToggle.checked ? 'online' : 'offline';
+
+        const concurrentProcessing = parseInt(document.getElementById('concurrent-processing').value) || 1;
+
+        const settings = {
+            mode: mode,
+            concurrentProcessing: concurrentProcessing,
+            offline: {
+                model: document.getElementById('ollama-model').value || 'llama2',
+                endpoint: document.getElementById('ollama-endpoint').value || 'http://localhost:11434'
+            },
+            online: {
+                provider: document.getElementById('provider-select').value,
+                apiKey: document.getElementById('api-key').value,
+                model: document.getElementById('model-select').value
+            }
+        };
+
+        console.log('Saving AI settings:', settings);
+
+        const success = await aiSettingsManager.saveSettings(settings);
+        console.log('Save result:', success);
+
+        // Update processing queue settings
+        if (success && settings.concurrentProcessing) {
+            try {
+                const queueResponse = await fetch('/api/processing-queue/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        concurrentProcessing: settings.concurrentProcessing
+                    })
+                });
+
+                if (queueResponse.ok) {
+                    console.log('Processing queue settings updated successfully');
+                } else {
+                    console.warn('Failed to update processing queue settings');
+                }
+            } catch (error) {
+                console.warn('Error updating processing queue settings:', error);
+            }
+        }
+
+        if (success) {
+            // Update button state
+            const saveBtn = document.getElementById('save-config-btn');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="btn-icon">✅</span><span class="btn-text">Saved!</span>';
+            saveBtn.style.background = 'var(--status-completed)';
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalText;
+                saveBtn.style.background = '';
+            }, 2000);
+        } else {
+            throw new Error('Failed to save settings');
+        }
+
+    } catch (error) {
+        console.error('Error saving AI configuration:', error);
+        alert('Error saving configuration: ' + error.message);
+    }
+}

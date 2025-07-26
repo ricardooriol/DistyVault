@@ -398,7 +398,8 @@ body {
     background: var(--bg-secondary);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    overflow: hidden;
+    overflow: visible;
+    width: 100%;
 }
 
 .knowledge-base-table {
@@ -407,12 +408,14 @@ body {
     table-layout: fixed;
 }
 
-.knowledge-base-table th:nth-child(1) { width: 30%; } /* Source */
-.knowledge-base-table th:nth-child(2) { width: 10%; } /* Type */
-.knowledge-base-table th:nth-child(3) { width: 15%; } /* Status */
-.knowledge-base-table th:nth-child(4) { width: 10%; } /* Time */
-.knowledge-base-table th:nth-child(5) { width: 15%; } /* Date */
-.knowledge-base-table th:nth-child(6) { width: 20%; } /* Actions */
+.knowledge-base-table th:nth-child(1) { width: 40px; } /* Checkbox */
+.knowledge-base-table th:nth-child(2) { width: 20%; } /* Name */
+.knowledge-base-table th:nth-child(3) { width: 20%; } /* Source */
+.knowledge-base-table th:nth-child(4) { width: 8%; } /* Type */
+.knowledge-base-table th:nth-child(5) { width: 12%; } /* Status */
+.knowledge-base-table th:nth-child(6) { width: 8%; } /* Time */
+.knowledge-base-table th:nth-child(7) { width: 12%; } /* Date */
+.knowledge-base-table th:nth-child(8) { width: 20%; } /* Actions */
 
 .knowledge-base-table th {
     background: var(--bg-tertiary);
@@ -425,15 +428,43 @@ body {
 }
 
 .knowledge-base-table td {
-    padding: 1rem;
+    padding: 0.75rem 0.5rem;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    vertical-align: top;
+    font-size: 0.85rem;
+    vertical-align: middle;
+    height: 60px;
+    overflow: hidden;
 }
 
+.knowledge-base-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    height: 50px;
+}
+
+/* Checkbox column */
+.checkbox-column {
+    text-align: center;
+    padding: 0.5rem !important;
+}
+
+/* Name column */
+.name-cell {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.name-cell,
 .source-cell {
-    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .source-cell a,
@@ -442,6 +473,31 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Type column */
+.type-cell {
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+/* Status column */
+.status-cell {
+    text-align: center;
+}
+
+/* Time and date columns */
+.time-cell,
+.date-cell {
+    text-align: center;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* Actions column */
+.actions-cell {
+    text-align: right;
+    padding-right: 0.75rem !important;
 }
 
 .knowledge-base-table tbody tr:hover {
@@ -523,32 +579,21 @@ body {
 }
 
 .table-actions {
-    /* Fallback for older browsers */
-    display: block;
-    text-align: right;
-    
-    /* Modern flexbox layout */
     display: flex;
-    gap: 0.5rem;
+    gap: 0.25rem;
     flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
     min-width: 0;
-}
-
-/* Fallback spacing for older browsers */
-.table-actions .action-btn {
-    margin-left: 0.5rem;
-    margin-bottom: 0.25rem;
-}
-
-/* Reset margin when flexbox is supported */
-.table-actions {
-    gap: 0.5rem;
+    height: 100%;
 }
 
 .table-actions .action-btn {
     margin: 0;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.7rem;
+    min-height: 24px;
+    flex-shrink: 0;
 }
 
 /* Empty state in table */
@@ -581,6 +626,95 @@ body {
 
 .action-btn:focus:not(:focus-visible) {
     outline: none;
+}
+
+/* Bulk Actions Bar */
+.bulk-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.bulk-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.bulk-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-action-btn {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.bulk-action-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.bulk-action-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.bulk-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.bulk-action-btn.select-all-btn {
+    background: var(--primary-orange);
+    color: white;
+}
+
+.bulk-action-btn.select-all-btn:hover:not(:disabled) {
+    background: var(--orange-hover);
+}
+
+.bulk-action-btn.download-btn {
+    background: var(--status-completed);
+    color: white;
+}
+
+.bulk-action-btn.download-btn:hover:not(:disabled) {
+    background: #45a049;
+}
+
+.bulk-action-btn.delete-btn {
+    background: var(--status-error);
+    color: white;
+}
+
+.bulk-action-btn.delete-btn:hover:not(:disabled) {
+    background: #d32f2f;
+}
+
+.selected-count {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
 }
 
 .view-btn {
@@ -718,6 +852,218 @@ body {
     color: var(--text-secondary);
 }
 
+/* Modal content formatting - Manual numbered lists */
+.modal-body ol.manual-numbered {
+    padding-left: 0 !important;
+    list-style: none !important;
+    margin-left: 0 !important;
+    margin-bottom: 1rem !important;
+    counter-reset: none !important;
+}
+
+.modal-body ol.manual-numbered li {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 0 !important;
+    position: relative !important;
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-increment: none !important;
+}
+
+.modal-body ol.manual-numbered li::before {
+    display: none !important;
+    content: none !important;
+}
+
+.modal-body ol.manual-numbered li .list-number {
+    color: var(--primary-orange) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+}
+
+/* Fallback for regular ol elements */
+.modal-body ol:not(.manual-numbered) {
+    padding-left: 1.5rem !important;
+    list-style-type: decimal !important;
+}
+
+.modal-body ol:not(.manual-numbered) li {
+    display: list-item !important;
+    margin-bottom: 0.5rem !important;
+    list-style-type: decimal !important;
+}
+
+/* Additional reset for manual numbered lists */
+.modal-body ol.manual-numbered,
+.modal-body ol.manual-numbered * {
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-reset: none !important;
+    counter-increment: none !important;
+}
+
+.modal-body ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+/* Force override any browser defaults */
+ol.manual-numbered {
+    padding-left: 0 !important;
+    list-style: none !important;
+    margin-left: 0 !important;
+    margin-bottom: 1rem !important;
+    counter-reset: none !important;
+}
+
+ol.manual-numbered li {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 0 !important;
+    position: relative !important;
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-increment: none !important;
+}
+
+ol.manual-numbered li::before {
+    display: none !important;
+    content: none !important;
+}
+
+ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+ol.manual-numbered li .list-number {
+    color: var(--primary-orange) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+}
+
+/* Debug: Add a background to see if the span is being rendered */
+.modal-body ol.manual-numbered li .list-number {
+    background: rgba(255, 107, 53, 0.2) !important;
+    border: 1px solid var(--primary-orange) !important;
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+}
+
+/* Ultimate fix - use hardcoded color values to avoid any variable issues */
+.modal-body ol.manual-numbered li .list-number,
+ol.manual-numbered li .list-number,
+.list-number {
+    color: #ff6b35 !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: rgba(255, 107, 53, 0.2) !important;
+    border: 1px solid #ff6b35 !important;
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+}
+
+/* Test marker - if you see this, CSS is loading */
+body::before {
+    content: "CSS LOADED - NUMBERED LIST FIX ACTIVE";
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: #ff6b35;
+    color: white;
+    padding: 0.5rem;
+    z-index: 9999;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.modal-body ul {
+    padding-left: 1.5rem;
+}
+
+.modal-body ul > li {
+    margin-bottom: 0.5rem;
+    list-style-type: disc;
+}
+
+.modal-body p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.modal-body h1, .modal-body h2, .modal-body h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.8rem;
+    color: var(--primary-orange);
+}
+
+.modal-body h1 {
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--primary-orange);
+    padding-bottom: 0.3rem;
+}
+
+.modal-body h2 {
+    font-size: 1.3rem;
+}
+
+.modal-body h3 {
+    font-size: 1.1rem;
+}
+
+.modal-body strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.modal-body em {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.modal-body code {
+    background: var(--bg-primary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: var(--primary-orange);
+}
+
+.modal-body pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.modal-body pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-primary);
+}
+
+.modal-body a {
+    color: var(--primary-orange);
+    text-decoration: none;
+}
+
+.modal-body a:hover {
+    text-decoration: underline;
+}
+
 .summary-content {
     line-height: 1.7;
     color: var(--text-primary);
@@ -845,9 +1191,8 @@ body {
     }
     
     .knowledge-base-table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
+        display: table;
+        overflow: visible;
     }
     
     .knowledge-base-table td {
@@ -1318,4 +1663,371 @@ input:checked + .toggle-slider:before {
         width: 95vw;
         margin: 1rem;
     }
+}
+/* NUMBERE
+D LIST FIX - Black Bold Numbers */
+/* Force override browser defaults for manual numbered lists */
+ol.manual-numbered {
+    padding-left: 0 !important;
+    list-style: none !important;
+    margin-left: 0 !important;
+    margin-bottom: 1rem !important;
+    counter-reset: none !important;
+}
+
+ol.manual-numbered li {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 0 !important;
+    position: relative !important;
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-increment: none !important;
+}
+
+ol.manual-numbered li::before {
+    display: none !important;
+    content: none !important;
+}
+
+ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+/* Black bold numbers as requested */
+.modal-body ol.manual-numbered li .list-number,
+ol.manual-numbered li .list-number,
+.list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Additional reset for manual numbered lists */
+.modal-body ol.manual-numbered,
+.modal-body ol.manual-numbered * {
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-reset: none !important;
+    counter-increment: none !important;
+}
+
+.modal-body ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+/* Fallback for regular ol elements */
+.modal-body ol:not(.manual-numbered) {
+    padding-left: 1.5rem !important;
+    list-style-type: decimal !important;
+}
+
+.modal-body ol:not(.manual-numbered) li {
+    display: list-item !important;
+    margin-bottom: 0.5rem !important;
+    list-style-type: decimal !important;
+}
+
+.modal-body ul {
+    padding-left: 1.5rem;
+}
+
+.modal-body ul > li {
+    margin-bottom: 0.5rem;
+    list-style-type: disc;
+}
+
+.modal-body p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.modal-body h1, .modal-body h2, .modal-body h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.8rem;
+    color: var(--primary-orange);
+}
+
+.modal-body h1 {
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--primary-orange);
+    padding-bottom: 0.3rem;
+}
+
+.modal-body h2 {
+    font-size: 1.3rem;
+}
+
+.modal-body h3 {
+    font-size: 1.1rem;
+}
+
+.modal-body strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.modal-body em {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.modal-body code {
+    background: var(--bg-primary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: var(--primary-orange);
+}
+
+.modal-body pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.modal-body pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-primary);
+}
+
+.modal-body a {
+    color: var(--primary-orange);
+    text-decoration: none;
+}
+
+.modal-body a:hover {
+    text-decoration: underline;
+}
+
+.summary-content {
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.summary-content h1,
+.summary-content h2,
+.summary-content h3 {
+    color: var(--primary-orange);
+    margin: 1.5rem 0 1rem 0;
+}
+
+.summary-content p {
+    margin-bottom: 1rem;
+}
+
+.summary-content ol,
+.summary-content ul {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.summary-content li {
+    margin-bottom: 0.5rem;
+}
+/* ==
+=== NUMBERED LIST FIX - COMPREHENSIVE RESET ===== */
+
+/* Step 1: Complete browser default override for manual numbered lists */
+ol.manual-numbered {
+    list-style: none !important;
+    list-style-type: none !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    margin-bottom: 1rem !important;
+    counter-reset: none !important;
+    counter-increment: none !important;
+}
+
+/* Step 2: Reset all list item defaults */
+ol.manual-numbered li {
+    list-style: none !important;
+    list-style-type: none !important;
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 0 !important;
+    position: relative !important;
+    counter-increment: none !important;
+}
+
+/* Step 3: Disable browser-generated markers and pseudo-elements */
+ol.manual-numbered li::before {
+    display: none !important;
+    content: none !important;
+}
+
+ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+ol.manual-numbered li::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Step 4: Apply to modal context specifically */
+.modal-body ol.manual-numbered {
+    list-style: none !important;
+    list-style-type: none !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    counter-reset: none !important;
+}
+
+.modal-body ol.manual-numbered li {
+    list-style: none !important;
+    list-style-type: none !important;
+    display: block !important;
+    counter-increment: none !important;
+}
+
+.modal-body ol.manual-numbered li::before,
+.modal-body ol.manual-numbered li::marker,
+.modal-body ol.manual-numbered li::after {
+    display: none !important;
+    content: none !important;
+}/* ===
+== BLACK BOLD NUMBER STYLING ===== */
+
+/* Primary styling for list numbers - black bold without decoration */
+.list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: none !important;
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Modal context specific styling */
+.modal-body .list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* High specificity override for any conflicting styles */
+.modal-body ol.manual-numbered li .list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: none !important;
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Ultimate fallback with maximum specificity */
+ol.manual-numbered li .list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}/* =
+==== CSS LOADING VERIFICATION & DEBUG ===== */
+
+/* Clean styling without debug indicator */
+
+/* Clean numbered list styling */
+ol.manual-numbered {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+
+ol.manual-numbered li {
+    position: relative !important;
+}
+
+/* Clean list-number styling without debug elements */
+
+/* Fallback CSS rules with multiple specificity levels */
+html body .modal-body ol.manual-numbered li .list-number,
+html body ol.manual-numbered li .list-number,
+html body .list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}/* P
+rocessing Queue Configuration Styles */
+.number-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+}
+
+.number-input {
+    width: 80px !important;
+    text-align: center;
+    padding: 8px 12px !important;
+    -moz-appearance: textfield; /* Firefox */
+}
+
+/* Remove arrows from number input in Chrome, Safari, Edge */
+.number-input::-webkit-outer-spin-button,
+.number-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.number-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.number-btn:hover {
+    background: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.number-btn:active {
+    background: var(--primary-orange);
+    color: white;
 }

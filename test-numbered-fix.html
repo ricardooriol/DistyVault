@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Numbered List Test</title>
+    <link rel="stylesheet" href="public/styles.css">
+    <style>
+        body {
+            padding: 2rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .test-container {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>Manual Numbered List Test</h2>
+        
+        <h3>This should show proper numbering:</h3>
+        <ol class="manual-numbered">
+            <li><span class="list-number">1.</span> First item with manual numbering</li>
+            <li><span class="list-number">2.</span> Second item with manual numbering</li>
+            <li><span class="list-number">3.</span> Third item with manual numbering</li>
+            <li><span class="list-number">4.</span> Fourth item with manual numbering</li>
+        </ol>
+        
+        <h3>Regular numbered list for comparison:</h3>
+        <ol>
+            <li>First regular item</li>
+            <li>Second regular item</li>
+            <li>Third regular item</li>
+        </ol>
+    </div>
+</body>
+</html>

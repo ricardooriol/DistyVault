@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Numbered Test</title>
+    <style>
+        /* Inline styles to test without external CSS conflicts */
+        body {
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        
+        .test-container {
+            background: #1a1a1a;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 600px;
+        }
+        
+        /* Manual numbered list styles */
+        ol.manual-numbered {
+            padding-left: 0 !important;
+            list-style: none !important;
+            margin-left: 0 !important;
+            margin-bottom: 1rem !important;
+            counter-reset: none !important;
+        }
+
+        ol.manual-numbered li {
+            display: block !important;
+            margin-bottom: 0.5rem !important;
+            padding-left: 0 !important;
+            position: relative !important;
+            list-style: none !important;
+            list-style-type: none !important;
+            counter-increment: none !important;
+        }
+
+        ol.manual-numbered li::before {
+            display: none !important;
+            content: none !important;
+        }
+
+        ol.manual-numbered li::marker {
+            display: none !important;
+            content: none !important;
+        }
+
+        ol.manual-numbered li .list-number {
+            color: #ff6b35 !important;
+            font-weight: bold !important;
+            margin-right: 0.5rem !important;
+            display: inline-block !important;
+            min-width: 1.5rem !important;
+            text-align: left !important;
+        }
+        
+        /* Regular list for comparison */
+        ol.regular {
+            padding-left: 1.5rem;
+            list-style-type: decimal;
+        }
+        
+        ol.regular li {
+            display: list-item;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>Manual Numbered List Test (Should show 1, 2, 3, 4)</h2>
+        <ol class="manual-numbered">
+            <li><span class="list-number">1.</span> First item with manual numbering</li>
+            <li><span class="list-number">2.</span> Second item with manual numbering</li>
+            <li><span class="list-number">3.</span> Third item with manual numbering</li>
+            <li><span class="list-number">4.</span> Fourth item with manual numbering</li>
+        </ol>
+        
+        <h2>Regular Numbered List (Should show 1, 2, 3)</h2>
+        <ol class="regular">
+            <li>First regular item</li>
+            <li>Second regular item</li>
+            <li>Third regular item</li>
+        </ol>
+        
+        <h2>Test with JavaScript Generation</h2>
+        <div id="js-test"></div>
+    </div>
+    
+    <script>
+        // Test the exact same logic as the main app
+        function generateNumberedList() {
+            const html = `
+                <ol class="manual-numbered">
+                    <li><span class="list-number">1.</span> Generated item one</li>
+                    <li><span class="list-number">2.</span> Generated item two</li>
+                    <li><span class="list-number">3.</span> Generated item three</li>
+                </ol>
+            `;
+            document.getElementById('js-test').innerHTML = html;
+        }
+        
+        generateNumberedList();
+    </script>
+</body>
+</html>

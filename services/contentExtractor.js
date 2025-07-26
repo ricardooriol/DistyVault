@@ -888,6 +888,7 @@ class ContentExtractor {
         return url.includes('youtube.com/watch') ||
             url.includes('youtu.be/') ||
             url.includes('youtube.com/embed/') ||
+            url.includes('youtube.com/playlist') ||
             url.includes('m.youtube.com/watch');
     }
 
@@ -897,6 +898,11 @@ class ContentExtractor {
      * @returns {string} - The URL type ('video', 'playlist', 'channel', 'unknown')
      */
     classifyYoutubeUrl(url) {
+        // Check for playlist-only URLs (no video ID, just playlist)
+        if (url.includes('youtube.com/playlist') && url.includes('list=') && !url.includes('v=')) {
+            return 'playlist';
+        }
+
         // Check for individual video (even with playlist parameters)
         if (url.includes('youtube.com/watch') && url.includes('v=')) {
             return 'video'; // Individual video, even if part of a playlist
@@ -908,11 +914,6 @@ class ContentExtractor {
 
         if (url.includes('youtube.com/embed/')) {
             return 'video'; // Embed format is always individual video
-        }
-
-        // Check for playlist-only URLs
-        if (url.includes('youtube.com/playlist') && url.includes('list=')) {
-            return 'playlist';
         }
 
         // Check for channel URLs

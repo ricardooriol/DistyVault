@@ -93,7 +93,7 @@ class AISettingsManager {
      */
     getDefaultSettings() {
         return {
-            mode: 'offline',
+            mode: 'online',
             offline: {
                 model: '',
                 endpoint: 'http://localhost:11434'

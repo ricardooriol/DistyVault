@@ -199,12 +199,224 @@ app.get('/api/summaries/:id/pdf', async (req, res) => {
             });
         }
         
-        // TODO: Implement PDF generation
-        res.status(501).json({
-            status: 'error',
-            message: 'PDF generation not yet implemented'
-        });
+        console.log(`Generating PDF for summary: ${summary.title}`);
+        
+        // Generate PDF
+        const { buffer, filename } = await processor.generatePdf(req.params.id);
+        
+        // Set headers for PDF download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'no-cache');
+        
+        // Send PDF buffer
+        res.end(buffer, 'binary');
+        
     } catch (error) {
+        console.error('PDF generation error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+});
+
+// Bulk download summaries as ZIP
+app.post('/api/summaries/bulk-download', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'IDs array is required'
+            });
+        }
+        
+        console.log(`Bulk download requested for ${ids.length} items`);
+        
+        // If only one item, redirect to single PDF download
+        if (ids.length === 1) {
+            const summary = await database.getSummary(ids[0]);
+            if (!summary) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'Summary not found'
+                });
+            }
+            
+            if (summary.status !== 'completed') {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Summary is not yet completed'
+                });
+            }
+            
+            const { buffer, filename } = await processor.generatePdf(ids[0]);
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            res.setHeader('Cache-Control', 'no-cache');
+            
+            return res.end(buffer, 'binary');
+        }
+        
+        // Multiple items - create ZIP
+        const archiver = require('archiver');
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        
+        // Set headers for ZIP download
+        const zipFilename = `summaries-${new Date().toISOString().split('T')[0]}.zip`;
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+        res.setHeader('Cache-Control', 'no-cache');
+        
+        // Handle archive errors
+        archive.on('error', (err) => {
+            console.error('Archive error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    status: 'error',
+                    message: 'Failed to create ZIP archive'
+                });
+            }
+        });
+        
+        // Pipe archive to response
+        archive.pipe(res);
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Process each ID sequentially to avoid overwhelming the system
+        for (const id of ids) {
+            try {
+                console.log(`Processing summary ${id} for bulk download...`);
+                
+                const summary = await database.getSummary(id);
+                if (!summary) {
+                    console.warn(`Summary ${id} not found`);
+                    errorCount++;
+                    continue;
+                }
+                
+                if (summary.status !== 'completed') {
+                    console.warn(`Summary ${id} not completed (status: ${summary.status})`);
+                    errorCount++;
+                    continue;
+                }
+                
+                // Generate PDF
+                const pdfResult = await processor.generatePdf(id);
+                
+                if (!pdfResult || typeof pdfResult !== 'object') {
+                    console.error(`Invalid PDF result for summary ${id}`);
+                    errorCount++;
+                    continue;
+                }
+                
+                const { buffer, filename } = pdfResult;
+                
+                // Convert buffer to Node.js Buffer if needed (Puppeteer returns Uint8Array)
+                let finalBuffer;
+                if (Buffer.isBuffer(buffer)) {
+                    finalBuffer = buffer;
+                } else if (buffer instanceof Uint8Array) {
+                    finalBuffer = Buffer.from(buffer);
+                } else if (buffer && typeof buffer === 'object' && buffer.length !== undefined) {
+                    // Handle other array-like objects
+                    finalBuffer = Buffer.from(buffer);
+                } else {
+                    console.error(`Invalid buffer type for summary ${id}: ${typeof buffer}, isBuffer: ${Buffer.isBuffer(buffer)}`);
+                    errorCount++;
+                    continue;
+                }
+                
+                if (finalBuffer.length === 0) {
+                    console.error(`Empty buffer for summary ${id}`);
+                    errorCount++;
+                    continue;
+                }
+                
+                const finalFilename = filename || `summary-${id}.pdf`;
+                
+                console.log(`Adding ${finalFilename} to ZIP (${finalBuffer.length} bytes)`);
+                
+                // Add to archive
+                archive.append(finalBuffer, { name: finalFilename });
+                successCount++;
+                
+            } catch (error) {
+                console.error(`Error processing summary ${id}:`, error);
+                errorCount++;
+            }
+        }
+        
+        console.log(`Bulk download processing complete: ${successCount} successful, ${errorCount} errors`);
+        
+        // Finalize the archive (this will trigger the download)
+        archive.finalize();
+        
+    } catch (error) {
+        console.error('Bulk download error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+});
+
+// Bulk delete summaries
+app.post('/api/summaries/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'IDs array is required'
+            });
+        }
+        
+        console.log(`Bulk delete requested for ${ids.length} items`);
+        
+        let deletedCount = 0;
+        const errors = [];
+        
+        // Process each ID
+        for (const id of ids) {
+            try {
+                const success = await database.deleteSummary(id);
+                if (success) {
+                    deletedCount++;
+                } else {
+                    errors.push({
+                        id: id,
+                        error: 'Summary not found'
+                    });
+                }
+            } catch (error) {
+                console.error(`Error deleting summary ${id}:`, error);
+                errors.push({
+                    id: id,
+                    error: error.message
+                });
+            }
+        }
+        
+        console.log(`Bulk delete completed: ${deletedCount} deleted, ${errors.length} errors`);
+        
+        res.json({
+            deletedCount: deletedCount,
+            errors: errors
+        });
+        
+    } catch (error) {
+        console.error('Bulk delete error:', error);
         res.status(500).json({
             status: 'error',
             message: error.message
