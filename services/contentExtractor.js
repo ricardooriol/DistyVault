@@ -26,13 +26,20 @@ class ContentExtractor {
             // Check if it's a YouTube URL
             if (this.isYoutubeUrl(url)) {
                 console.log(`Detected YouTube URL (${this.classifyYoutubeUrl(url)}), extracting content...`);
-                const result = await this.extractFromYoutube(url);
 
-                const duration = (Date.now() - startTime) / 1000;
-                console.log(`YouTube processing completed in ${duration.toFixed(2)}s`);
-                console.log(`Final result - Method: ${result.extractionMethod}, Content length: ${result.text.length} characters, Fallback used: ${result.fallbackUsed}`);
+                try {
+                    const result = await this.extractFromYoutube(url);
 
-                return result;
+                    const duration = (Date.now() - startTime) / 1000;
+                    console.log(`YouTube processing completed in ${duration.toFixed(2)}s`);
+                    console.log(`Final result - Method: ${result.extractionMethod}, Content length: ${result.text.length} characters, Fallback used: ${result.fallbackUsed}`);
+
+                    return result;
+                } catch (youtubeError) {
+                    // For YouTube transcript extraction failures, throw the error to be handled by the processor
+                    console.error(`YouTube transcript extraction failed: ${youtubeError.message}`);
+                    throw youtubeError;
+                }
             }
 
             // Otherwise, treat as a regular web page
@@ -40,11 +47,17 @@ class ContentExtractor {
             return await this.extractFromWebpage(url, startTime);
 
         } catch (error) {
+            // Only catch non-YouTube errors for fallback handling
+            if (this.isYoutubeUrl(url)) {
+                // Re-throw YouTube errors so they can be handled properly by the processor
+                throw error;
+            }
+
             console.error(`Unexpected error during URL extraction: ${error.message}`, error);
 
             const duration = (Date.now() - startTime) / 1000;
 
-            // Return fallback content instead of throwing
+            // Return fallback content for non-YouTube URLs
             return {
                 text: `An unexpected error occurred while processing the URL "${url}": ${error.message}. This could be due to network issues, the website being unavailable, or the site blocking automated access.`,
                 title: `Error: ${url}`,
@@ -235,7 +248,7 @@ class ContentExtractor {
         const metadata = await this.extractYoutubeMetadata(videoId);
 
         try {
-            // Try multiple transcript extraction strategies
+            // Try transcript extraction using LangChain
             const transcriptResult = await this.tryMultipleTranscriptMethods(videoId);
 
             const duration = (Date.now() - startTime) / 1000;
@@ -256,153 +269,48 @@ class ContentExtractor {
             };
         } catch (error) {
             const duration = (Date.now() - startTime) / 1000;
-            console.error(`YouTube transcript extraction failed after ${duration.toFixed(2)}s: ${error.message}`);
-            
-            // Throw the error instead of returning fallback content
-            throw new Error(`Failed to extract transcript from YouTube video "${metadata.title}" (${videoId}): ${error.message}`);
+            console.error(`❌ YouTube transcript extraction failed after ${duration.toFixed(2)}s: ${error.message}`);
+            console.error(`📋 Unable to extract transcript for video "${metadata.title}" (${videoId})`);
+
+            // Throw the error so it can be handled upstream with proper status setting
+            throw new Error(`Unable to extract transcript: ${error.message}`);
         }
     }
 
     /**
-     * Try multiple methods to extract YouTube transcript using strategy pattern with enhanced logging
+     * Extract YouTube transcript using simplified LangChain-only approach
      * @param {string} videoId - The YouTube video ID
      * @returns {Promise<{text: string, method: string, fallbackUsed: boolean}>} - Extraction result
      */
     async tryMultipleTranscriptMethods(videoId) {
-        // Initialize enhanced logger
-        const TranscriptLogger = require('./transcript/TranscriptLogger');
-        const logger = new TranscriptLogger('YouTubeTranscriptExtraction');
-        
-        logger.logSystemInfo();
-        const extractionOp = logger.startOperation('TranscriptExtraction', { videoId });
+        const YouTubeTranscriptExtractor = require('./transcript/YouTubeTranscriptExtractor');
+        const extractor = new YouTubeTranscriptExtractor();
+
+        console.log(`🎬 Starting transcript extraction for video ID: ${videoId}`);
+        const startTime = Date.now();
 
         try {
-            logger.log('info', `🎬 Starting transcript extraction for video ID: ${videoId}`);
+            const result = await extractor.extractTranscript(videoId);
+            const processingTime = Date.now() - startTime;
 
-            // Import the strategy classes
-            const LangChainYoutubeStrategy = require('./transcript/LangChainYoutubeStrategy');
-            const YouTubePageScrapingStrategy = require('./transcript/YouTubePageScrapingStrategy');
-            const AlternativePageParsingStrategy = require('./transcript/AlternativePageParsingStrategy');
-            const LibraryFallbackStrategy = require('./transcript/LibraryFallbackStrategy');
+            if (result.success) {
+                console.log(`✅ Transcript extracted successfully: ${result.transcript.length} characters in ${processingTime}ms`);
 
-            // Initialize strategies in priority order (LangChain first since it works!)
-            const strategies = [
-                new LangChainYoutubeStrategy(),
-                new YouTubePageScrapingStrategy(),
-                new AlternativePageParsingStrategy(),
-                new LibraryFallbackStrategy()
-            ];
-
-            logger.log('info', `📋 Initialized ${strategies.length} extraction strategies`, {
-                strategies: strategies.map(s => ({ name: s.name, priority: s.priority }))
-            });
-
-            // Try each strategy in order
-            for (let i = 0; i < strategies.length; i++) {
-                const strategy = strategies[i];
-                const strategyOp = logger.startOperation(`Strategy_${strategy.name}`, { 
-                    strategyName: strategy.name, 
-                    priority: strategy.priority,
-                    attempt: i + 1,
-                    totalStrategies: strategies.length
-                });
-
-                try {
-                    logger.logStrategyAttempt(strategy.name, videoId);
-                    
-                    // Execute the strategy
-                    const startTime = Date.now();
-                    const result = await strategy.execute(videoId);
-                    const executionTime = Date.now() - startTime;
-                    
-                    logger.logPerformance(`${strategy.name}_execution`, executionTime);
-                    
-                    if (result.success && result.data) {
-                        logger.log('info', `🔍 Strategy ${strategy.name} succeeded, validating data...`, {
-                            dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
-                            dataLength: Array.isArray(result.data) ? result.data.length : 'N/A'
-                        });
-                        
-                        // Validate the extracted data
-                        const validationStart = Date.now();
-                        const validation = await strategy.validate(result.data);
-                        const validationTime = Date.now() - validationStart;
-                        
-                        logger.logPerformance(`${strategy.name}_validation`, validationTime);
-                        
-                        if (validation.valid) {
-                            const totalTime = Date.now() - startTime;
-                            
-                            logger.logStrategySuccess(strategy.name, {
-                                transcript: validation.transcript,
-                                segments: validation.segments,
-                                processingTime: totalTime,
-                                stats: validation.stats
-                            });
-                            
-                            logger.endOperation(true, {
-                                strategy: strategy.name,
-                                transcriptLength: validation.transcript.length,
-                                segmentCount: validation.segments?.length || 0,
-                                processingTime: totalTime
-                            });
-                            
-                            logger.log('info', `✅ Transcript extracted successfully using ${strategy.name}`, {
-                                length: validation.transcript.length,
-                                segments: validation.segments?.length || 0,
-                                preview: validation.transcript.substring(0, 200) + '...'
-                            });
-                            
-                            const summary = logger.generateSummary();
-                            
-                            return {
-                                text: validation.transcript,
-                                method: strategy.name,
-                                fallbackUsed: false,
-                                stats: validation.stats,
-                                processingTime: totalTime,
-                                summary: summary
-                            };
-                        } else {
-                            logger.logStrategyFailure(strategy.name, validation.error, {
-                                code: validation.code,
-                                details: validation.details
-                            });
-                            logger.endOperation(false, { error: validation.error, code: validation.code });
-                        }
-                    } else {
-                        logger.logStrategyFailure(strategy.name, result.error || 'Unknown error', result);
-                        logger.endOperation(false, { error: result.error });
-                    }
-                } catch (error) {
-                    logger.logError(error, `Strategy_${strategy.name}`);
-                    logger.logStrategyFailure(strategy.name, error.message, { stack: error.stack });
-                    logger.endOperation(false, { error: error.message });
-                }
+                return {
+                    text: result.transcript,
+                    method: 'langchain-youtube-loader',
+                    fallbackUsed: false,
+                    processingTime: processingTime
+                };
+            } else {
+                console.error(`❌ Transcript extraction failed: ${result.error}`);
+                throw new Error(`Unable to extract transcript: ${result.error}`);
             }
 
-            // If all strategies fail, log comprehensive failure and throw error
-            const failureMessage = `No transcript available for video ${videoId}. All ${strategies.length} extraction methods failed.`;
-            logger.log('error', `💥 All transcript extraction strategies failed`, {
-                videoId,
-                strategiesAttempted: strategies.length,
-                strategies: strategies.map(s => s.name)
-            });
-            
-            logger.endOperation(false, { 
-                error: failureMessage,
-                strategiesAttempted: strategies.length 
-            });
-            
-            const summary = logger.generateSummary();
-            console.log('📊 Final Summary:', JSON.stringify(summary, null, 2));
-            
-            throw new Error(failureMessage);
-
         } catch (error) {
-            logger.logError(error, 'TranscriptExtraction');
-            logger.endOperation(false, { error: error.message });
-            throw error;
+            const processingTime = Date.now() - startTime;
+            console.error(`💥 Transcript extraction failed after ${processingTime}ms: ${error.message}`);
+            throw new Error(`Failed to extract transcript from video ${videoId}: ${error.message}`);
         }
     }
 
@@ -939,7 +847,7 @@ class ContentExtractor {
 
         // Normalize URL
         const normalizedUrl = url.trim().toLowerCase();
-        
+
         // Check if it's a YouTube URL
         if (!this._isValidYouTubeUrl(normalizedUrl)) {
             console.error(`Not a valid YouTube URL: ${url}`);

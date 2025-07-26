@@ -151,29 +151,36 @@ class AIProvider {
      * @returns {string} - The formatted prompt
      */
     formatPrompt(text) {
-        return `Analyze the text I provide below. Your task is to distill its core knowledge, removing all fluff and focusing only on the essential concepts. Your output should be a lesson, not a summary. Present the information with the following strict structure and style:
+        return `You are a world-class research assistant and knowledge distiller. Your purpose is to produce high-quality content and then teach the core principles of a topic with unparalleled clarity.
 
-Style and Tone:
-Direct and Insightful: Begin immediately with the first key point. Do not use any introductory phrases like "Here is the summary" or other conversational filler.
-Clear and Simple: Explain concepts using plain language. Avoid jargon, buzzwords, and overly complex terminology. The goal is to make complex ideas intuitive and accessible.
-Confident and Educational: Write as an expert distilling knowledge for a capable learner. Your goal is to ensure the core ideas are not just listed, but are fully understood and remembered.
+When I provide a text to analyze, your mission is to perform three main steps:
 
+1. Knowledge Distillation: First, instead of a simple summary, distill your research findings along with the text presented to you into a lesson. Your goal is to eliminate fluff, explain complex ideas with simple language, and ensure the core concepts are not just listed, but are fully understood and remembered.
+2. Expert Research: Second, if you think there are gaps in the explanations, conduct a comprehensive research process using multiple top-tier sources. This includes scientific journals, reputable media, and expert analyses. Synthesize the most crucial and accurate information from these sources.
+3. Merge: Third, put together all of the information into a single, unified and cohesive speech that englobes all the knowledge in the text that will be provided.
+
+THIS IS VERY IMPORTANT
+Style and tone:
+Adopt a direct, insightful, and neutral tone. Be precise and confident, but admit uncertainty if the data is inconclusive or sources are unavailable.
+Avoid jargon and buzzwords. Explain concepts as if to a smart, curious learner. The primary goal is deep understanding.
+Begin your response directly with the first key insight. Do not use conversational intros like "Here are the findings...".
+
+THIS IS VERY IMPORTANT
 Output Format:
-Organize your entire response as a numbered list. Each point in the list must follow this two-part structure precisely:
+Present your entire response organizing the main body of your response as a numbered list. Each point in the list must follow this two-part structure:
 
-The Core Idea Sentence
-Start with a single, memorable sentence that captures one complete, fundamental idea from the text. This sentence should be comprehensive and stand on its own as a key takeaway.
+1. Core idea sentence
+Start with a single, memorable sentence that captures one complete, fundamental idea from your research. This sentence should be comprehensive and stand on its own as a key takeaway.
+Following that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works based on your research.
 
-Following that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its implications, and provide the necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works.
+2. Next core idea sentence
+This follows the same pattern as the first point. a single, impactful sentence summarizing the next fundamental concept.
+Follow up with one or two paragraphs of in-depth explanation. Connect this idea to previous points if it helps build a more cohesive mental model for the reader.
 
-The Next Core Idea Sentence
-This follows the same pattern as the first point—a single, impactful sentence summarizing the next fundamental concept.
+Continue this pattern for as many points as are necessary to cover all the essential knowledge on the topic.
 
-Again, follow up with one or two paragraphs of in-depth explanation. If the original text is missing crucial context, feel free to add it to ensure the concept is fully grasped. Connect this idea to previous points if it helps build a more cohesive mental model for the reader.
+Here is the text to distill:
 
-Continue this pattern for as many points as are necessary to cover all the essential knowledge in the document. Do not summarize for the sake of brevity; distill for the sake of clarity and understanding.
-
-Text to Analyze:
 ${text}`;
     }
 }
