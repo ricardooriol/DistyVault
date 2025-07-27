@@ -108,20 +108,20 @@ body {
 }
 
 .url-input-container {
-    display: flex;
-    gap: 1rem;
-    align-items: stretch;
+    position: relative;
+    width: 100%;
 }
 
 .main-input-field {
-    flex: 1;
+    width: 100%;
     background: var(--bg-primary);
     border: 2px solid var(--border-color);
     border-radius: 12px;
-    padding: 1rem 1.5rem;
+    padding: 1rem 4rem 1rem 1.5rem;
     color: var(--text-primary);
     font-size: 1rem;
     transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .main-input-field:focus {
@@ -132,6 +132,31 @@ body {
 
 .main-input-field::placeholder {
     color: var(--text-muted);
+}
+
+.paste-btn-inside {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.paste-btn-inside:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--primary-orange);
 }
 
 .paste-btn {
@@ -330,6 +355,8 @@ body {
 /* Knowledge Base Section */
 .knowledge-base-section {
     margin-top: 3rem;
+    position: relative;
+    overflow: visible;
 }
 
 .knowledge-base-header {
@@ -398,7 +425,7 @@ body {
     background: var(--bg-secondary);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    overflow: hidden;
+    overflow: visible;
     width: 100%;
 }
 
@@ -407,17 +434,17 @@ body {
     border-collapse: collapse;
     table-layout: fixed;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .knowledge-base-table th:nth-child(1) { width: 40px; } /* Checkbox */
-.knowledge-base-table th:nth-child(2) { width: 20%; } /* Name */
-.knowledge-base-table th:nth-child(3) { width: 20%; } /* Source */
-.knowledge-base-table th:nth-child(4) { width: 8%; } /* Type */
-.knowledge-base-table th:nth-child(5) { width: 12%; } /* Status */
-.knowledge-base-table th:nth-child(6) { width: 8%; } /* Time */
-.knowledge-base-table th:nth-child(7) { width: 12%; } /* Date */
-.knowledge-base-table th:nth-child(8) { width: 20%; } /* Actions */
+.knowledge-base-table th:nth-child(2) { width: 22%; } /* Name */
+.knowledge-base-table th:nth-child(3) { width: 22%; } /* Source */
+.knowledge-base-table th:nth-child(4) { width: 10%; } /* Type */
+.knowledge-base-table th:nth-child(5) { width: 15%; } /* Status */
+.knowledge-base-table th:nth-child(6) { width: 10%; } /* Time */
+.knowledge-base-table th:nth-child(7) { width: 15%; } /* Date */
+.knowledge-base-table th:nth-child(8) { width: 100px; } /* Actions */
 
 .knowledge-base-table th {
     background: var(--bg-tertiary);
@@ -497,12 +524,18 @@ body {
 
 /* Actions column */
 .actions-cell {
-    text-align: right;
-    padding-right: 0.75rem !important;
+    text-align: center;
+    padding: 0.75rem 1rem !important;
+    position: relative;
+    vertical-align: middle;
 }
 
 .knowledge-base-table tbody tr:hover {
     background: var(--bg-primary);
+}
+
+.knowledge-base-table tbody tr {
+    position: relative;
 }
 
 .knowledge-base-table tbody tr:last-child td {
@@ -1152,7 +1185,11 @@ ol.manual-numbered li .list-number,
     }
     
     .url-input-container {
-        flex-direction: column;
+        position: relative;
+    }
+    
+    .main-input-field {
+        padding: 1rem 4rem 1rem 1rem;
     }
     
     .action-buttons {
@@ -1203,7 +1240,9 @@ ol.manual-numbered li .list-number,
     }
     
     .actions-cell {
-        min-width: 80px;
+        min-width: 100px;
+        text-align: center;
+        padding: 0.75rem 0.5rem !important;
     }
 }
 
@@ -1223,7 +1262,9 @@ ol.manual-numbered li .list-number,
     }
     
     .actions-cell {
-        min-width: 160px;
+        min-width: 100px;
+        text-align: center;
+        padding: 0.75rem 0.5rem !important;
     }
 }
 
@@ -2017,4 +2058,187 @@ rocessing Queue Configuration Styles */
 .number-btn:active {
     background: var(--primary-orange);
     color: white;
+}
+
+/* Action Dropdown */
+.action-dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.action-dropdown.show {
+    z-index: 9998;
+}
+
+.action-dropdown-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.2s ease;
+    min-width: 70px;
+    justify-content: center;
+}
+
+.action-dropdown-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--primary-orange);
+}
+
+.action-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px var(--shadow-dark);
+    z-index: 9999;
+    min-width: 140px;
+    top: 100%;
+    margin-top: 4px;
+    white-space: nowrap;
+}
+
+.action-dropdown.show .action-dropdown-content {
+    display: block;
+}
+
+.action-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.8rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.action-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.action-dropdown-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.action-dropdown-item.delete-item:hover {
+    background: var(--error-bg);
+    color: var(--error-color);
+}/* Enhan
+ced Logs Styling */
+.log-section {
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.log-section-title {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-entry {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-time {
+    color: var(--text-muted);
+    margin-right: 0.5rem;
+}
+
+.log-level {
+    font-weight: bold;
+    margin-right: 0.5rem;
+    min-width: 60px;
+    display: inline-block;
+}
+
+.log-message {
+    color: var(--text-secondary);
+}
+
+.log-info {
+    background: var(--bg-primary);
+}
+
+.log-info .log-level {
+    color: var(--primary-blue);
+}
+
+.log-warn {
+    background: var(--warning-bg);
+}
+
+.log-warn .log-level {
+    color: var(--warning-color);
+}
+
+.log-error {
+    background: var(--error-bg);
+}
+
+.log-error .log-level {
+    color: var(--error-color);
+}
+
+.log-success {
+    background: var(--success-bg);
+}
+
+.log-success .log-level {
+    color: var(--success-color);
+}/* Ensure
+ dropdown is visible on smaller screens */
+@media (max-width: 768px) {
+    .action-dropdown-content {
+        right: 10px;
+        min-width: 160px;
+    }
+    
+    .action-dropdown-btn {
+        min-width: 60px;
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .actions-cell {
+        padding: 0.75rem 0.5rem !important;
+    }
+}
+
+/* Fix for very narrow screens */
+@media (max-width: 480px) {
+    .action-dropdown-content {
+        right: 5px;
+        min-width: 180px;
+    }
 }

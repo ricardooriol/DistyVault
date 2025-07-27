@@ -308,11 +308,11 @@ class SawronApp {
         }
 
         tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
-        
+
         // Restore checkbox states after rendering
         this.restoreCheckboxStates();
     }
-    
+
     restoreCheckboxStates() {
         // Restore selected states for checkboxes
         this.selectedItems.forEach(id => {
@@ -321,11 +321,11 @@ class SawronApp {
                 checkbox.checked = true;
             }
         });
-        
+
         // Update UI based on current selection
         this.handleRowSelection();
     }
-    
+
     showTemporaryMessage(message, type = 'info') {
         // Create or get existing message container
         let messageContainer = document.getElementById('temp-message-container');
@@ -341,7 +341,7 @@ class SawronApp {
             `;
             document.body.appendChild(messageContainer);
         }
-        
+
         // Create message element
         const messageElement = document.createElement('div');
         messageElement.style.cssText = `
@@ -354,10 +354,10 @@ class SawronApp {
             animation: slideIn 0.3s ease-out;
             background: ${type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : type === 'error' ? '#f44336' : '#2196f3'};
         `;
-        
+
         messageElement.textContent = message;
         messageContainer.appendChild(messageElement);
-        
+
         // Add slide-in animation
         const style = document.createElement('style');
         style.textContent = `
@@ -374,7 +374,7 @@ class SawronApp {
             style.id = 'temp-message-styles';
             document.head.appendChild(style);
         }
-        
+
         // Remove message after 4 seconds
         setTimeout(() => {
             messageElement.style.animation = 'slideOut 0.3s ease-in';
@@ -389,7 +389,7 @@ class SawronApp {
     extractItemName(item) {
         // Extract name from title, URL, or file
         let name = 'Unknown';
-        
+
         if (item.title && item.title !== 'Processing...' && !item.title.includes('Processing')) {
             name = item.title;
         } else if (item.sourceUrl) {
@@ -408,7 +408,7 @@ class SawronApp {
             // Remove extension from file name
             name = item.sourceFile.name.replace(/\.[^/.]+$/, '');
         }
-        
+
         return name;
     }
 
@@ -433,7 +433,7 @@ class SawronApp {
         }
 
         const title = item.title || 'Processing...';
-        
+
         // Extract name for display
         const name = this.extractItemName(item);
 
@@ -466,35 +466,39 @@ class SawronApp {
         const createdAt = new Date(item.createdAt);
         const formattedDate = this.formatDate(createdAt);
 
-        // Format actions
+        // Format actions as dropdown
         const actions = `
-            <div class="table-actions">
-                ${isCompleted ? `
-                    <button class="action-btn view-btn" onclick="app.showSummaryModal('${item.id}')">
-                        View
-                    </button>
-                    <button class="action-btn download-btn" onclick="app.downloadSummary('${item.id}')">
-                        Download
-                    </button>
-                ` : ''}
-                ${isProcessing ? `
-                    <button class="action-btn stop-btn" onclick="app.stopProcessing('${item.id}')">
-                        Stop
-                    </button>
-                ` : ''}
-                ${(isCompleted || isError) && item.rawContent ? `
-                    <button class="action-btn debug-btn" onclick="app.showRawContent('${item.id}')">
-                        Raw
-                    </button>
-                ` : ''}
-                ${item.logs && item.logs.length > 0 ? `
-                    <button class="action-btn debug-btn" onclick="app.showLogs('${item.id}')">
-                        Logs
-                    </button>
-                ` : ''}
-                <button class="action-btn delete-btn" onclick="app.deleteSummary('${item.id}')">
-                    Delete
+            <div class="action-dropdown" onclick="app.toggleActionDropdown(event, '${item.id}')">
+                <button class="action-dropdown-btn">
+                    Action
+                    <span style="font-size: 0.7rem;">▼</span>
                 </button>
+                <div class="action-dropdown-content" id="dropdown-${item.id}">
+                    ${isCompleted ? `
+                        <button class="action-dropdown-item" onclick="app.showSummaryModal('${item.id}')">
+                            📄 View Summary
+                        </button>
+                        <button class="action-dropdown-item" onclick="app.downloadSummary('${item.id}')">
+                            📥 Download
+                        </button>
+                    ` : ''}
+                    ${isProcessing ? `
+                        <button class="action-dropdown-item" onclick="app.stopProcessing('${item.id}')">
+                            ⏹️ Stop Processing
+                        </button>
+                    ` : ''}
+                    ${(isCompleted || isError) && item.rawContent ? `
+                        <button class="action-dropdown-item" onclick="app.showRawContent('${item.id}')">
+                            🔍 View Raw Content
+                        </button>
+                    ` : ''}
+                    <button class="action-dropdown-item" onclick="app.showLogs('${item.id}')">
+                        📋 Processing Logs
+                    </button>
+                    <button class="action-dropdown-item delete-item" onclick="app.deleteSummary('${item.id}')">
+                        🗑️ Delete
+                    </button>
+                </div>
             </div>
         `;
 
@@ -571,6 +575,35 @@ class SawronApp {
         }
     }
 
+    toggleActionDropdown(event, id) {
+        event.stopPropagation();
+
+        // Close all other dropdowns
+        document.querySelectorAll('.action-dropdown').forEach(dropdown => {
+            if (dropdown !== event.currentTarget) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // Toggle current dropdown
+        const dropdown = event.currentTarget;
+        dropdown.classList.toggle('show');
+
+        // Close dropdown when clicking outside
+        const closeDropdown = (e) => {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+
+        if (dropdown.classList.contains('show')) {
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdown);
+            }, 0);
+        }
+    }
+
     async showRawContent(id) {
         try {
             const response = await fetch(`/api/summaries/${id}`);
@@ -604,23 +637,111 @@ class SawronApp {
 
             const summary = await response.json();
 
-            if (!summary.logs || summary.logs.length === 0) {
-                alert('No logs available for this summary');
-                return;
-            }
-
             document.getElementById('logs-title').textContent = `Processing Logs: ${summary.title}`;
 
-            const logsHtml = summary.logs.map(log => {
-                const timestamp = new Date(log.timestamp);
-                const formattedTime = timestamp.toLocaleTimeString();
-                const levelClass = `log-${log.level}`;
+            // Create comprehensive logs including system information
+            let logsHtml = '';
 
-                return `<div class="log-entry ${levelClass}">
-                    <span class="log-time">[${formattedTime}]</span>
-                    <span class="log-message">${log.message}</span>
-                </div>`;
-            }).join('');
+            // Add summary information header
+            logsHtml += `
+                <div class="log-section">
+                    <h4 class="log-section-title">📊 Summary Information</h4>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>ID:</strong> ${summary.id}</span>
+                    </div>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>Source:</strong> ${summary.sourceUrl || summary.sourceFile || 'Unknown'}</span>
+                    </div>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>Type:</strong> ${summary.sourceType || 'Unknown'}</span>
+                    </div>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>Status:</strong> ${summary.status}</span>
+                    </div>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>Processing Step:</strong> ${summary.processingStep || 'N/A'}</span>
+                    </div>
+                    <div class="log-entry log-info">
+                        <span class="log-message"><strong>Created:</strong> ${new Date(summary.createdAt).toLocaleString()}</span>
+                    </div>
+                    ${summary.completedAt ? `
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Completed:</strong> ${new Date(summary.completedAt).toLocaleString()}</span>
+                        </div>
+                    ` : ''}
+                    ${summary.elapsedTime ? `
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Elapsed Time:</strong> ${Math.floor(summary.elapsedTime / 60)}m ${Math.floor(summary.elapsedTime % 60)}s</span>
+                        </div>
+                    ` : ''}
+                    ${summary.processingTime ? `
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Processing Time:</strong> ${summary.processingTime.toFixed(1)}s</span>
+                        </div>
+                    ` : ''}
+                    ${summary.wordCount ? `
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Word Count:</strong> ${summary.wordCount} words</span>
+                        </div>
+                    ` : ''}
+                    ${summary.error ? `
+                        <div class="log-entry log-error">
+                            <span class="log-message"><strong>Error:</strong> ${summary.error}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Add processing logs section
+            if (summary.logs && summary.logs.length > 0) {
+                logsHtml += `
+                    <div class="log-section">
+                        <h4 class="log-section-title">📋 Processing Logs</h4>
+                `;
+
+                summary.logs.forEach(log => {
+                    const timestamp = new Date(log.timestamp);
+                    const formattedTime = timestamp.toLocaleTimeString();
+                    const levelClass = `log-${log.level}`;
+
+                    logsHtml += `
+                        <div class="log-entry ${levelClass}">
+                            <span class="log-time">[${formattedTime}]</span>
+                            <span class="log-level">[${log.level.toUpperCase()}]</span>
+                            <span class="log-message">${log.message}</span>
+                        </div>
+                    `;
+                });
+
+                logsHtml += `</div>`;
+            } else {
+                logsHtml += `
+                    <div class="log-section">
+                        <h4 class="log-section-title">📋 Processing Logs</h4>
+                        <div class="log-entry log-info">
+                            <span class="log-message">No detailed processing logs available for this item.</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add extraction metadata if available
+            if (summary.extractionMetadata) {
+                logsHtml += `
+                    <div class="log-section">
+                        <h4 class="log-section-title">🔍 Extraction Details</h4>
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Content Type:</strong> ${summary.extractionMetadata.contentType || 'Unknown'}</span>
+                        </div>
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Extraction Method:</strong> ${summary.extractionMetadata.extractionMethod || 'Unknown'}</span>
+                        </div>
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Fallback Used:</strong> ${summary.extractionMetadata.fallbackUsed ? 'Yes' : 'No'}</span>
+                        </div>
+                    </div>
+                `;
+            }
 
             document.getElementById('logs-content').innerHTML = logsHtml;
             document.getElementById('logs-modal').style.display = 'block';
@@ -929,15 +1050,15 @@ class SawronApp {
             const selectedCount = document.getElementById('selected-count');
             const selectAllBtn = document.getElementById('select-all-btn');
             const headerCheckbox = document.getElementById('header-checkbox');
-            
+
             // Ensure all elements exist
             if (!bulkActionsBar || !selectedCount || !selectAllBtn || !headerCheckbox) {
                 return;
             }
-            
+
             const selectedCount_num = checkedBoxes.length;
             const totalCount = checkboxes.length;
-            
+
             // Update selected items set
             this.selectedItems.clear();
             checkedBoxes.forEach(checkbox => {
@@ -945,17 +1066,17 @@ class SawronApp {
                     this.selectedItems.add(checkbox.dataset.id);
                 }
             });
-            
+
             // Update selected count
             selectedCount.textContent = `${selectedCount_num} selected`;
-            
+
             // Show/hide bulk actions bar
             if (selectedCount_num > 0) {
                 bulkActionsBar.style.display = 'flex';
             } else {
                 bulkActionsBar.style.display = 'none';
             }
-            
+
             // Update header checkbox state
             if (selectedCount_num === 0) {
                 headerCheckbox.indeterminate = false;
@@ -967,7 +1088,7 @@ class SawronApp {
                 headerCheckbox.indeterminate = true;
                 headerCheckbox.checked = false;
             }
-            
+
             // Update select all button text
             if (selectedCount_num === totalCount && totalCount > 0) {
                 selectAllBtn.innerHTML = '<span class="btn-icon">☐</span><span class="btn-text">Unselect All</span>';
@@ -984,13 +1105,13 @@ class SawronApp {
             const checkboxes = document.querySelectorAll('.row-checkbox');
             const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
             const shouldSelectAll = checkedBoxes.length !== checkboxes.length;
-            
+
             checkboxes.forEach(checkbox => {
                 if (checkbox) {
                     checkbox.checked = shouldSelectAll;
                 }
             });
-            
+
             this.handleRowSelection();
         } catch (error) {
             // Handle toggle errors silently
@@ -1008,13 +1129,13 @@ class SawronApp {
             alert('Please select items to download');
             return;
         }
-        
+
         // Disable download button during operation
         const downloadBtn = document.getElementById('bulk-download-btn');
         const originalText = downloadBtn.innerHTML;
         downloadBtn.disabled = true;
         downloadBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
-        
+
         try {
             const response = await fetch('/api/summaries/bulk-download', {
                 method: 'POST',
@@ -1023,7 +1144,7 @@ class SawronApp {
                 },
                 body: JSON.stringify({ ids: selectedIds })
             });
-            
+
             if (!response.ok) {
                 let errorMessage = 'Failed to download items';
                 try {
@@ -1034,17 +1155,17 @@ class SawronApp {
                 }
                 throw new Error(errorMessage);
             }
-            
+
             // Handle download
             const blob = await response.blob();
-            
+
             if (blob.size === 0) {
                 throw new Error('Downloaded file is empty. Please try again.');
             }
-            
+
             const contentDisposition = response.headers.get('Content-Disposition');
             let filename = `download-${new Date().toISOString().split('T')[0]}`;
-            
+
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
                 if (filenameMatch) {
@@ -1059,7 +1180,7 @@ class SawronApp {
                     filename += '.zip';
                 }
             }
-            
+
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
@@ -1067,19 +1188,19 @@ class SawronApp {
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            
+
             setTimeout(() => {
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
             }, 100);
-            
+
             // Show success feedback
             const itemText = selectedIds.length === 1 ? 'item' : 'items';
             this.showTemporaryMessage(`Successfully downloaded ${selectedIds.length} ${itemText}`, 'success');
-            
+
         } catch (error) {
             console.error('Error downloading items:', error);
-            
+
             // Show user-friendly error message
             let userMessage = 'Failed to download items. ';
             if (error.message.includes('network') || error.message.includes('fetch')) {
@@ -1089,7 +1210,7 @@ class SawronApp {
             } else {
                 userMessage += error.message;
             }
-            
+
             alert(userMessage);
         } finally {
             // Re-enable download button
@@ -1104,21 +1225,21 @@ class SawronApp {
             alert('Please select items to delete');
             return;
         }
-        
-        const confirmMessage = selectedIds.length === 1 
-            ? 'Are you sure you want to delete this item? This action cannot be undone.' 
+
+        const confirmMessage = selectedIds.length === 1
+            ? 'Are you sure you want to delete this item? This action cannot be undone.'
             : `Are you sure you want to delete ${selectedIds.length} items? This action cannot be undone.`;
-            
+
         if (!confirm(confirmMessage)) {
             return;
         }
-        
+
         // Disable delete button during operation
         const deleteBtn = document.getElementById('bulk-delete-btn');
         const originalText = deleteBtn.innerHTML;
         deleteBtn.disabled = true;
         deleteBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Deleting...</span>';
-        
+
         try {
             const response = await fetch('/api/summaries/bulk-delete', {
                 method: 'POST',
@@ -1127,7 +1248,7 @@ class SawronApp {
                 },
                 body: JSON.stringify({ ids: selectedIds })
             });
-            
+
             if (!response.ok) {
                 let errorMessage = 'Failed to delete items';
                 try {
@@ -1138,7 +1259,7 @@ class SawronApp {
                 }
                 throw new Error(errorMessage);
             }
-            
+
             const result = await response.json();
             // Show success/partial success feedback
             if (result.deletedCount === selectedIds.length) {
@@ -1149,21 +1270,21 @@ class SawronApp {
             } else {
                 this.showTemporaryMessage('No items were deleted. Please try again.', 'error');
             }
-            
+
             // Handle any deletion errors silently
-            
+
             // Refresh the knowledge base
             this.loadKnowledgeBase();
-            
+
             // Hide bulk actions bar
             document.getElementById('bulk-actions-bar').style.display = 'none';
-            
+
             // Clear selection
             this.selectedItems.clear();
-            
+
         } catch (error) {
             console.error('Error deleting items:', error);
-            
+
             // Show user-friendly error message
             let userMessage = 'Failed to delete items. ';
             if (error.message.includes('network') || error.message.includes('fetch')) {
@@ -1173,7 +1294,7 @@ class SawronApp {
             } else {
                 userMessage += error.message;
             }
-            
+
             alert(userMessage);
         } finally {
             // Re-enable delete button
@@ -1771,8 +1892,17 @@ document.getElementById('ai-settings-modal').addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
     // Load initial settings
     const settings = await aiSettingsManager.loadSettings();
+
+    // Add global click handler to close dropdowns
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.action-dropdown')) {
+            document.querySelectorAll('.action-dropdown.show').forEach(dropdown => {
+                dropdown.classList.remove('show');
+            });
+        }
+    });
     aiSettingsManager.settings = settings;
-    
+
 });// Processing Queue Configuration Functions
 function adjustConcurrentProcessing(delta) {
     const input = document.getElementById('concurrent-processing');

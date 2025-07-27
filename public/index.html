@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAWRON - Connect the Dots & Fill the Gaps</title>
+    <title>SAWRON</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -17,7 +17,6 @@
         <header class="header">
             <div class="header-content">
                 <h1 class="logo">
-                    <span class="logo-icon">🧠</span>
                     SAWRON
                 </h1>
                 <p class="tagline">Connect the Dots & Fill the Gaps</p>
@@ -25,7 +24,6 @@
             <div class="header-actions">
                 <button class="settings-btn" onclick="openAISettingsModal()">
                     <span class="btn-icon">⚙️</span>
-                    <span class="btn-text">AI Settings</span>
                 </button>
             </div>
         </header>
@@ -36,22 +34,22 @@
             <section class="input-section">
                 <div class="main-input-group">
                     <div class="url-input-container">
-                        <input type="text" id="main-input" placeholder="Insert URL" class="main-input-field">
-                        <button class="paste-btn" id="paste-btn" onclick="pasteFromClipboard()">
+                        <input type="text" id="main-input" placeholder="Insert a URL and let the magic happen"
+                            class="main-input-field">
+                        <button class="paste-btn-inside" id="paste-btn" onclick="pasteFromClipboard()">
                             <span class="btn-icon">📋</span>
-                            <span class="btn-text">Paste</span>
                         </button>
                     </div>
 
                     <div class="action-buttons">
                         <button class="upload-btn" id="upload-btn" onclick="triggerFileUpload()">
                             <span class="btn-icon">📄</span>
-                            <span class="btn-text">Upload File</span>
+                            <span class="btn-text">UPLOAD</span>
                         </button>
 
                         <button class="summarize-btn disabled" id="summarize-btn" onclick="startSummarization()">
-                            <span class="btn-icon">⚡</span>
-                            <span class="btn-text">Distill</span>
+                            <span class="btn-icon">💠</span>
+                            <span class="btn-text">DISTILL</span>
                         </button>
                     </div>
                 </div>
@@ -92,22 +90,22 @@
             <!-- Knowledge Base Section -->
             <section class="knowledge-base-section">
                 <div class="knowledge-base-header">
-                    <h2 class="section-title">Knowledge Base</h2>
+                    <h2 class="section-title">KNOWLEDGE BASE</h2>
                     <div class="knowledge-base-controls">
-                        <input type="text" id="search-input" placeholder="Search knowledge base..." class="search-input">
+                        <input type="text" id="search-input" placeholder="Search knowledge base..."
+                            class="search-input">
                         <select id="filter-select" class="filter-select">
                             <option value="all">All Types</option>
-                            <option value="url">Web Pages</option>
-                            <option value="youtube">YouTube Videos</option>
-                            <option value="file">Documents</option>
+                            <option value="url">Web Page</option>
+                            <option value="youtube">YouTube Video</option>
+                            <option value="file">Document</option>
                         </select>
                         <button class="refresh-btn" onclick="refreshKnowledgeBase()">
                             <span class="btn-icon">🔄</span>
-                            <span class="btn-text">Refresh</span>
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- Bulk Actions Bar -->
                 <div class="bulk-actions-bar" id="bulk-actions-bar" style="display: none;">
                     <div class="bulk-actions-left">
@@ -141,8 +139,8 @@
                                 <th>Type</th>
                                 <th>Status</th>
                                 <th>Elapsed Time</th>
-                                <th>Created</th>
-                                <th>Actions</th>
+                                <th>Created On</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody id="knowledge-base-tbody">
@@ -151,7 +149,7 @@
                     </table>
                 </div>
             </section>
-            
+
             <!-- Raw Content Modal -->
             <div class="modal" id="raw-content-modal">
                 <div class="modal-content large-modal">
@@ -164,7 +162,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Logs Modal -->
             <div class="modal" id="logs-modal">
                 <div class="modal-content large-modal">
@@ -198,22 +196,22 @@
     <div class="modal" id="ai-settings-modal">
         <div class="modal-content large-modal">
             <div class="modal-header">
-                <h3 class="modal-title">AI Provider Settings</h3>
+                <h3 class="modal-title">Settings</h3>
                 <button class="modal-close" onclick="closeAISettingsModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="ai-provider-config">
                     <!-- Mode Toggle -->
                     <div class="config-section">
-                        <h4 class="config-section-title">AI Provider Mode</h4>
+                        <h4 class="config-section-title">Processing Mode</h4>
                         <div class="mode-toggle-container">
                             <div class="mode-toggle">
                                 <input type="checkbox" id="mode-toggle" onchange="handleModeToggle()" checked>
                                 <label for="mode-toggle" class="toggle-slider"></label>
                             </div>
                             <div class="mode-labels">
-                                <span class="mode-label" id="offline-label">Offline (Ollama)</span>
-                                <span class="mode-label active" id="online-label">Online (Cloud)</span>
+                                <span class="mode-label" id="offline-label">Offline</span>
+                                <span class="mode-label active" id="online-label">Online</span>
                             </div>
                         </div>
                         <p class="mode-description" id="mode-description">
@@ -221,32 +219,17 @@
                         </p>
                     </div>
 
-                    <!-- Processing Queue Configuration -->
-                    <div class="config-section">
-                        <h4 class="config-section-title">Processing Queue Settings</h4>
-                        <div class="form-group">
-                            <label for="concurrent-processing" class="form-label">Simultaneous Processing Limit:</label>
-                            <div class="number-input-container">
-                                <button type="button" class="number-btn number-down" onclick="adjustConcurrentProcessing(-1)">−</button>
-                                <input type="number" id="concurrent-processing" class="form-input number-input" 
-                                       min="1" max="10" value="1" step="1">
-                                <button type="button" class="number-btn number-up" onclick="adjustConcurrentProcessing(1)">+</button>
-                            </div>
-                            <small class="form-help">Maximum number of items that can be processed simultaneously. Lower values reduce API rate limit issues.</small>
-                        </div>
-                    </div>
-
                     <!-- Offline Configuration -->
                     <div class="config-section hidden" id="offline-config">
-                        <h4 class="config-section-title">Ollama Configuration</h4>
                         <div class="form-group">
-                            <label for="ollama-model" class="form-label">Model Name:</label>
+                            <label for="ollama-model" class="form-label">Model Name</label>
                             <input type="text" id="ollama-model" class="form-input" placeholder="llama2">
                             <small class="form-help">Enter the name of the Ollama model to use</small>
                         </div>
                         <div class="form-group">
-                            <label for="ollama-endpoint" class="form-label">Endpoint:</label>
-                            <input type="text" id="ollama-endpoint" class="form-input" placeholder="http://localhost:11434">
+                            <label for="ollama-endpoint" class="form-label">Endpoint</label>
+                            <input type="text" id="ollama-endpoint" class="form-input"
+                                placeholder="http://localhost:11434">
                             <small class="form-help">Ollama server endpoint URL</small>
                         </div>
                         <button class="test-btn" id="test-ollama-btn" onclick="testOllamaConnection()">
@@ -257,39 +240,40 @@
 
                     <!-- Online Configuration -->
                     <div class="config-section" id="online-config">
-                        <h4 class="config-section-title">Cloud AI Provider</h4>
                         <div class="form-group">
-                            <label for="provider-select" class="form-label">AI Provider:</label>
+                            <label for="provider-select" class="form-label">AI Provider</label>
                             <select id="provider-select" class="form-select" onchange="handleProviderChange()">
                                 <option value="openai">OpenAI</option>
-                                <option value="anthropic">Anthropic Claude</option>
-                                <option value="google">Google Gemini</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="google">Gemini</option>
                                 <option value="microsoft">Microsoft Copilot</option>
                                 <option value="grok">Grok</option>
-                                <option value="deepseek">Deepseek</option>
+                                <option value="deepseek">DeepSeek</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
-                            <label for="api-key" class="form-label">API Key:</label>
+                            <label for="model-select" class="form-label">Model</label>
+                            <select id="model-select" class="form-select">
+                                <!-- Options populated based on provider selection -->
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="api-key" class="form-label">API Key</label>
                             <div class="api-key-input-container">
                                 <input type="password" id="api-key" class="form-input" placeholder="Enter your API key">
                                 <button class="toggle-visibility-btn" onclick="toggleApiKeyVisibility()">
                                     <span id="visibility-icon">👁️</span>
                                 </button>
                             </div>
-                            <small class="form-help" id="api-key-help">Enter your API key for the selected provider</small>
+                            <small class="form-help" id="api-key-help">Enter your API key for the selected
+                                provider</small>
                             <div class="security-notice">
                                 <span class="security-icon">🔒</span>
-                                <small class="security-text">API keys are stored in memory only and are not saved to disk for security.</small>
+                                <small class="security-text">API keys are stored only in memory only and are not saved
+                                    to disk for security</small>
                             </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="model-select" class="form-label">Model:</label>
-                            <select id="model-select" class="form-select">
-                                <!-- Options populated based on provider selection -->
-                            </select>
                         </div>
 
                         <button class="test-btn" id="test-provider-btn" onclick="testProviderConnection()">
@@ -303,15 +287,32 @@
                         <div class="test-result-content" id="test-result-content"></div>
                     </div>
 
+                    <!-- Processing Queue Configuration -->
+                    <div class="config-section">
+                        <div class="form-group">
+                            <label for="concurrent-processing" class="form-label">Simultaneous Processing Limit</label>
+                            <div class="number-input-container">
+                                <button type="button" class="number-btn number-down"
+                                    onclick="adjustConcurrentProcessing(-1)">−</button>
+                                <input type="number" id="concurrent-processing" class="form-input number-input" min="1"
+                                    max="10" value="1" step="1">
+                                <button type="button" class="number-btn number-up"
+                                    onclick="adjustConcurrentProcessing(1)">+</button>
+                            </div>
+                            <small class="form-help">Maximum number of items that can be processed simultaneously, lower
+                                values reduce API rate limit issues</small>
+                        </div>
+                    </div>
+
                     <!-- Action Buttons -->
                     <div class="modal-actions">
                         <button class="save-btn" id="save-config-btn" onclick="saveAIConfiguration()">
                             <span class="btn-icon">💾</span>
-                            <span class="btn-text">Save Configuration</span>
+                            <span class="btn-text">Save</span>
                         </button>
                         <button class="reset-btn" onclick="resetAIConfiguration()">
                             <span class="btn-icon">🔄</span>
-                            <span class="btn-text">Reset to Defaults</span>
+                            <span class="btn-text">Reset</span>
                         </button>
                     </div>
                 </div>
