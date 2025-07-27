@@ -36,7 +36,7 @@
                                 <div class="url-input-container">
                                     <input type="text" id="main-input"
                                         placeholder="Insert a URL and let the magic happen" class="main-input-field">
-                                    <button class="paste-btn-inside" id="paste-btn" onclick="pasteFromClipboard()">
+                                    <button class="paste-btn-inside" id="paste-btn" onclick="pasteFromClipboard(event)" type="button">
                                         <span class="btn-icon" style="font-size: 2em;">📋</span>
                                     </button>
                                 </div>
@@ -47,8 +47,8 @@
                                         <span class="btn-text" style="font-size: 2em;">UPLOAD</span>
                                     </button>
 
-                                    <button class="summarize-btn disabled" id="summarize-btn"
-                                        onclick="startSummarization()">
+                                    <button class="distill-btn disabled" id="distill-btn"
+                                        onclick="startDistillation()">
                                         <span class="btn-icon" style="font-size: 2em;">💠</span>
                                         <span class="btn-text" style="font-size: 2em;">DISTILL</span>
                                     </button>
@@ -112,7 +112,6 @@
                                 <div class="bulk-actions-left">
                                     <button class="bulk-action-btn select-all-btn" id="select-all-btn"
                                         onclick="toggleSelectAll()">
-                                        <span class="btn-icon">☑️</span>
                                         <span class="btn-text">Select All</span>
                                     </button>
                                     <span class="selected-count" id="selected-count">0 selected</span>
@@ -183,16 +182,16 @@
                         </main>
             </div>
 
-            <!-- Summary Modal -->
-            <div class="modal" id="summary-modal">
+            <!-- Distillation Modal -->
+            <div class="modal" id="distillation-modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="modal-title" id="modal-title">Summary</h3>
-                        <button class="modal-close" onclick="closeSummaryModal()">&times;</button>
+                        <h3 class="modal-title" id="modal-title">Distillation</h3>
+                        <button class="modal-close" onclick="closeDistillationModal()">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <div class="summary-meta" id="summary-meta"></div>
-                        <div class="summary-content" id="summary-content"></div>
+                        <div class="distillation-meta" id="distillation-meta"></div>
+                        <div class="distillation-content" id="distillation-content"></div>
                     </div>
                 </div>
             </div>
@@ -251,7 +250,6 @@
                                         <option value="openai">OpenAI</option>
                                         <option value="anthropic">Anthropic</option>
                                         <option value="google">Gemini</option>
-                                        <option value="microsoft">Microsoft Copilot</option>
                                         <option value="grok">Grok</option>
                                         <option value="deepseek">DeepSeek</option>
                                     </select>

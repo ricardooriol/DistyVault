@@ -11,10 +11,10 @@ class AIProvider {
     }
 
     /**
-     * Generate a summary from the given text
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Additional options for summarization
-     * @returns {Promise<string>} - The generated summary
+     * Generate a distilled analysis from the given text
+     * @param {string} text - The text to distill
+     * @param {Object} options - Additional options for distillation
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         // This method should be overridden by subclasses to call the AI provider
@@ -23,9 +23,9 @@ class AIProvider {
     }
 
     /**
-     * Post-process the AI-generated summary to fix common issues
-     * @param {string} rawSummary - The raw summary from the AI provider
-     * @returns {string} - The processed summary with fixes applied
+     * Post-process the AI-generated distillation to fix common issues
+     * @param {string} rawSummary - The raw distillation from the AI provider
+     * @returns {string} - The processed distillation with fixes applied
      */
     postProcessSummary(rawSummary) {
         if (!rawSummary || typeof rawSummary !== 'string') {
@@ -137,7 +137,7 @@ class AIProvider {
     }
 
     /**
-     * Prepare the text for summarization (common preprocessing)
+     * Prepare the text for distillation (common preprocessing)
      * @param {string} text - The input text
      * @returns {string} - Preprocessed text
      */
@@ -171,12 +171,12 @@ class AIProvider {
     }
 
     /**
-     * Create a standardized prompt for summarization
-     * @param {string} text - The text to summarize
-     * @param {Object} options - Summarization options
+     * Create a standardized prompt for distillation
+     * @param {string} text - The text to distill
+     * @param {Object} options - Distillation options
      * @returns {string} - The formatted prompt
      */
-    createSummarizationPrompt(text, options = {}) {
+    createDistillationPrompt(text, options = {}) {
         return this.formatPrompt(text);
     }
 
@@ -206,7 +206,7 @@ Tone: Direct, insightful, and neutral. Be precise and confident. If data is inco
 
 Clarity: Avoid all jargon and buzzwords. Explain concepts as if to a smart, curious learner. The goal is deep understanding, not just listing facts.
 
-Directness: Your response MUST begin directly with the first key insight (Point #1). Do not use conversational introductions, preambles, or summaries like "Here are the findings...". Your response MUST end after the final point's elaboration. Do not add a concluding paragraph.
+Directness: Your response MUST begin directly with the first key insight (Point #1). Do not use conversational introductions, preambles, or distillations like "Here are the findings...". Your response MUST end after the final point's elaboration. Do not add a concluding paragraph.
 
 4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)
 
@@ -217,7 +217,7 @@ Begin with a single, bolded sentence that captures one complete, fundamental ide
 Then, in one or two subsequent paragraphs, elaborate on this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context. Use analogies or simple examples where they can aid understanding. Explain not just what the idea is, but why it matters and how it works based on your synthesis of the text and your research.
 
 2. Next Core Idea Sentence
-This follows the exact same pattern. A single, bolded, impactful sentence summarizing the next fundamental concept.
+This follows the exact same pattern. A single, bolded, impactful sentence distilling the next fundamental concept.
 Follow up with one or two paragraphs of in-depth explanation. Connect this idea to previous points if it helps build a cohesive mental model.
 
 Continue this pattern for as many points as are necessary to cover all essential knowledge.

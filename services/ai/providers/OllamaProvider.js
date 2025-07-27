@@ -14,10 +14,10 @@ class OllamaProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using Ollama
-     * @param {string} text - The text to summarize
+     * Generate a distillation using Ollama
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -65,7 +65,7 @@ class OllamaProvider extends AIProvider {
             }
 
         } catch (error) {
-            console.error('Error generating summary with Ollama:', error);
+            console.error('Error generating distillation with Ollama:', error);
 
             if (error.code === 'ECONNREFUSED') {
                 throw new Error('Cannot connect to Ollama. Please ensure Ollama is running on ' + this.endpoint);

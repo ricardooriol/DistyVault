@@ -35,10 +35,10 @@ class GoogleProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using Google Gemini
-     * @param {string} text - The text to summarize
+     * Generate a distillation using Google Gemini
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -77,7 +77,7 @@ class GoogleProvider extends AIProvider {
             }
 
         } catch (error) {
-            console.error('Error generating summary with Google Gemini:', error);
+            console.error('Error generating distillation with Google Gemini:', error);
             
             if (error.message.includes('API key')) {
                 throw new Error('Invalid Google API key. Please check your API key.');
@@ -95,7 +95,7 @@ class GoogleProvider extends AIProvider {
      * Fallback method using REST API
      * @param {string} prompt - The prompt to send
      * @param {Object} options - Generation options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummaryWithRestAPI(prompt, options = {}) {
         const axios = require('axios');
@@ -133,7 +133,10 @@ class GoogleProvider extends AIProvider {
             const candidate = response.data.candidates[0];
             
             if (candidate.content && candidate.content.parts && candidate.content.parts[0]) {
-                return candidate.content.parts[0].text.trim();
+                const rawSummary = candidate.content.parts[0].text.trim();
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid content structure in Gemini response');
             }
@@ -272,7 +275,9 @@ class GoogleProvider extends AIProvider {
      */
     getAvailableModels() {
         return [
-            'gemini-2.5-flash'
+            'gemini-2.5-pro',
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite'
         ];
     }
 

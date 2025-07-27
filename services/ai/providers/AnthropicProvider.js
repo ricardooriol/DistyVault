@@ -9,7 +9,7 @@ class AnthropicProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'claude-3-haiku-20240307';
+        this.model = config.model || 'claude-3-5-haiku-latest';
         this.endpoint = config.endpoint || 'https://api.anthropic.com/v1';
         this.timeout = config.timeout || 60000; // 1 minute default
         
@@ -19,10 +19,10 @@ class AnthropicProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using Anthropic Claude
-     * @param {string} text - The text to summarize
+     * Generate a distillation using Anthropic Claude
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -75,7 +75,7 @@ class AnthropicProvider extends AIProvider {
             }
 
         } catch (error) {
-            console.error('Error generating summary with Anthropic:', error);
+            console.error('Error generating distillation with Anthropic:', error);
             
             if (error.response) {
                 const status = error.response.status;
@@ -185,7 +185,7 @@ class AnthropicProvider extends AIProvider {
             model: {
                 type: 'string',
                 required: false,
-                default: 'claude-3-haiku-20240307',
+                default: 'claude-3-5-haiku-latest',
                 description: 'Claude model to use'
             }
         };
@@ -197,10 +197,10 @@ class AnthropicProvider extends AIProvider {
      */
     getAvailableModels() {
         return [
-            'claude-3-haiku-20240307',
-            'claude-3-sonnet-20240229',
-            'claude-3-opus-20240229',
-            'claude-3-5-sonnet-20241022'
+            'claude-opus-4-20250514',
+            'claude-sonnet-4-20250514',
+            'claude-3-7-sonnet-latest',
+            'claude-3-5-haiku-latest'
         ];
     }
 

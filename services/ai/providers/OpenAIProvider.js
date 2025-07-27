@@ -9,7 +9,7 @@ class OpenAIProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'gpt-3.5-turbo';
+        this.model = config.model || 'gpt-4o';
         this.endpoint = config.endpoint || 'https://api.openai.com/v1';
         this.timeout = config.timeout || 60000; // 1 minute default
         
@@ -19,10 +19,10 @@ class OpenAIProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using OpenAI
-     * @param {string} text - The text to summarize
+     * Generate a distillation using OpenAI
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -73,7 +73,7 @@ class OpenAIProvider extends AIProvider {
             }
 
         } catch (error) {
-            console.error('Error generating summary with OpenAI:', error);
+            console.error('Error generating distillation with OpenAI:', error);
             
             if (error.response) {
                 const status = error.response.status;
@@ -172,7 +172,7 @@ class OpenAIProvider extends AIProvider {
             model: {
                 type: 'string',
                 required: false,
-                default: 'gpt-3.5-turbo',
+                default: 'gpt-4o',
                 description: 'OpenAI model to use'
             }
         };
@@ -184,12 +184,10 @@ class OpenAIProvider extends AIProvider {
      */
     getAvailableModels() {
         return [
-            'gpt-3.5-turbo',
-            'gpt-3.5-turbo-16k',
-            'gpt-4',
-            'gpt-4-turbo',
+            'o3-mini',
+            'o4-mini',
             'gpt-4o',
-            'gpt-4o-mini'
+            'gpt-4.1'
         ];
     }
 

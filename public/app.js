@@ -39,9 +39,9 @@ class SawronApp {
         });
 
         // Modal close
-        document.getElementById('summary-modal').addEventListener('click', (e) => {
+        document.getElementById('distillation-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                this.closeSummaryModal();
+                this.closeDistillationModal();
             }
         });
 
@@ -123,7 +123,7 @@ class SawronApp {
     updateButtonStates() {
         const mainInput = document.getElementById('main-input');
         const uploadBtn = document.getElementById('upload-btn');
-        const summarizeBtn = document.getElementById('summarize-btn');
+        const summarizeBtn = document.getElementById('distill-btn');
 
         const hasText = mainInput.value.trim().length > 0;
         const hasFile = this.selectedFile !== null;
@@ -167,9 +167,9 @@ class SawronApp {
         document.getElementById('status-section').style.display = 'none';
     }
 
-    async startSummarization() {
-        const summarizeBtn = document.getElementById('summarize-btn');
-        if (summarizeBtn.classList.contains('disabled')) {
+    async startDistillation() {
+        const distillBtn = document.getElementById('distill-btn');
+        if (distillBtn.classList.contains('disabled')) {
             return;
         }
 
@@ -475,10 +475,10 @@ class SawronApp {
                 </button>
                 <div class="action-dropdown-content" id="dropdown-${item.id}">
                     ${isCompleted ? `
-                        <button class="action-dropdown-item" onclick="app.showSummaryModal('${item.id}')">
-                            📄 View Summary
+                        <button class="action-dropdown-item" onclick="app.showDistillationModal('${item.id}')">
+                            📄 View Distillation
                         </button>
-                        <button class="action-dropdown-item" onclick="app.downloadSummary('${item.id}')">
+                        <button class="action-dropdown-item" onclick="app.downloadDistillation('${item.id}')">
                             📥 Download
                         </button>
                     ` : ''}
@@ -495,7 +495,7 @@ class SawronApp {
                     <button class="action-dropdown-item" onclick="app.showLogs('${item.id}')">
                         📋 Processing Logs
                     </button>
-                    <button class="action-dropdown-item delete-item" onclick="app.deleteSummary('${item.id}')">
+                    <button class="action-dropdown-item delete-item" onclick="app.deleteDistillation('${item.id}')">
                         🗑️ Delete
                     </button>
                 </div>
@@ -518,7 +518,7 @@ class SawronApp {
         `;
     }
 
-    async showSummaryModal(id) {
+    async showDistillationModal(id) {
         try {
             const response = await fetch(`/api/summaries/${id}`);
             if (!response.ok) {
@@ -563,9 +563,9 @@ class SawronApp {
                 metaHtml += `<strong>Word Count:</strong> ${summary.wordCount} words<br>`;
             }
 
-            document.getElementById('summary-meta').innerHTML = metaHtml;
-            document.getElementById('summary-content').innerHTML = this.formatContent(summary.content || '');
-            document.getElementById('summary-modal').style.display = 'block';
+            document.getElementById('distillation-meta').innerHTML = metaHtml;
+            document.getElementById('distillation-content').innerHTML = this.formatContent(summary.content || '');
+            document.getElementById('distillation-modal').style.display = 'block';
 
 
 
@@ -760,8 +760,8 @@ class SawronApp {
         }
     }
 
-    closeSummaryModal() {
-        document.getElementById('summary-modal').style.display = 'none';
+    closeDistillationModal() {
+        document.getElementById('distillation-modal').style.display = 'none';
     }
 
     closeRawContentModal() {
@@ -772,7 +772,7 @@ class SawronApp {
         document.getElementById('logs-modal').style.display = 'none';
     }
 
-    async downloadSummary(id) {
+    async downloadDistillation(id) {
         try {
             const response = await fetch(`/api/summaries/${id}/pdf`);
 
@@ -837,7 +837,7 @@ class SawronApp {
         }
     }
 
-    async deleteSummary(id) {
+    async deleteDistillation(id) {
         if (!confirm('Are you sure you want to delete this summary?')) {
             return;
         }
@@ -1313,15 +1313,28 @@ class SawronApp {
 }
 
 // Global functions for HTML onclick handlers
-async function pasteFromClipboard() {
+async function pasteFromClipboard(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
     try {
+        // Try to read from clipboard directly
         const text = await navigator.clipboard.readText();
         const mainInput = document.getElementById('main-input');
         mainInput.value = text;
+        mainInput.focus();
         app.handleInputChange(text);
+        console.log('Text pasted from clipboard successfully');
     } catch (err) {
         console.error('Failed to read clipboard:', err);
-        alert('Unable to access clipboard. Please paste manually.');
+        
+        // Fallback: show alert and focus input for manual paste
+        alert('Unable to access clipboard automatically. Please paste manually using Ctrl+V (or Cmd+V on Mac).');
+        const mainInput = document.getElementById('main-input');
+        mainInput.focus();
+        mainInput.select();
     }
 }
 
@@ -1332,16 +1345,16 @@ function triggerFileUpload() {
     }
 }
 
-function startSummarization() {
-    app.startSummarization();
+function startDistillation() {
+    app.startDistillation();
 }
 
 function removeFile() {
     app.removeFile();
 }
 
-function closeSummaryModal() {
-    app.closeSummaryModal();
+function closeDistillationModal() {
+    app.closeDistillationModal();
 }
 
 function closeRawContentModal() {
@@ -1379,18 +1392,16 @@ class AISettingsManager {
             this.settings = settings;
         });
         this.providerModels = {
-            openai: ['gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-4o-mini'],
-            anthropic: ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229', 'claude-3-5-sonnet-20241022'],
-            google: ['gemini-2.5-flash'],
-            microsoft: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-3.5-turbo-16k'],
-            grok: ['grok-1', 'grok-1.5'],
-            deepseek: ['deepseek-chat', 'deepseek-coder']
+            openai: ['o3-mini', 'o4-mini', 'gpt-4o', 'gpt-4.1'],
+            anthropic: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-latest', 'claude-3-5-haiku-latest'],
+            google: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+            grok: ['grok-4-0709', 'grok-3', 'grok-3-mini', 'grok-3-fast'],
+            deepseek: ['deepseek-chat', 'deepseek-reasoner']
         };
         this.providerInfo = {
             openai: { name: 'OpenAI', keyPrefix: 'sk-', help: 'Get your API key from https://platform.openai.com/api-keys' },
             anthropic: { name: 'Anthropic Claude', keyPrefix: 'sk-ant-', help: 'Get your API key from https://console.anthropic.com/' },
             google: { name: 'Google Gemini', keyPrefix: '', help: 'Get your API key from https://makersuite.google.com/app/apikey' },
-            microsoft: { name: 'Microsoft Copilot', keyPrefix: '', help: 'Get your API key from Azure OpenAI Service' },
             grok: { name: 'Grok', keyPrefix: 'xai-', help: 'Get your API key from https://console.x.ai/' },
             deepseek: { name: 'Deepseek', keyPrefix: 'sk-', help: 'Get your API key from https://platform.deepseek.com/' }
         };

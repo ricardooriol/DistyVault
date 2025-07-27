@@ -19,10 +19,10 @@ class DeepseekProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using Deepseek
-     * @param {string} text - The text to summarize
+     * Generate a distillation using Deepseek
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -60,17 +60,20 @@ class DeepseekProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.choices && response.data.choices[0]) {
-                const summary = response.data.choices[0].message.content.trim();
+                const rawSummary = response.data.choices[0].message.content.trim();
                 console.log(`Deepseek response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${summary.length} characters`);
+                console.log(`Summary length: ${rawSummary.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
-                return summary;
+                
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid response format from Deepseek');
             }
 
         } catch (error) {
-            console.error('Error generating summary with Deepseek:', error);
+            console.error('Error generating distillation with Deepseek:', error);
             
             if (error.response) {
                 const status = error.response.status;
@@ -183,7 +186,7 @@ class DeepseekProvider extends AIProvider {
     getAvailableModels() {
         return [
             'deepseek-chat',
-            'deepseek-coder'
+            'deepseek-reasoner'
         ];
     }
 

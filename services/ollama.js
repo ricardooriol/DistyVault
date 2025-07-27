@@ -11,9 +11,9 @@ class OllamaService {
     }
 
     /**
-     * Generate a summary using the Ollama API
-     * @param {string} text - The text to summarize
-     * @returns {Promise<string>} - The generated summary
+     * Generate a distillation using the Ollama API
+     * @param {string} text - The text to distill
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text) {
         const prompt = this.formatPrompt(text);

@@ -9,9 +9,9 @@ class GrokProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'grok-1';
+        this.model = config.model || 'grok-3';
         this.endpoint = config.endpoint || 'https://api.x.ai/v1';
-        this.timeout = config.timeout || 60000; // 1 minute default
+        this.timeout = config.timeout || 360000; // 6 minutes for reasoning models
         
         if (!this.apiKey) {
             throw new Error('Grok API key is required');
@@ -19,10 +19,10 @@ class GrokProvider extends AIProvider {
     }
 
     /**
-     * Generate a summary using Grok
-     * @param {string} text - The text to summarize
+     * Generate a distillation using Grok
+     * @param {string} text - The text to distill
      * @param {Object} options - Summarization options
-     * @returns {Promise<string>} - The generated summary
+     * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
         try {
@@ -60,17 +60,20 @@ class GrokProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.choices && response.data.choices[0]) {
-                const summary = response.data.choices[0].message.content.trim();
+                const rawSummary = response.data.choices[0].message.content.trim();
                 console.log(`Grok response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${summary.length} characters`);
+                console.log(`Summary length: ${rawSummary.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
-                return summary;
+                
+                // Apply post-processing to fix numbering and other issues
+                const processedSummary = this.postProcessSummary(rawSummary);
+                return processedSummary;
             } else {
                 throw new Error('Invalid response format from Grok');
             }
 
         } catch (error) {
-            console.error('Error generating summary with Grok:', error);
+            console.error('Error generating distillation with Grok:', error);
             
             if (error.response) {
                 const status = error.response.status;
@@ -170,7 +173,7 @@ class GrokProvider extends AIProvider {
             model: {
                 type: 'string',
                 required: false,
-                default: 'grok-1',
+                default: 'grok-3',
                 description: 'Grok model to use'
             }
         };
@@ -182,8 +185,10 @@ class GrokProvider extends AIProvider {
      */
     getAvailableModels() {
         return [
-            'grok-1',
-            'grok-1.5'
+            'grok-4-0709',
+            'grok-3',
+            'grok-3-mini',
+            'grok-3-fast'
         ];
     }
 

@@ -6,7 +6,7 @@ const OllamaProvider = require('./providers/OllamaProvider');
 const OpenAIProvider = require('./providers/OpenAIProvider');
 const AnthropicProvider = require('./providers/AnthropicProvider');
 const GoogleProvider = require('./providers/GoogleProvider');
-const MicrosoftProvider = require('./providers/MicrosoftProvider');
+
 const GrokProvider = require('./providers/GrokProvider');
 const DeepseekProvider = require('./providers/DeepseekProvider');
 
@@ -41,7 +41,7 @@ class AIProviderFactory {
                 }
                 return new OpenAIProvider({
                     apiKey,
-                    model: model || 'gpt-3.5-turbo',
+                    model: model || 'gpt-4o',
                     endpoint: endpoint || 'https://api.openai.com/v1',
                     ...otherOptions
                 });
@@ -52,7 +52,7 @@ class AIProviderFactory {
                 }
                 return new AnthropicProvider({
                     apiKey,
-                    model: model || 'claude-3-haiku-20240307',
+                    model: model || 'claude-3-5-haiku-latest',
                     endpoint: endpoint || 'https://api.anthropic.com/v1',
                     ...otherOptions
                 });
@@ -67,24 +67,13 @@ class AIProviderFactory {
                     ...otherOptions
                 });
 
-            case 'microsoft':
-                if (!apiKey) {
-                    throw new Error('API key is required for Microsoft provider');
-                }
-                return new MicrosoftProvider({
-                    apiKey,
-                    model: model || 'gpt-4',
-                    endpoint: endpoint || 'https://api.cognitive.microsoft.com',
-                    ...otherOptions
-                });
-
             case 'grok':
                 if (!apiKey) {
                     throw new Error('API key is required for Grok provider');
                 }
                 return new GrokProvider({
                     apiKey,
-                    model: model || 'grok-1',
+                    model: model || 'grok-3',
                     endpoint: endpoint || 'https://api.x.ai/v1',
                     ...otherOptions
                 });
@@ -124,16 +113,16 @@ class AIProviderFactory {
                 name: 'OpenAI',
                 category: 'online',
                 requiresApiKey: true,
-                defaultModel: 'gpt-3.5-turbo',
-                models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o']
+                defaultModel: 'gpt-4o',
+                models: ['o3-mini', 'o4-mini', 'gpt-4o', 'gpt-4.1']
             },
             {
                 type: 'anthropic',
                 name: 'Anthropic Claude',
                 category: 'online',
                 requiresApiKey: true,
-                defaultModel: 'claude-3-haiku-20240307',
-                models: ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229']
+                defaultModel: 'claude-3-5-haiku-latest',
+                models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-latest', 'claude-3-5-haiku-latest']
             },
             {
                 type: 'google',
@@ -141,23 +130,15 @@ class AIProviderFactory {
                 category: 'online',
                 requiresApiKey: true,
                 defaultModel: 'gemini-2.5-flash',
-                models: ['gemini-2.5-flash']
-            },
-            {
-                type: 'microsoft',
-                name: 'Microsoft Copilot',
-                category: 'online',
-                requiresApiKey: true,
-                defaultModel: 'gpt-4',
-                models: ['gpt-4', 'gpt-3.5-turbo']
+                models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
             },
             {
                 type: 'grok',
                 name: 'Grok',
                 category: 'online',
                 requiresApiKey: true,
-                defaultModel: 'grok-1',
-                models: ['grok-1', 'grok-1.5']
+                defaultModel: 'grok-3',
+                models: ['grok-4-0709', 'grok-3', 'grok-3-mini', 'grok-3-fast']
             },
             {
                 type: 'deepseek',
@@ -165,7 +146,7 @@ class AIProviderFactory {
                 category: 'online',
                 requiresApiKey: true,
                 defaultModel: 'deepseek-chat',
-                models: ['deepseek-chat', 'deepseek-coder']
+                models: ['deepseek-chat', 'deepseek-reasoner']
             }
         ];
     }
