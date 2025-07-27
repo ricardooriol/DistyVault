@@ -27,7 +27,7 @@ class GrokProvider extends AIProvider {
     async generateSummary(text, options = {}) {
         try {
             const processedText = this.preprocessText(text);
-            const prompt = this.createSummarizationPrompt(processedText, options);
+            const prompt = this.createDistillationPrompt(processedText, options);
 
             console.log(`Sending request to Grok with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);

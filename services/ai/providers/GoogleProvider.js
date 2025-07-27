@@ -43,7 +43,7 @@ class GoogleProvider extends AIProvider {
     async generateSummary(text, options = {}) {
         try {
             const processedText = this.preprocessText(text);
-            const prompt = this.createSummarizationPrompt(processedText, options);
+            const prompt = this.createDistillationPrompt(processedText, options);
 
             console.log(`Sending request to Google Gemini with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);
