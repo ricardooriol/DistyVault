@@ -1,4 +1,4 @@
-# 🧠 SAWRON - Connect the Dots & Fill the Gaps
+# SAWRON - Connect the Dots & Fill the Gaps
 
 **The Ultimate Knowledge Distillation & AI Processing Platform**
 
@@ -10,7 +10,7 @@
 
 ## What is SAWRON?
 
-SAWRON is a powerful knowledge distillation application that transforms diverse content sources into structured, actionable insights using advanced AI. You have complete control over your data processing - choose between **local AI processing** for maximum privacy or **cloud AI providers** for enhanced capabilities. The application runs locally on your machine, but you decide where the AI processing happens.
+SAWRON is a powerful knowledge distillation application that transforms diverse content sources into structured, actionable insights using advanced AI. You have complete control over your data processing - choose between **local AI processing** for maximum privacy or **online AI providers** for enhanced capabilities. The application runs locally on your machine, but you decide where the AI processing happens.
 
 ### Core Purpose
 
@@ -18,13 +18,13 @@ SAWRON distills complex information from various sources into clear, numbered in
 - **Connect scattered information** across different content types
 - **Fill knowledge gaps** with AI-powered analysis and research
 - **Build a searchable knowledge base** of distilled insights
-- **Choose your privacy level** - use local AI models or cloud providers based on your needs
+- **Choose your privacy level** - use local AI models or online providers based on your needs
 
 ---
 
 ## Key Features
 
-- **🔒 Privacy Control** - Choose between local AI processing (private) or cloud providers (enhanced capabilities)
+- **🔒 Privacy Control** - Choose between local AI processing (private) or online providers (enhanced capabilities)
 - **🤖 Multi-AI Support** - Works with OpenAI, Anthropic, Google, Grok, DeepSeek, and Ollama
 - **📚 Universal Content Processing** - YouTube videos, web pages, documents, and direct text
 - **⚡ Real-time Processing** - Live status updates and progress tracking
@@ -82,7 +82,7 @@ ollama serve
 ollama pull phi3:mini
 ```
 
-#### ☁️ Cloud Providers (Enhanced Capabilities)
+#### ☁️ Online Providers (Enhanced Capabilities)
 **More powerful models, faster processing, requires API keys, data sent to provider**
 - **OpenAI**: Get API key from [platform.openai.com](https://platform.openai.com/api-keys)
 - **Anthropic**: Get API key from [console.anthropic.com](https://console.anthropic.com/)
@@ -95,8 +95,8 @@ ollama pull phi3:mini
 2. Click the Settings button (⚙️)
 3. **Choose your processing approach**:
    - **Local**: Select Ollama for privacy-first processing
-   - **Cloud**: Choose OpenAI, Anthropic, Google, Grok, or DeepSeek for enhanced capabilities
-4. Enter your API key (for cloud providers) or configure Ollama endpoint (for local)
+   - **Online**: Choose OpenAI, Anthropic, Google, Grok, or DeepSeek for enhanced capabilities
+4. Enter your API key (for online providers) or configure Ollama endpoint (for local)
 5. Select your preferred model
 6. Test the connection and save
 
@@ -110,15 +110,15 @@ SAWRON gives you complete control over how your data is processed:
 - **Maximum Privacy**: Your content never leaves your machine
 - **No API Keys**: No external accounts or subscriptions needed
 - **Offline Capable**: Works without internet connection
-- **Trade-off**: May be slower and less capable than cloud models
+- **Trade-off**: May be slower and less capable than online models
 
-### ☁️ Cloud Processing (OpenAI, Anthropic, etc.)
+### ☁️ Online Processing (OpenAI, Anthropic, etc.)
 - **Enhanced Capabilities**: Access to the most powerful AI models
-- **Faster Processing**: Optimized cloud infrastructure
+- **Faster Processing**: Optimized online infrastructure
 - **Regular Updates**: Always access to latest model improvements
 - **Trade-off**: Your content is sent to the AI provider for processing
 
-**Your Choice**: Switch between providers anytime based on your current needs - use local for sensitive content and cloud for enhanced capabilities.
+**Your Choice**: Switch between providers anytime based on your current needs - use local for sensitive content and online for enhanced capabilities.
 
 ---
 
@@ -126,10 +126,9 @@ SAWRON gives you complete control over how your data is processed:
 
 ### Processing Content
 
-1. **YouTube Videos**: Paste any YouTube URL and click Distill
-2. **Web Pages**: Enter any webpage URL for content extraction
-3. **Documents**: Upload PDF, DOCX, or TXT files (up to 50MB)
-4. **Direct Text**: Process any text content directly
+- **YouTube Videos**: Paste any YouTube Video/Playlist URL and click Distill
+- **Web Pages**: Enter any webpage URL for content extraction
+- **Documents**: Upload PDF, DOCX, or TXT files (up to 50MB)
 
 ### Managing Knowledge
 
@@ -154,7 +153,7 @@ SAWRON is built with:
 - **Backend**: Node.js with Express.js (runs locally)
 - **Database**: SQLite for local storage (your data stays on your machine)
 - **Frontend**: Vanilla JavaScript with modern CSS
-- **AI Integration**: Modular provider system (supports both local and cloud AI)
+- **AI Integration**: Modular provider system (supports both local and online AI)
 - **Content Extraction**: LangChain, Puppeteer, and custom processors
 
 ---
@@ -162,35 +161,9 @@ SAWRON is built with:
 ## Future Enhancements
 
 - **Additional AI Providers**: Integration with more AI services and local models
-- **Advanced Content Sources**: RSS feeds, email processing, API integrations
-- **Knowledge Graph Visualization**: Interactive maps of content relationships
-- **Collaborative Features**: Shared knowledge bases and team workflows
-- **Advanced Search**: Semantic search, tagging, and categorization
 - **Export Formats**: Markdown, JSON, XML, and custom templates
 - **Automation**: Scheduled processing, webhooks, and workflow triggers
-- **Mobile App**: Native mobile applications for iOS and Android
-- **Plugin System**: Extensible architecture for custom processors
-- **Analytics Dashboard**: Insights into processing patterns and knowledge trends
-
----
-
-## Contributing
-
-We welcome contributions! Here's how to get started:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test thoroughly
-4. Commit: `git commit -m 'Add amazing feature'`
-5. Push: `git push origin feature/amazing-feature`
-6. Open a Pull Request
-
-### Areas for Contribution
-- New AI provider integrations
-- Additional content source support
-- UI/UX improvements
-- Performance optimizations
-- Documentation improvements
+- **App**: Native applications for Windows, MacOS, Linux, iOS and Android
 
 ---
 
