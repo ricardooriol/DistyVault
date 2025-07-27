@@ -1,11 +1,11 @@
 /**
  * Database service for SAWRON
- * Handles persistence of summaries using SQLite
+ * Handles persistence of distillations using SQLite
  */
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const Summary = require('../models/summary');
+const Distillation = require('../models/distillation');
 
 class Database {
     constructor() {
@@ -24,7 +24,7 @@ class Database {
 
     init() {
         this.db.serialize(() => {
-            // Create summaries table if it doesn't exist
+            // Create distillations table if it doesn't exist
             this.db.run(`
                 CREATE TABLE IF NOT EXISTS summaries (
                     id TEXT PRIMARY KEY,
@@ -41,59 +41,59 @@ class Database {
                     processingTime REAL,
                     elapsedTime REAL,
                     startTime TEXT,
-                    summarizingStartTime TEXT,
+                    distillingStartTime TEXT,
                     wordCount INTEGER,
                     error TEXT,
                     logs TEXT
                 )
             `);
 
-            // Add summarizingStartTime column if it doesn't exist (for existing databases)
+            // Add distillingStartTime column if it doesn't exist (for existing databases)
             this.db.run(`
-                ALTER TABLE summaries ADD COLUMN summarizingStartTime TEXT
+                ALTER TABLE summaries ADD COLUMN distillingStartTime TEXT
             `, (err) => {
                 // Ignore error if column already exists
                 if (err && !err.message.includes('duplicate column name')) {
-                    console.warn('Warning adding summarizingStartTime column:', err.message);
+                    console.warn('Warning adding distillingStartTime column:', err.message);
                 }
             });
         });
         // Database initialized successfully
     }
 
-    async saveSummary(summary) {
+    async saveDistillation(distillation) {
         return new Promise((resolve, reject) => {
             const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO summaries 
                 (id, title, content, sourceUrl, sourceType, sourceFile, status, processingStep, rawContent,
-                createdAt, completedAt, processingTime, elapsedTime, startTime, summarizingStartTime, wordCount, error, logs)
+                createdAt, completedAt, processingTime, elapsedTime, startTime, distillingStartTime, wordCount, error, logs)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
 
             stmt.run(
-                summary.id,
-                summary.title,
-                summary.content,
-                summary.sourceUrl,
-                summary.sourceType,
-                summary.sourceFile ? JSON.stringify(summary.sourceFile) : null,
-                summary.status,
-                summary.processingStep || '',
-                summary.rawContent || '',
-                summary.createdAt.toISOString(),
-                summary.completedAt ? summary.completedAt.toISOString() : null,
-                summary.processingTime,
-                summary.elapsedTime || 0,
-                summary.startTime ? summary.startTime.toISOString() : null,
-                summary.summarizingStartTime ? summary.summarizingStartTime.toISOString() : null,
-                summary.wordCount,
-                summary.error,
-                JSON.stringify(summary.logs || []),
+                distillation.id,
+                distillation.title,
+                distillation.content,
+                distillation.sourceUrl,
+                distillation.sourceType,
+                distillation.sourceFile ? JSON.stringify(distillation.sourceFile) : null,
+                distillation.status,
+                distillation.processingStep || '',
+                distillation.rawContent || '',
+                distillation.createdAt.toISOString(),
+                distillation.completedAt ? distillation.completedAt.toISOString() : null,
+                distillation.processingTime,
+                distillation.elapsedTime || 0,
+                distillation.startTime ? distillation.startTime.toISOString() : null,
+                distillation.distillingStartTime ? distillation.distillingStartTime.toISOString() : null,
+                distillation.wordCount,
+                distillation.error,
+                JSON.stringify(distillation.logs || []),
                 function (err) {
                     if (err) {
                         reject(err);
                     } else {
-                        resolve(summary);
+                        resolve(distillation);
                     }
                 }
             );
@@ -102,7 +102,7 @@ class Database {
         });
     }
 
-    async getSummary(id) {
+    async getDistillation(id) {
         return new Promise((resolve, reject) => {
             this.db.get('SELECT * FROM summaries WHERE id = ?', [id], (err, row) => {
                 if (err) {
@@ -110,7 +110,7 @@ class Database {
                 } else if (!row) {
                     resolve(null);
                 } else {
-                    resolve(this.rowToSummary(row));
+                    resolve(this.rowToDistillation(row));
                 }
             });
         });
@@ -122,13 +122,13 @@ class Database {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve(rows.map(row => this.rowToSummary(row)));
+                    resolve(rows.map(row => this.rowToDistillation(row)));
                 }
             });
         });
     }
 
-    async deleteSummary(id) {
+    async deleteDistillation(id) {
         return new Promise((resolve, reject) => {
             this.db.run('DELETE FROM summaries WHERE id = ?', [id], function (err) {
                 if (err) {
@@ -140,7 +140,7 @@ class Database {
         });
     }
 
-    async updateSummaryStatus(id, status, processingStep = null, error = null) {
+    async updateDistillationStatus(id, status, processingStep = null, error = null) {
         return new Promise(async (resolve, reject) => {
             try {
                 const updates = { status };
@@ -157,18 +157,18 @@ class Database {
                     updates.error = error;
                 }
 
-                // Update elapsed time and start time for summarizing status
-                const summary = await this.getSummary(id);
-                if (status === 'summarizing' && summary && !summary.summarizingStartTime) {
-                    // Set the summarizing start time when status first changes to summarizing
-                    updates.summarizingStartTime = new Date().toISOString();
+                // Update elapsed time and start time for distilling status
+                const distillation = await this.getDistillation(id);
+                if (status === 'distilling' && distillation && !distillation.distillingStartTime) {
+                    // Set the distilling start time when status first changes to distilling
+                    updates.distillingStartTime = new Date().toISOString();
                     updates.elapsedTime = 0; // Reset elapsed time
-                } else if (summary && summary.summarizingStartTime) {
-                    // Calculate elapsed time from when summarizing started
-                    updates.elapsedTime = (new Date() - new Date(summary.summarizingStartTime)) / 1000;
-                } else if (summary && summary.startTime && status !== 'summarizing') {
-                    // For non-summarizing statuses, use original logic
-                    updates.elapsedTime = (new Date() - summary.startTime) / 1000;
+                } else if (distillation && distillation.distillingStartTime) {
+                    // Calculate elapsed time from when distilling started
+                    updates.elapsedTime = (new Date() - new Date(distillation.distillingStartTime)) / 1000;
+                } else if (distillation && distillation.startTime && status !== 'distilling') {
+                    // For non-distilling statuses, use original logic
+                    updates.elapsedTime = (new Date() - distillation.startTime) / 1000;
                 }
 
                 const setClauses = Object.keys(updates).map(key => `${key} = ?`).join(', ');
@@ -187,20 +187,20 @@ class Database {
         });
     }
 
-    async updateSummaryContent(id, content, rawContent, processingTime, wordCount) {
+    async updateDistillationContent(id, content, rawContent, processingTime, wordCount) {
         return new Promise(async (resolve, reject) => {
             try {
-                // Get current summary to calculate elapsed time
-                const summary = await this.getSummary(id);
+                // Get current distillation to calculate elapsed time
+                const distillation = await this.getDistillation(id);
                 const now = new Date();
-                // Use summarizing start time if available, otherwise fall back to start time
-                const elapsedTime = summary && summary.summarizingStartTime ? 
-                    (now - summary.summarizingStartTime) / 1000 : 
-                    (summary && summary.startTime ? (now - summary.startTime) / 1000 : 0);
+                // Use distilling start time if available, otherwise fall back to start time
+                const elapsedTime = distillation && distillation.distillingStartTime ? 
+                    (now - distillation.distillingStartTime) / 1000 : 
+                    (distillation && distillation.startTime ? (now - distillation.startTime) / 1000 : 0);
 
                 this.db.run(
                     'UPDATE summaries SET content = ?, rawContent = ?, processingTime = ?, elapsedTime = ?, wordCount = ?, status = ?, processingStep = ?, completedAt = ? WHERE id = ?',
-                    [content, rawContent, processingTime, elapsedTime, wordCount, 'completed', 'Summary completed', now.toISOString(), id],
+                    [content, rawContent, processingTime, elapsedTime, wordCount, 'completed', 'Distillation completed', now.toISOString(), id],
                     function (err) {
                         if (err) {
                             reject(err);
@@ -225,15 +225,15 @@ class Database {
                     if (err) {
                         reject(err);
                     } else {
-                        resolve(rows.map(row => this.rowToSummary(row)));
+                        resolve(rows.map(row => this.rowToDistillation(row)));
                     }
                 }
             );
         });
     }
 
-    rowToSummary(row) {
-        return new Summary({
+    rowToDistillation(row) {
+        return new Distillation({
             id: row.id,
             title: row.title,
             content: row.content,
@@ -248,7 +248,7 @@ class Database {
             processingTime: row.processingTime,
             elapsedTime: row.elapsedTime,
             startTime: row.startTime ? new Date(row.startTime) : null,
-            summarizingStartTime: row.summarizingStartTime ? new Date(row.summarizingStartTime) : null,
+            distillingStartTime: row.distillingStartTime ? new Date(row.distillingStartTime) : null,
             wordCount: row.wordCount,
             error: row.error,
             logs: row.logs ? JSON.parse(row.logs) : []

@@ -1,11 +1,11 @@
 /**
  * Processor service for SAWRON
- * Orchestrates the content extraction, summarization, and storage process
+ * Orchestrates the content extraction, distillation, and storage process
  */
 const contentExtractor = require('./contentExtractor');
 const ollamaService = require('./ollama');
 const database = require('./database');
-const Summary = require('../models/summary');
+const Distillation = require('../models/distillation');
 const AIProviderFactory = require('./ai/AIProviderFactory');
 const AISettingsManager = require('./ai/AISettingsManager');
 const processingQueue = require('./ProcessingQueue');
@@ -42,8 +42,6 @@ class Processor {
             return AIProviderFactory.createProvider(config);
         } catch (error) {
             // Fallback to Ollama with default settings
-            
-            // Fallback to Ollama with default settings
             return AIProviderFactory.createProvider({
                 type: 'ollama',
                 model: 'llama2',
@@ -53,9 +51,9 @@ class Processor {
     }
 
     /**
-     * Process a URL for summarization
+     * Process a URL for distillation
      * @param {string} url - The URL to process
-     * @returns {Promise<Summary>} - The created summary object
+     * @returns {Promise<Distillation>} - The created distillation object
      */
     async processUrl(url) {
         // Start URL processing
@@ -65,8 +63,8 @@ class Processor {
             return await this.processYoutubePlaylist(url);
         }
 
-        // Create initial summary record
-        const summary = new Summary({
+        // Create initial distillation record
+        const distillation = new Distillation({
             title: 'Processing URL...',
             sourceUrl: url,
             sourceType: this.detectUrlType(url),
@@ -75,25 +73,37 @@ class Processor {
             startTime: new Date()
         });
 
-        // Add initial log
-        summary.addLog(`Starting processing of URL: ${url}`);
+        // Add initial log with system information
+        distillation.addLog(`🚀 Starting processing of URL: ${url}`);
+        distillation.addLog(`📋 Process ID: ${distillation.id}`);
+        distillation.addLog(`⏰ Started at: ${new Date().toISOString()}`);
+        distillation.addLog(`🌐 User Agent: ${process.env.USER_AGENT || 'SAWRON/1.0'}`);
 
         // Save initial record to database
-        await database.saveSummary(summary);
+        await database.saveDistillation(distillation);
 
         // Start processing in background
-        this.processInBackground(summary.id, async () => {
+        this.processInBackground(distillation.id, async () => {
             try {
                 const startTime = Date.now();
+                const distillationObj = await database.getDistillation(distillation.id);
+
+                distillationObj.addLog(`🔄 Background processing started`);
+                distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
                 // Update status to extracting
-                await database.updateSummaryStatus(
-                    summary.id,
+                await database.updateDistillationStatus(
+                    distillation.id,
                     'extracting',
                     'Extracting content from URL'
                 );
 
-                console.log(`[${summary.id}] Extracting content from URL: ${url}`);
+                distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
+                distillationObj.addLog(`🌐 Target URL: ${url}`);
+                distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
+                await database.saveDistillation(distillationObj);
+
+                console.log(`[${distillation.id}] Extracting content from URL: ${url}`);
 
                 // Extract content with timeout
                 const extractionPromise = contentExtractor.extractFromUrl(url);
@@ -104,59 +114,113 @@ class Processor {
                 const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
                 const { text, title, contentType, extractionMethod, fallbackUsed, metadata } = extractionResult;
 
-                console.log(`[${summary.id}] Content extracted successfully. Title: ${title}, Content length: ${text.length} chars`);
-                console.log(`[${summary.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+                const extractionTime = Date.now() - startTime;
+                const updatedDistillation = await database.getDistillation(distillation.id);
 
-                // Update status to summarizing
-                await database.updateSummaryStatus(
-                    summary.id,
-                    'summarizing',
-                    'Generating summary with AI provider'
+                updatedDistillation.addLog(`✅ Content extraction completed in ${(extractionTime / 1000).toFixed(2)}s`);
+                updatedDistillation.addLog(`📄 Title: "${title}"`);
+                updatedDistillation.addLog(`📝 Content length: ${text.length.toLocaleString()} characters`);
+                updatedDistillation.addLog(`🔧 Extraction method: ${extractionMethod}`);
+                updatedDistillation.addLog(`📋 Content type: ${contentType}`);
+                updatedDistillation.addLog(`🔄 Fallback used: ${fallbackUsed ? 'Yes' : 'No'}`);
+
+                if (metadata) {
+                    if (metadata.duration) updatedDistillation.addLog(`⏱️ Video duration: ${metadata.duration}`);
+                    if (metadata.viewCount) updatedDistillation.addLog(`👁️ View count: ${metadata.viewCount.toLocaleString()}`);
+                    if (metadata.author) updatedDistillation.addLog(`👤 Author: ${metadata.author}`);
+                    if (metadata.publishDate) updatedDistillation.addLog(`📅 Published: ${metadata.publishDate}`);
+                }
+
+                await database.saveDistillation(updatedDistillation);
+
+                console.log(`[${distillation.id}] Content extracted successfully. Title: ${title}, Content length: ${text.length} chars`);
+                console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+
+                // Update status to distilling
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'distilling',
+                    'Generating distillation with AI provider'
                 );
 
                 // Store raw content and enhanced extraction metadata
-                const summaryObj = await database.getSummary(summary.id);
-                summaryObj.rawContent = text;
-                summaryObj.title = title;
-                summaryObj.extractionMetadata = {
+                distillationObj.rawContent = text;
+                distillationObj.title = title;
+
+                distillationObj.addLog(`🤖 Phase 2: AI Distillation`);
+                distillationObj.addLog(`📊 Text preprocessing started`);
+
+                // Get AI provider info for logging
+                const aiProvider = await this.getCurrentAIProvider();
+                distillationObj.addLog(`🧠 AI Provider: ${aiProvider.name}`);
+                distillationObj.addLog(`🎯 Model: ${aiProvider.model}`);
+                distillationObj.addLog(`🔗 Endpoint: ${aiProvider.endpoint || 'Default'}`);
+
+                distillationObj.extractionMetadata = {
                     contentType,
                     extractionMethod,
                     fallbackUsed,
                     ...metadata
                 };
-                await database.saveSummary(summaryObj);
+                await database.saveDistillation(distillationObj);
 
-                console.log(`[${summary.id}] Starting summarization with AI provider`);
+                console.log(`[${distillation.id}] Starting distillation with AI provider`);
+                const distillationContent = await aiProvider.generateSummary(text);
 
-                // Get current AI provider and generate summary
-                const aiProvider = await this.getCurrentAIProvider();
-                const summaryContent = await aiProvider.generateSummary(text);
-
-                console.log(`[${summary.id}] Summary generated successfully. Length: ${summaryContent.length} chars`);
+                console.log(`[${distillation.id}] Distillation generated successfully. Length: ${distillationContent.length} chars`);
 
                 // Calculate processing time and word count
                 const processingTime = (Date.now() - startTime) / 1000;
-                const wordCount = summaryContent.split(/\s+/).length;
+                const wordCount = distillationContent.split(/\s+/).length;
 
-                console.log(`[${summary.id}] Processing completed in ${processingTime.toFixed(2)}s. Word count: ${wordCount}`);
+                console.log(`[${distillation.id}] Processing completed in ${processingTime.toFixed(2)}s. Word count: ${wordCount}`);
 
-                // Update summary in database
-                await database.updateSummaryContent(
-                    summary.id,
-                    summaryContent,
+                // Update distillation in database
+                await database.updateDistillationContent(
+                    distillation.id,
+                    distillationContent,
                     text,
                     processingTime,
                     wordCount
                 );
 
                 // Update title
-                await this.updateSummaryTitle(summary.id, title);
+                await this.updateDistillationTitle(distillation.id, title);
+
+                // Add final completion logs
+                const completedDistillation = await database.getDistillation(distillation.id);
+                completedDistillation.addLog(`✅ Processing completed successfully`);
+                completedDistillation.addLog(`📊 Final statistics:`);
+                completedDistillation.addLog(`   • Original content: ${text.length.toLocaleString()} chars`);
+                completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
+                completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
+                completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
+                completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / text.length) * 100).toFixed(1)}%`);
+                completedDistillation.addLog(`🎯 Ready for review and export`);
+                await database.saveDistillation(completedDistillation);
 
                 return { success: true };
             } catch (error) {
-                console.error(`[${summary.id}] Error processing URL ${url}:`, error);
-                await database.updateSummaryStatus(
-                    summary.id,
+                console.error(`[${distillation.id}] Error processing URL ${url}:`, error);
+
+                // Add detailed error logging
+                const errorDistillation = await database.getDistillation(distillation.id);
+                if (errorDistillation) {
+                    errorDistillation.addLog(`❌ Processing failed with error`, 'error');
+                    errorDistillation.addLog(`🔍 Error type: ${error.constructor.name}`, 'error');
+                    errorDistillation.addLog(`📝 Error message: ${error.message}`, 'error');
+                    errorDistillation.addLog(`📊 Processing time before error: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, 'error');
+
+                    if (error.stack) {
+                        const stackLines = error.stack.split('\n').slice(0, 3);
+                        errorDistillation.addLog(`🔧 Stack trace: ${stackLines.join(' → ')}`, 'error');
+                    }
+
+                    await database.saveDistillation(errorDistillation);
+                }
+
+                await database.updateDistillationStatus(
+                    distillation.id,
                     'error',
                     `Error: ${error.message}`,
                     error.message
@@ -165,19 +229,19 @@ class Processor {
             }
         });
 
-        return summary;
+        return distillation;
     }
 
     /**
      * Process a YouTube playlist by extracting individual videos and processing each one
      * @param {string} playlistUrl - The YouTube playlist URL
-     * @returns {Promise<Summary>} - The created summary object for tracking
+     * @returns {Promise<Distillation>} - The created distillation object for tracking
      */
     async processYoutubePlaylist(playlistUrl) {
         console.log(`Processing YouTube playlist: ${playlistUrl}`);
 
-        // Create a tracking summary for the playlist processing
-        const trackingSummary = new Summary({
+        // Create a tracking distillation for the playlist processing
+        const trackingDistillation = new Distillation({
             title: 'Processing YouTube Playlist...',
             sourceUrl: playlistUrl,
             sourceType: 'youtube',
@@ -186,32 +250,32 @@ class Processor {
             startTime: new Date()
         });
 
-        trackingSummary.addLog(`Starting playlist processing: ${playlistUrl}`);
-        await database.saveSummary(trackingSummary);
+        trackingDistillation.addLog(`Starting playlist processing: ${playlistUrl}`);
+        await database.saveDistillation(trackingDistillation);
 
         // Start processing in background
-        this.processInBackground(trackingSummary.id, async () => {
+        this.processInBackground(trackingDistillation.id, async () => {
             try {
                 // Update status
-                await database.updateSummaryStatus(
-                    trackingSummary.id,
+                await database.updateDistillationStatus(
+                    trackingDistillation.id,
                     'extracting',
                     'Extracting video URLs from playlist'
                 );
 
                 // Extract playlist videos using a simple approach
                 const videoUrls = await this.extractPlaylistVideos(playlistUrl);
-                
+
                 if (!videoUrls || videoUrls.length === 0) {
                     throw new Error('No videos found in playlist. The playlist may be private or empty.');
                 }
 
-                console.log(`[${trackingSummary.id}] Found ${videoUrls.length} videos in playlist`);
+                console.log(`[${trackingDistillation.id}] Found ${videoUrls.length} videos in playlist`);
 
                 // Update status
-                await database.updateSummaryStatus(
-                    trackingSummary.id,
-                    'summarizing',
+                await database.updateDistillationStatus(
+                    trackingDistillation.id,
+                    'distilling',
                     `Processing ${videoUrls.length} videos from playlist`
                 );
 
@@ -219,34 +283,34 @@ class Processor {
                 const processedVideos = [];
                 for (let i = 0; i < videoUrls.length; i++) {
                     const videoUrl = videoUrls[i];
-                    console.log(`[${trackingSummary.id}] Processing video ${i + 1}/${videoUrls.length}: ${videoUrl}`);
+                    console.log(`[${trackingDistillation.id}] Processing video ${i + 1}/${videoUrls.length}: ${videoUrl}`);
 
                     try {
-                        // Create individual video summary
-                        const videoSummary = await this.processUrl(videoUrl);
-                        processedVideos.push(videoSummary);
+                        // Create individual video distillation
+                        const videoDistillation = await this.processUrl(videoUrl);
+                        processedVideos.push(videoDistillation);
 
                         // Update progress
-                        await database.updateSummaryStatus(
-                            trackingSummary.id,
-                            'summarizing',
+                        await database.updateDistillationStatus(
+                            trackingDistillation.id,
+                            'distilling',
                             `Processed ${i + 1}/${videoUrls.length} videos from playlist`
                         );
                     } catch (error) {
-                        console.error(`[${trackingSummary.id}] Error processing video ${videoUrl}:`, error);
+                        console.error(`[${trackingDistillation.id}] Error processing video ${videoUrl}:`, error);
                         // Continue with other videos even if one fails
                     }
                 }
 
-                // Delete the tracking summary since all individual videos are now processed
-                await database.deleteSummary(trackingSummary.id);
-                console.log(`[${trackingSummary.id}] Playlist processing completed and tracking summary deleted. Successfully processed ${processedVideos.length} out of ${videoUrls.length} videos.`);
+                // Delete the tracking distillation since all individual videos are now processed
+                await database.deleteDistillation(trackingDistillation.id);
+                console.log(`[${trackingDistillation.id}] Playlist processing completed and tracking distillation deleted. Successfully processed ${processedVideos.length} out of ${videoUrls.length} videos.`);
 
                 return { success: true, processedVideos: processedVideos.length };
             } catch (error) {
-                console.error(`[${trackingSummary.id}] Error processing playlist ${playlistUrl}:`, error);
-                await database.updateSummaryStatus(
-                    trackingSummary.id,
+                console.error(`[${trackingDistillation.id}] Error processing playlist ${playlistUrl}:`, error);
+                await database.updateDistillationStatus(
+                    trackingDistillation.id,
                     'error',
                     `Error: ${error.message}`,
                     error.message
@@ -255,7 +319,7 @@ class Processor {
             }
         });
 
-        return trackingSummary;
+        return trackingDistillation;
     }
 
     /**
@@ -273,12 +337,11 @@ class Processor {
                 throw new Error('Could not extract playlist ID from URL');
             }
 
-            // Use youtube-transcript library to get playlist videos
-            const { YoutubeTranscript } = require('youtube-transcript');
-            
+            // Extract playlist videos using direct HTTP request
+
             // Try to get the playlist page to extract video IDs
             const axios = require('axios');
-            
+
             try {
                 const response = await axios.get(`https://www.youtube.com/playlist?list=${playlistId}`, {
                     headers: {
@@ -290,7 +353,7 @@ class Processor {
                 const html = response.data;
 
                 // Check for private playlist indicators
-                if (html.includes('This playlist is private') || 
+                if (html.includes('This playlist is private') ||
                     html.includes('Private playlist') ||
                     html.includes('"isPrivate":true') ||
                     html.includes('playlist-header-banner-private')) {
@@ -298,21 +361,21 @@ class Processor {
                 }
 
                 // More robust video ID extraction
-                const videoIdMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g) || 
-                                     html.match(/watch\?v=([a-zA-Z0-9_-]{11})/g);
-                
+                const videoIdMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g) ||
+                    html.match(/watch\?v=([a-zA-Z0-9_-]{11})/g);
+
                 if (!videoIdMatches || videoIdMatches.length === 0) {
                     // Try alternative extraction methods
                     const altMatches = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/g);
                     if (!altMatches || altMatches.length === 0) {
                         throw new Error('This YouTube playlist is private, cannot access the videos.');
                     }
-                    
+
                     // Process alternative matches
-                    const videoIds = [...new Set(altMatches.map(match => 
+                    const videoIds = [...new Set(altMatches.map(match =>
                         match.replace('/watch?v=', '')
                     ))];
-                    
+
                     const videoUrls = videoIds.map(id => `https://www.youtube.com/watch?v=${id}`);
                     console.log(`Successfully extracted ${videoUrls.length} unique videos from playlist (alternative method)`);
                     return videoUrls;
@@ -328,7 +391,7 @@ class Processor {
                 }))];
 
                 const videoUrls = videoIds.map(id => `https://www.youtube.com/watch?v=${id}`);
-                
+
                 console.log(`Successfully extracted ${videoUrls.length} unique videos from playlist`);
                 return videoUrls;
 
@@ -341,35 +404,35 @@ class Processor {
 
         } catch (error) {
             console.error('Error extracting playlist videos:', error);
-            
+
             // Handle specific errors
             if (error.message.includes('private') || error.message.includes('Private')) {
                 throw new Error('This YouTube playlist is private, cannot access the videos.');
             }
-            
+
             if (error.message.includes('not found') || error.message.includes('404') || error.message.includes('unavailable')) {
                 throw new Error('This YouTube playlist is unavailable or does not exist.');
             }
-            
+
             if (error.message.includes('empty') || error.message.includes('no videos')) {
                 throw new Error('This YouTube playlist is empty.');
             }
-            
+
             // Generic error
             throw new Error(`Failed to extract playlist videos: ${error.message}`);
         }
     }
 
     /**
-     * Process a file for summarization
+     * Process a file for distillation
      * @param {Object} file - The uploaded file object
-     * @returns {Promise<Summary>} - The created summary object
+     * @returns {Promise<Distillation>} - The created distillation object
      */
     async processFile(file) {
         console.log(`Starting file processing: ${file.originalname} (${file.size} bytes)`);
 
-        // Create initial summary record
-        const summary = new Summary({
+        // Create initial distillation record
+        const distillation = new Distillation({
             title: `Processing ${file.originalname}...`,
             sourceType: 'file',
             sourceFile: {
@@ -382,25 +445,40 @@ class Processor {
             startTime: new Date()
         });
 
-        // Add initial log
-        summary.addLog(`Starting processing of file: ${file.originalname} (${file.size} bytes)`);
+        // Add initial log with file information
+        distillation.addLog(`🚀 Starting processing of file: ${file.originalname}`);
+        distillation.addLog(`📋 Process ID: ${distillation.id}`);
+        distillation.addLog(`⏰ Started at: ${new Date().toISOString()}`);
+        distillation.addLog(`📄 File details:`);
+        distillation.addLog(`   • Name: ${file.originalname}`);
+        distillation.addLog(`   • Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+        distillation.addLog(`   • Type: ${file.mimetype}`);
 
         // Save initial record to database
-        await database.saveSummary(summary);
+        await database.saveDistillation(distillation);
 
         // Start processing in background
-        this.processInBackground(summary.id, async () => {
+        this.processInBackground(distillation.id, async () => {
             try {
                 const startTime = Date.now();
+                const distillationObj = await database.getDistillation(distillation.id);
+
+                distillationObj.addLog(`🔄 Background processing started`);
+                distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
                 // Update status to extracting
-                await database.updateSummaryStatus(
-                    summary.id,
+                await database.updateDistillationStatus(
+                    distillation.id,
                     'extracting',
                     `Extracting content from ${file.originalname}`
                 );
 
-                console.log(`[${summary.id}] Extracting content from file: ${file.originalname}`);
+                distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
+                distillationObj.addLog(`📁 Processing file: ${file.originalname}`);
+                distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
+                await database.saveDistillation(distillationObj);
+
+                console.log(`[${distillation.id}] Extracting content from file: ${file.originalname}`);
 
                 // Extract content with timeout
                 const extractionPromise = contentExtractor.extractFromFile(file);
@@ -411,71 +489,88 @@ class Processor {
                 const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
                 const { text, title, contentType, extractionMethod, fallbackUsed, metadata } = extractionResult;
 
-                console.log(`[${summary.id}] File content extracted successfully. Content length: ${text.length} chars`);
-                console.log(`[${summary.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+                console.log(`[${distillation.id}] File content extracted successfully. Content length: ${text.length} chars`);
+                console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
 
-                // Update status to summarizing
-                await database.updateSummaryStatus(
-                    summary.id,
-                    'summarizing',
-                    'Generating summary with AI provider'
+                // Update status to distilling
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'distilling',
+                    'Generating distillation with AI provider'
                 );
 
                 // Store raw content and enhanced extraction metadata
-                const summaryObj = await database.getSummary(summary.id);
-                summaryObj.rawContent = text;
-                if (title !== summary.title) {
-                    summaryObj.title = title;
+                distillationObj.rawContent = text;
+                if (title !== distillation.title) {
+                    distillationObj.title = title;
                 }
-                summaryObj.extractionMetadata = {
+                distillationObj.extractionMetadata = {
                     contentType,
                     extractionMethod,
                     fallbackUsed,
                     ...metadata
                 };
-                await database.saveSummary(summaryObj);
+                await database.saveDistillation(distillationObj);
 
-                console.log(`[${summary.id}] Starting summarization with AI provider`);
+                console.log(`[${distillation.id}] Starting distillation with AI provider`);
 
-                // Get current AI provider and generate summary
+                // Get current AI provider and generate distillation
                 const aiProvider = await this.getCurrentAIProvider();
-                const summaryContent = await aiProvider.generateSummary(text);
+                const distillationContent = await aiProvider.generateSummary(text);
 
-                console.log(`[${summary.id}] Summary generated successfully. Length: ${summaryContent.length} chars`);
+                console.log(`[${distillation.id}] Distillation generated successfully. Length: ${distillationContent.length} chars`);
 
                 // Calculate processing time and word count
                 const processingTime = (Date.now() - startTime) / 1000;
-                const wordCount = summaryContent.split(/\s+/).length;
+                const wordCount = distillationContent.split(/\s+/).length;
 
-                console.log(`[${summary.id}] Processing completed in ${processingTime.toFixed(2)}s. Word count: ${wordCount}`);
+                console.log(`[${distillation.id}] Processing completed in ${processingTime.toFixed(2)}s. Word count: ${wordCount}`);
 
-                // Update summary in database
-                await database.updateSummaryContent(
-                    summary.id,
-                    summaryContent,
+                // Update distillation in database
+                await database.updateDistillationContent(
+                    distillation.id,
+                    distillationContent,
                     text,
                     processingTime,
                     wordCount
                 );
 
                 // Update title if needed
-                if (title !== summary.title) {
-                    await this.updateSummaryTitle(summary.id, title);
+                if (title !== distillation.title) {
+                    await this.updateDistillationTitle(distillation.id, title);
                 }
 
                 // Clean up temporary file
                 try {
                     await fs.unlink(file.path);
-                    console.log(`[${summary.id}] Temporary file deleted: ${file.path}`);
+                    console.log(`[${distillation.id}] Temporary file deleted: ${file.path}`);
                 } catch (err) {
-                    console.warn(`[${summary.id}] Failed to delete temporary file:`, err);
+                    console.warn(`[${distillation.id}] Failed to delete temporary file:`, err);
                 }
 
                 return { success: true };
             } catch (error) {
-                console.error(`[${summary.id}] Error processing file ${file.originalname}:`, error);
-                await database.updateSummaryStatus(
-                    summary.id,
+                console.error(`[${distillation.id}] Error processing file ${file.originalname}:`, error);
+
+                // Add detailed error logging
+                const errorDistillation = await database.getDistillation(distillation.id);
+                if (errorDistillation) {
+                    errorDistillation.addLog(`❌ File processing failed with error`, 'error');
+                    errorDistillation.addLog(`🔍 Error type: ${error.constructor.name}`, 'error');
+                    errorDistillation.addLog(`📝 Error message: ${error.message}`, 'error');
+                    errorDistillation.addLog(`📊 Processing time before error: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, 'error');
+                    errorDistillation.addLog(`📁 File: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'error');
+
+                    if (error.stack) {
+                        const stackLines = error.stack.split('\n').slice(0, 3);
+                        errorDistillation.addLog(`🔧 Stack trace: ${stackLines.join(' → ')}`, 'error');
+                    }
+
+                    await database.saveDistillation(errorDistillation);
+                }
+
+                await database.updateDistillationStatus(
+                    distillation.id,
                     'error',
                     `Error: ${error.message}`,
                     error.message
@@ -484,54 +579,63 @@ class Processor {
                 // Clean up temporary file even on error
                 try {
                     await fs.unlink(file.path);
-                    console.log(`[${summary.id}] Temporary file deleted after error: ${file.path}`);
+                    console.log(`[${distillation.id}] Temporary file deleted after error: ${file.path}`);
+
+                    if (errorDistillation) {
+                        errorDistillation.addLog(`🧹 Temporary file cleaned up: ${file.path}`);
+                        await database.saveDistillation(errorDistillation);
+                    }
                 } catch (err) {
-                    console.warn(`[${summary.id}] Failed to delete temporary file:`, err);
+                    console.warn(`[${distillation.id}] Failed to delete temporary file:`, err);
+                    if (errorDistillation) {
+                        errorDistillation.addLog(`⚠️ Failed to clean up temporary file: ${err.message}`, 'warn');
+                        await database.saveDistillation(errorDistillation);
+                    }
                 }
 
                 return { success: false, error: error.message };
             }
         });
 
-        return summary;
+        return distillation;
     }
 
     /**
      * Process a task in the background
-     * @param {string} summaryId - The ID of the summary to process
+     * @param {string} distillationId - The ID of the distillation to process
      * @param {Function} processFn - The function to execute
      */
-    async processInBackground(summaryId, processFn) {
+    async processInBackground(distillationId, processFn) {
         // Use the processing queue to manage concurrent processing
         try {
-            await processingQueue.addToQueue(summaryId, async () => {
+            await processingQueue.addToQueue(distillationId, async () => {
                 try {
                     await processFn();
                 } catch (error) {
-                    console.error(`Background processing error for summary ${summaryId}:`, error);
-                    await database.updateSummaryStatus(summaryId, 'error', error.message);
+                    console.error(`Background processing error for distillation ${distillationId}:`, error);
+                    await database.updateDistillationStatus(distillationId, 'error', error.message);
                     throw error; // Re-throw to be handled by queue
                 }
             });
         } catch (error) {
-            console.error(`Failed to add summary ${summaryId} to processing queue:`, error);
+            console.error(`Failed to add distillation ${distillationId} to processing queue:`, error);
         }
     }
 
     /**
-     * Update the title of a summary
-     * @param {string} summaryId - The ID of the summary to update
+     * Update the title of a distillation
+     * @param {string} distillationId - The ID of the distillation to update
      * @param {string} title - The new title
      */
-    async updateSummaryTitle(summaryId, title) {
+    async updateDistillationTitle(distillationId, title) {
         try {
-            const summary = await database.getSummary(summaryId);
-            if (summary) {
-                summary.title = title;
-                await database.saveSummary(summary);
+            const distillation = await database.getDistillation(distillationId);
+            if (distillation) {
+                distillation.title = title;
+                await database.saveDistillation(distillation);
             }
         } catch (error) {
-            console.error(`Error updating summary title ${summaryId}:`, error);
+            console.error(`Error updating distillation title ${distillationId}:`, error);
         }
     }
 
@@ -546,7 +650,7 @@ class Processor {
         // Use the content extractor's classification logic
         if (contentExtractor.isYoutubeUrl(url)) {
             const youtubeType = contentExtractor.classifyYoutubeUrl(url);
-            
+
             if (youtubeType === 'video') {
                 console.log(`Detected as YouTube video`);
                 return 'youtube';
@@ -565,25 +669,25 @@ class Processor {
     }
 
     /**
-     * Generate a PDF from a summary
-     * @param {string} summaryId - The ID of the summary to convert
+     * Generate a PDF from a distillation
+     * @param {string} distillationId - The ID of the distillation to convert
      * @returns {Promise<{buffer: Buffer, filename: string}>} - The PDF buffer and filename
      */
-    async generatePdf(summaryId) {
+    async generatePdf(distillationId) {
         try {
-            const summary = await database.getSummary(summaryId);
-            if (!summary) {
-                throw new Error('Summary not found');
+            const distillation = await database.getDistillation(distillationId);
+            if (!distillation) {
+                throw new Error('Distillation not found');
             }
 
-            if (summary.status !== 'completed') {
-                throw new Error('Summary is not yet completed');
+            if (distillation.status !== 'completed') {
+                throw new Error('Distillation is not yet completed');
             }
 
-            // Generate PDF for summary
+            // Generate PDF for distillation
 
             const puppeteer = require('puppeteer');
-            
+
             // Launch browser
             const browser = await puppeteer.launch({
                 headless: true,
@@ -593,14 +697,14 @@ class Processor {
             const page = await browser.newPage();
 
             // Create HTML content with beautiful styling
-            const htmlContent = this.createPdfHtml(summary);
+            const htmlContent = this.createPdfHtml(distillation);
 
             // Set content and generate PDF
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-            
+
             // Add a small delay to ensure content is fully rendered
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             const pdfBuffer = await page.pdf({
                 format: 'A4',
                 margin: {
@@ -619,40 +723,40 @@ class Processor {
             await browser.close();
 
             // Generate filename from title
-            const filename = this.generatePdfFilename(summary.title);
+            const filename = this.generatePdfFilename(distillation.title);
 
             // PDF generated successfully
             return { buffer: pdfBuffer, filename };
 
         } catch (error) {
-            console.error(`Error generating PDF for summary ${summaryId}:`, error);
+            console.error(`Error generating PDF for distillation ${distillationId}:`, error);
             throw new Error(`PDF generation failed: ${error.message}`);
         }
     }
 
     /**
      * Create HTML content for PDF generation
-     * @param {Summary} summary - The summary object
+     * @param {Distillation} distillation - The distillation object
      * @returns {string} - HTML content
      */
-    createPdfHtml(summary) {
+    createPdfHtml(distillation) {
         const formattedDate = new Intl.DateTimeFormat('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-        }).format(summary.createdAt);
+        }).format(distillation.createdAt);
 
         // Convert markdown to HTML
-        const contentHtml = this.markdownToHtml(summary.content || '');
+        const contentHtml = this.markdownToHtml(distillation.content || '');
 
         return `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>${summary.title}</title>
+            <title>${distillation.title}</title>
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -838,13 +942,13 @@ class Processor {
         </head>
         <body>
             <div class="header">
-                <h1 class="title">${summary.title}</h1>
+                <h1 class="title">${distillation.title}</h1>
                 <div class="meta">
-                    ${summary.sourceUrl ? `<strong>Source:</strong> ${summary.sourceUrl}<br>` : ''}
-                    ${summary.sourceFile ? `<strong>Source:</strong> ${summary.sourceFile.name}<br>` : ''}
+                    ${distillation.sourceUrl ? `<strong>Source:</strong> ${distillation.sourceUrl}<br>` : ''}
+                    ${distillation.sourceFile ? `<strong>Source:</strong> ${distillation.sourceFile.name}<br>` : ''}
                     <strong>Generated:</strong> ${formattedDate}<br>
-                    ${summary.wordCount ? `<strong>Word Count:</strong> ${summary.wordCount} words<br>` : ''}
-                    ${summary.processingTime ? `<strong>Processing Time:</strong> ${summary.processingTime.toFixed(1)}s<br>` : ''}
+                    ${distillation.wordCount ? `<strong>Word Count:</strong> ${distillation.wordCount} words<br>` : ''}
+                    ${distillation.processingTime ? `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>` : ''}
                 </div>
             </div>
             
@@ -946,7 +1050,7 @@ class Processor {
                     result.push(`<p>${currentParagraph.join('<br>')}</p>`);
                     currentParagraph = [];
                 }
-                
+
                 if (!inList || listType !== 'ol') {
                     if (inList) result.push(`</${listType}>`);
                     result.push('<ol class="manual-numbered">');
@@ -954,7 +1058,7 @@ class Processor {
                     listType = 'ol';
                     // DON'T reset counter here - keep incrementing across the entire document
                 }
-                
+
                 numberedItemCounter++;
                 const content = this.processInlineMarkdown(orderedMatch[1]);
                 const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
@@ -1024,13 +1128,13 @@ class Processor {
     }
 
     /**
-     * Generate a clean filename from the summary title
-     * @param {string} title - The summary title
+     * Generate a clean filename from the distillation title
+     * @param {string} title - The distillation title
      * @returns {string} - Clean filename
      */
     generatePdfFilename(title) {
-        if (!title) return 'summary.pdf';
-        
+        if (!title) return 'distillation.pdf';
+
         // Clean the title for use as filename
         let filename = title
             .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
@@ -1038,32 +1142,32 @@ class Processor {
             .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
             .toLowerCase()
             .substring(0, 50); // Limit length
-        
+
         // Remove leading/trailing hyphens
         filename = filename.replace(/^-+|-+$/g, '');
-        
+
         // Ensure it's not empty
-        if (!filename) filename = 'summary';
-        
+        if (!filename) filename = 'distillation';
+
         return `${filename}.pdf`;
     }
 
     /**
-     * Stop a running summarization process
-     * @param {string} summaryId - The ID of the summary to stop
+     * Stop a running distillation process
+     * @param {string} distillationId - The ID of the distillation to stop
      * @returns {Promise<boolean>} - True if the process was stopped
      */
-    async stopProcess(summaryId) {
+    async stopProcess(distillationId) {
         // Since we're using setTimeout for background processing,
         // we can't actually stop a running process.
         // In a real implementation with a job queue, you would cancel the job.
 
         // For now, just mark it as error/cancelled
         try {
-            await database.updateSummaryStatus(summaryId, 'error', 'Process cancelled by user');
+            await database.updateDistillationStatus(distillationId, 'error', 'Process cancelled by user');
             return true;
         } catch (error) {
-            console.error(`Error stopping process ${summaryId}:`, error);
+            console.error(`Error stopping process ${distillationId}:`, error);
             return false;
         }
     }

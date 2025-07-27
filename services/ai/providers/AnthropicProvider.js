@@ -21,7 +21,7 @@ class AnthropicProvider extends AIProvider {
     /**
      * Generate a distillation using Anthropic Claude
      * @param {string} text - The text to distill
-     * @param {Object} options - Summarization options
+     * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
@@ -61,15 +61,15 @@ class AnthropicProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.content && response.data.content[0]) {
-                const rawSummary = response.data.content[0].text.trim();
+                const rawDistillation = response.data.content[0].text.trim();
                 console.log(`Anthropic response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${rawSummary.length} characters`);
+                console.log(`Distillation length: ${rawDistillation.length} characters`);
                 console.log(`Input tokens: ${response.data.usage?.input_tokens || 'unknown'}`);
                 console.log(`Output tokens: ${response.data.usage?.output_tokens || 'unknown'}`);
                 
                 // Apply post-processing to fix numbering and other issues
-                const processedSummary = this.postProcessSummary(rawSummary);
-                return processedSummary;
+                const processedDistillation = this.postProcessDistillation(rawDistillation);
+                return processedDistillation;
             } else {
                 throw new Error('Invalid response format from Anthropic');
             }

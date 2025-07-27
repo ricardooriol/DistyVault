@@ -21,7 +21,7 @@ class GrokProvider extends AIProvider {
     /**
      * Generate a distillation using Grok
      * @param {string} text - The text to distill
-     * @param {Object} options - Summarization options
+     * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
@@ -60,14 +60,14 @@ class GrokProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.choices && response.data.choices[0]) {
-                const rawSummary = response.data.choices[0].message.content.trim();
+                const rawDistillation = response.data.choices[0].message.content.trim();
                 console.log(`Grok response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${rawSummary.length} characters`);
+                console.log(`Distillation length: ${rawDistillation.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
                 
                 // Apply post-processing to fix numbering and other issues
-                const processedSummary = this.postProcessSummary(rawSummary);
-                return processedSummary;
+                const processedDistillation = this.postProcessDistillation(rawDistillation);
+                return processedDistillation;
             } else {
                 throw new Error('Invalid response format from Grok');
             }

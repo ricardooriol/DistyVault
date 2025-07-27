@@ -37,7 +37,7 @@ class GoogleProvider extends AIProvider {
     /**
      * Generate a distillation using Google Gemini
      * @param {string} text - The text to distill
-     * @param {Object} options - Summarization options
+     * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
@@ -61,13 +61,13 @@ class GoogleProvider extends AIProvider {
                 const duration = (endTime - startTime) / 1000;
 
                 if (response && response.text) {
-                    const rawSummary = response.text().trim();
+                    const rawDistillation = response.text().trim();
                     console.log(`Google Gemini response received in ${duration.toFixed(2)}s`);
-                    console.log(`Summary length: ${rawSummary.length} characters`);
+                    console.log(`Distillation length: ${rawDistillation.length} characters`);
                     
                     // Apply post-processing to fix numbering and other issues
-                    const processedSummary = this.postProcessSummary(rawSummary);
-                    return processedSummary;
+                    const processedDistillation = this.postProcessDistillation(rawDistillation);
+                    return processedDistillation;
                 } else {
                     throw new Error('Invalid response format from Google Gemini');
                 }
@@ -133,10 +133,10 @@ class GoogleProvider extends AIProvider {
             const candidate = response.data.candidates[0];
             
             if (candidate.content && candidate.content.parts && candidate.content.parts[0]) {
-                const rawSummary = candidate.content.parts[0].text.trim();
+                const rawDistillation = candidate.content.parts[0].text.trim();
                 // Apply post-processing to fix numbering and other issues
-                const processedSummary = this.postProcessSummary(rawSummary);
-                return processedSummary;
+                const processedDistillation = this.postProcessDistillation(rawDistillation);
+                return processedDistillation;
             } else {
                 throw new Error('Invalid content structure in Gemini response');
             }

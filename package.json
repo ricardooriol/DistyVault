@@ -37,7 +37,7 @@
     "local",
     "llm",
     "ollama",
-    "summarization"
+    "knowledge-distillation"
   ],
   "author": "SAWRON",
   "license": "MIT"

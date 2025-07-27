@@ -16,7 +16,7 @@ class OllamaProvider extends AIProvider {
     /**
      * Generate a distillation using Ollama
      * @param {string} text - The text to distill
-     * @param {Object} options - Summarization options
+     * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
      */
     async generateSummary(text, options = {}) {
@@ -53,13 +53,13 @@ class OllamaProvider extends AIProvider {
             const duration = (endTime - startTime) / 1000;
 
             if (response.data && response.data.response) {
-                const rawSummary = response.data.response.trim();
+                const rawDistillation = response.data.response.trim();
                 console.log(`Ollama response received in ${duration.toFixed(2)}s`);
-                console.log(`Summary length: ${rawSummary.length} characters`);
+                console.log(`Distillation length: ${rawDistillation.length} characters`);
                 
                 // Apply post-processing to fix numbering and other issues
-                const processedSummary = this.postProcessSummary(rawSummary);
-                return processedSummary;
+                const processedDistillation = this.postProcessDistillation(rawDistillation);
+                return processedDistillation;
             } else {
                 throw new Error('Invalid response format from Ollama');
             }

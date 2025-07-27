@@ -160,6 +160,7 @@ SAWRON is built with:
 
 ## Future Enhancements
 
+- **Web Search**: Real time web search to complement AI processing
 - **Additional AI Providers**: Integration with more AI services and local models
 - **Export Formats**: Markdown, JSON, XML, and custom templates
 - **Automation**: Scheduled processing, webhooks, and workflow triggers

@@ -69,11 +69,11 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Get all summaries
+// Get all distillations
 app.get('/api/summaries', async (req, res) => {
     try {
-        const summaries = await database.getAllSummaries();
-        res.json(summaries);
+        const distillations = await database.getAllSummaries();
+        res.json(distillations);
     } catch (error) {
         res.status(500).json({
             status: 'error',
@@ -82,17 +82,17 @@ app.get('/api/summaries', async (req, res) => {
     }
 });
 
-// Get a specific summary
+// Get a specific distillation
 app.get('/api/summaries/:id', async (req, res) => {
     try {
-        const summary = await database.getSummary(req.params.id);
-        if (!summary) {
+        const distillation = await database.getDistillation(req.params.id);
+        if (!distillation) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Summary not found'
+                message: 'Distillation not found'
             });
         }
-        res.json(summary);
+        res.json(distillation);
     } catch (error) {
         res.status(500).json({
             status: 'error',
@@ -113,8 +113,8 @@ app.post('/api/process/url', async (req, res) => {
             });
         }
         
-        const summary = await processor.processUrl(url);
-        res.status(202).json(summary);
+        const distillation = await processor.processUrl(url);
+        res.status(202).json(distillation);
     } catch (error) {
         res.status(500).json({
             status: 'error',
@@ -133,8 +133,8 @@ app.post('/api/process/file', upload.single('file'), async (req, res) => {
             });
         }
         
-        const summary = await processor.processFile(req.file);
-        res.status(202).json(summary);
+        const distillation = await processor.processFile(req.file);
+        res.status(202).json(distillation);
     } catch (error) {
         res.status(500).json({
             status: 'error',
@@ -143,14 +143,14 @@ app.post('/api/process/file', upload.single('file'), async (req, res) => {
     }
 });
 
-// Delete a summary
+// Delete a distillation
 app.delete('/api/summaries/:id', async (req, res) => {
     try {
-        const success = await database.deleteSummary(req.params.id);
+        const success = await database.deleteDistillation(req.params.id);
         if (!success) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Summary not found'
+                message: 'Distillation not found'
             });
         }
         res.json({ status: 'ok' });
@@ -181,25 +181,25 @@ app.post('/api/summaries/:id/stop', async (req, res) => {
     }
 });
 
-// Download summary as PDF
+// Download distillation as PDF
 app.get('/api/summaries/:id/pdf', async (req, res) => {
     try {
-        const summary = await database.getSummary(req.params.id);
-        if (!summary) {
+        const distillation = await database.getDistillation(req.params.id);
+        if (!distillation) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Summary not found'
+                message: 'Distillation not found'
             });
         }
         
-        if (summary.status !== 'completed') {
+        if (distillation.status !== 'completed') {
             return res.status(400).json({
                 status: 'error',
-                message: 'Summary is not yet completed'
+                message: 'Distillation is not yet completed'
             });
         }
         
-        // Generate PDF for the requested summary
+        // Generate PDF for the requested distillation
         
         // Generate PDF
         const { buffer, filename } = await processor.generatePdf(req.params.id);
@@ -222,7 +222,7 @@ app.get('/api/summaries/:id/pdf', async (req, res) => {
     }
 });
 
-// Bulk download summaries as ZIP
+// Bulk download distillations as ZIP
 app.post('/api/summaries/bulk-download', async (req, res) => {
     try {
         const { ids } = req.body;
@@ -238,18 +238,18 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         
         // If only one item, redirect to single PDF download
         if (ids.length === 1) {
-            const summary = await database.getSummary(ids[0]);
-            if (!summary) {
+            const distillation = await database.getDistillation(ids[0]);
+            if (!distillation) {
                 return res.status(404).json({
                     status: 'error',
-                    message: 'Summary not found'
+                    message: 'Distillation not found'
                 });
             }
             
-            if (summary.status !== 'completed') {
+            if (distillation.status !== 'completed') {
                 return res.status(400).json({
                     status: 'error',
-                    message: 'Summary is not yet completed'
+                    message: 'Distillation is not yet completed'
                 });
             }
             
@@ -268,7 +268,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         const archive = archiver('zip', { zlib: { level: 9 } });
         
         // Set headers for ZIP download
-        const zipFilename = `summaries-${new Date().toISOString().split('T')[0]}.zip`;
+        const zipFilename = `distillations-${new Date().toISOString().split('T')[0]}.zip`;
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
         res.setHeader('Cache-Control', 'no-cache');
@@ -293,17 +293,17 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         // Process each ID sequentially to avoid overwhelming the system
         for (const id of ids) {
             try {
-                // Process individual summary for bulk download
+                // Process individual distillation for bulk download
                 
-                const summary = await database.getSummary(id);
-                if (!summary) {
-                    console.warn(`Summary ${id} not found`);
+                const distillation = await database.getDistillation(id);
+                if (!distillation) {
+                    console.warn(`Distillation ${id} not found`);
                     errorCount++;
                     continue;
                 }
                 
-                if (summary.status !== 'completed') {
-                    console.warn(`Summary ${id} not completed (status: ${summary.status})`);
+                if (distillation.status !== 'completed') {
+                    console.warn(`Distillation ${id} not completed (status: ${distillation.status})`);
                     errorCount++;
                     continue;
                 }
@@ -312,7 +312,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 const pdfResult = await processor.generatePdf(id);
                 
                 if (!pdfResult || typeof pdfResult !== 'object') {
-                    console.error(`Invalid PDF result for summary ${id}`);
+                    console.error(`Invalid PDF result for distillation ${id}`);
                     errorCount++;
                     continue;
                 }
@@ -329,18 +329,18 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                     // Handle other array-like objects
                     finalBuffer = Buffer.from(buffer);
                 } else {
-                    console.error(`Invalid buffer type for summary ${id}: ${typeof buffer}, isBuffer: ${Buffer.isBuffer(buffer)}`);
+                    console.error(`Invalid buffer type for distillation ${id}: ${typeof buffer}, isBuffer: ${Buffer.isBuffer(buffer)}`);
                     errorCount++;
                     continue;
                 }
                 
                 if (finalBuffer.length === 0) {
-                    console.error(`Empty buffer for summary ${id}`);
+                    console.error(`Empty buffer for distillation ${id}`);
                     errorCount++;
                     continue;
                 }
                 
-                const finalFilename = filename || `summary-${id}.pdf`;
+                const finalFilename = filename || `distillation-${id}.pdf`;
                 
                 // Add PDF to ZIP archive
                 
@@ -349,7 +349,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 successCount++;
                 
             } catch (error) {
-                console.error(`Error processing summary ${id}:`, error);
+                console.error(`Error processing distillation ${id}:`, error);
                 errorCount++;
             }
         }
@@ -370,7 +370,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
     }
 });
 
-// Bulk delete summaries
+// Bulk delete distillations
 app.post('/api/summaries/bulk-delete', async (req, res) => {
     try {
         const { ids } = req.body;
@@ -390,17 +390,17 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
         // Process each ID
         for (const id of ids) {
             try {
-                const success = await database.deleteSummary(id);
+                const success = await database.deleteDistillation(id);
                 if (success) {
                     deletedCount++;
                 } else {
                     errors.push({
                         id: id,
-                        error: 'Summary not found'
+                        error: 'Distillation not found'
                     });
                 }
             } catch (error) {
-                console.error(`Error deleting summary ${id}:`, error);
+                console.error(`Error deleting distillation ${id}:`, error);
                 errors.push({
                     id: id,
                     error: error.message
@@ -424,7 +424,7 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
     }
 });
 
-// Search summaries
+// Search distillations
 app.get('/api/search', async (req, res) => {
     try {
         const { query } = req.query;

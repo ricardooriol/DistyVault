@@ -43,31 +43,31 @@ class OllamaService {
             console.log(`Ollama request completed in ${duration.toFixed(2)}s`);
             
             // Log the first 100 characters of the response
-            const summaryText = response.data.response;
-            console.log(`Summary preview: ${summaryText.substring(0, 100)}...`);
-            console.log(`Summary length: ${summaryText.length} characters`);
+            const distillationText = response.data.response;
+            console.log(`Distillation preview: ${distillationText.substring(0, 100)}...`);
+            console.log(`Distillation length: ${distillationText.length} characters`);
             
-            return summaryText;
+            return distillationText;
         } catch (error) {
             console.error('Error calling Ollama API:', error.message);
             if (error.response) {
                 console.error('Response data:', error.response.data);
                 console.error('Response status:', error.response.status);
             }
-            throw new Error(`Failed to generate summary: ${error.message}`);
+            throw new Error(`Failed to generate distillation: ${error.message}`);
         }
     }
 
     /**
      * Format the prompt for the Ollama API using the specified template
-     * @param {string} text - The text to summarize
+     * @param {string} text - The text to distill
      * @returns {string} - The formatted prompt
      */
     formatPrompt(text) {
-        return `Analyze the text I provide below. Your task is to distill its core knowledge, removing all fluff and focusing only on the essential concepts. Your output should be a lesson, not a summary. Present the information with the following strict structure and style:
+        return `Analyze the text I provide below. Your task is to distill its core knowledge, removing all fluff and focusing only on the essential concepts. Your output should be a lesson, not a distillation. Present the information with the following strict structure and style:
 
 Style and Tone:
-Direct and Insightful: Begin immediately with the first key point. Do not use any introductory phrases like "Here is the summary" or other conversational filler.
+Direct and Insightful: Begin immediately with the first key point. Do not use any introductory phrases like "Here are the insights" or other conversational filler.
 Clear and Simple: Explain concepts using plain language. Avoid jargon, buzzwords, and overly complex terminology. The goal is to make complex ideas intuitive and accessible.
 Confident and Educational: Write as an expert distilling knowledge for a capable learner. Your goal is to ensure the core ideas are not just listed, but are fully understood and remembered.
 
@@ -79,10 +79,10 @@ Start with a single, memorable sentence that captures one complete, fundamental 
 Following that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its implications, and provide the necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works.
 
 The Next Core Idea Sentence
-This follows the same pattern as the first point—a single, impactful sentence summarizing the next fundamental concept.
+This follows the same pattern as the first point—a single, impactful sentence distilling the next fundamental concept.
 Again, follow up with one or two paragraphs of in-depth explanation. If the original text is missing crucial context, feel free to add it to ensure the concept is fully grasped. Connect this idea to previous points if it helps build a more cohesive mental model for the reader.
 
-Continue this pattern for as many points as are necessary to cover all the essential knowledge in the document. Do not summarize for the sake of brevity; distill for the sake of clarity and understanding.
+Continue this pattern for as many points as are necessary to cover all the essential knowledge in the document. Do not condense for the sake of brevity; distill for the sake of clarity and understanding.
 
 Text to Analyze:
 ${text}`;

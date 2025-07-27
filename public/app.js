@@ -123,7 +123,7 @@ class SawronApp {
     updateButtonStates() {
         const mainInput = document.getElementById('main-input');
         const uploadBtn = document.getElementById('upload-btn');
-        const summarizeBtn = document.getElementById('distill-btn');
+        const distillBtn = document.getElementById('distill-btn');
 
         const hasText = mainInput.value.trim().length > 0;
         const hasFile = this.selectedFile !== null;
@@ -135,11 +135,11 @@ class SawronApp {
             uploadBtn.classList.remove('disabled');
         }
 
-        // Summarize button: enabled if there's text or file selected
+        // Distill button: enabled if there's text or file selected
         if (hasText || hasFile) {
-            summarizeBtn.classList.remove('disabled');
+            distillBtn.classList.remove('disabled');
         } else {
-            summarizeBtn.classList.add('disabled');
+            distillBtn.classList.add('disabled');
         }
     }
 
@@ -229,7 +229,7 @@ class SawronApp {
             this.updateButtonStates();
 
         } catch (error) {
-            console.error('Error during summarization:', error);
+            console.error('Error during distillation:', error);
             alert('Error: ' + error.message);
             this.hideStatus();
         }
@@ -415,7 +415,7 @@ class SawronApp {
     createTableRow(item) {
         const status = item.status;
         const isCompleted = status === 'completed';
-        const isProcessing = ['initializing', 'extracting', 'summarizing'].includes(status);
+        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(status);
         const isError = status === 'error';
 
         let statusClass = '';
@@ -454,12 +454,14 @@ class SawronApp {
             </div>
         `;
 
-        // Format elapsed time
-        let elapsedTimeDisplay = '-';
-        if (item.elapsedTime) {
+        // Format processing time
+        let processingTimeDisplay = '-';
+        if (item.processingTime) {
+            processingTimeDisplay = `${item.processingTime.toFixed(1)}s`;
+        } else if (item.elapsedTime) {
             const minutes = Math.floor(item.elapsedTime / 60);
             const seconds = Math.floor(item.elapsedTime % 60);
-            elapsedTimeDisplay = `${minutes}m ${seconds}s`;
+            processingTimeDisplay = `${minutes}m ${seconds}s`;
         }
 
         // Format created date
@@ -511,7 +513,7 @@ class SawronApp {
                 <td class="source-cell">${sourceDisplay}</td>
                 <td class="type-cell">${this.getTypeLabel(item.sourceType)}</td>
                 <td class="status-cell">${statusDisplay}</td>
-                <td class="time-cell">${elapsedTimeDisplay}</td>
+                <td class="time-cell">${processingTimeDisplay}</td>
                 <td class="date-cell">${formattedDate}</td>
                 <td class="actions-cell">${actions}</td>
             </tr>
@@ -522,56 +524,58 @@ class SawronApp {
         try {
             const response = await fetch(`/api/summaries/${id}`);
             if (!response.ok) {
-                throw new Error('Failed to load summary');
+                throw new Error('Failed to load distillation');
             }
 
-            const summary = await response.json();
+            const distillation = await response.json();
 
-            document.getElementById('modal-title').textContent = summary.title;
+            document.getElementById('modal-title').textContent = distillation.title;
 
             let metaHtml = '';
 
-            if (summary.sourceUrl) {
-                metaHtml += `<strong>Source:</strong> <a href="${summary.sourceUrl}" target="_blank">${summary.sourceUrl}</a><br>`;
-            } else if (summary.sourceFile) {
-                metaHtml += `<strong>Source:</strong> ${summary.sourceFile.name}<br>`;
+            if (distillation.sourceUrl) {
+                metaHtml += `<strong>Source:</strong> <a href="${distillation.sourceUrl}" target="_blank">${distillation.sourceUrl}</a><br>`;
+            } else if (distillation.sourceFile) {
+                metaHtml += `<strong>Source:</strong> ${distillation.sourceFile.name}<br>`;
             }
 
-            metaHtml += `<strong>Status:</strong> ${summary.status.toUpperCase()}<br>`;
+            metaHtml += `<strong>Status:</strong> ${distillation.status.toUpperCase()}<br>`;
 
-            if (summary.processingStep) {
-                metaHtml += `<strong>Processing Step:</strong> ${summary.processingStep}<br>`;
+            if (distillation.processingStep) {
+                metaHtml += `<strong>Processing Step:</strong> ${distillation.processingStep}<br>`;
             }
 
-            metaHtml += `<strong>Created:</strong> ${this.formatDate(new Date(summary.createdAt))}<br>`;
+            metaHtml += `<strong>Created:</strong> ${this.formatDate(new Date(distillation.createdAt))}<br>`;
 
-            if (summary.completedAt) {
-                metaHtml += `<strong>Completed:</strong> ${this.formatDate(new Date(summary.completedAt))}<br>`;
+            if (distillation.completedAt) {
+                metaHtml += `<strong>Completed:</strong> ${this.formatDate(new Date(distillation.completedAt))}<br>`;
             }
 
-            if (summary.elapsedTime) {
-                const minutes = Math.floor(summary.elapsedTime / 60);
-                const seconds = Math.floor(summary.elapsedTime % 60);
-                metaHtml += `<strong>Elapsed Time:</strong> ${minutes}m ${seconds}s<br>`;
+            if (distillation.processingTime) {
+                metaHtml += `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>`;
+            } else if (distillation.elapsedTime) {
+                const minutes = Math.floor(distillation.elapsedTime / 60);
+                const seconds = Math.floor(distillation.elapsedTime % 60);
+                metaHtml += `<strong>Processing Time:</strong> ${minutes}m ${seconds}s<br>`;
             }
 
-            if (summary.processingTime) {
-                metaHtml += `<strong>Processing Time:</strong> ${summary.processingTime.toFixed(1)}s<br>`;
+            if (distillation.processingTime) {
+                metaHtml += `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>`;
             }
 
-            if (summary.wordCount) {
-                metaHtml += `<strong>Word Count:</strong> ${summary.wordCount} words<br>`;
+            if (distillation.wordCount) {
+                metaHtml += `<strong>Word Count:</strong> ${distillation.wordCount} words<br>`;
             }
 
             document.getElementById('distillation-meta').innerHTML = metaHtml;
-            document.getElementById('distillation-content').innerHTML = this.formatContent(summary.content || '');
+            document.getElementById('distillation-content').innerHTML = this.formatContent(distillation.content || '');
             document.getElementById('distillation-modal').style.display = 'block';
 
 
 
         } catch (error) {
-            console.error('Error showing summary:', error);
-            alert('Error loading summary: ' + error.message);
+            console.error('Error showing distillation:', error);
+            alert('Error loading distillation: ' + error.message);
         }
     }
 
@@ -616,18 +620,18 @@ class SawronApp {
         try {
             const response = await fetch(`/api/summaries/${id}`);
             if (!response.ok) {
-                throw new Error('Failed to load summary');
+                throw new Error('Failed to load distillation');
             }
 
-            const summary = await response.json();
+            const distillation = await response.json();
 
-            if (!summary.rawContent) {
-                alert('No raw content available for this summary');
+            if (!distillation.rawContent) {
+                alert('No raw content available for this distillation');
                 return;
             }
 
-            document.getElementById('raw-content-title').textContent = `Raw Content: ${summary.title}`;
-            document.getElementById('raw-content-text').textContent = summary.rawContent;
+            document.getElementById('raw-content-title').textContent = `Raw Content: ${distillation.title}`;
+            document.getElementById('raw-content-text').textContent = distillation.rawContent;
             document.getElementById('raw-content-modal').style.display = 'block';
 
         } catch (error) {
@@ -640,74 +644,78 @@ class SawronApp {
         try {
             const response = await fetch(`/api/summaries/${id}`);
             if (!response.ok) {
-                throw new Error('Failed to load summary');
+                throw new Error('Failed to load distillation');
             }
 
-            const summary = await response.json();
+            const distillation = await response.json();
 
-            document.getElementById('logs-title').textContent = `Processing Logs: ${summary.title}`;
+            document.getElementById('logs-title').textContent = `Processing Logs: ${distillation.title}`;
 
             // Create comprehensive logs including system information
             let logsHtml = '';
 
-            // Add summary information header
+            // Add distillation information header
             logsHtml += `
                 <div class="log-section">
-                    <h4 class="log-section-title">📊 Summary Information</h4>
+                    <h4 class="log-section-title">📊 Distillation Information</h4>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>ID:</strong> ${summary.id}</span>
+                        <span class="log-message"><strong>ID:</strong> ${distillation.id}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Source:</strong> ${summary.sourceUrl || summary.sourceFile || 'Unknown'}</span>
+                        <span class="log-message"><strong>Source:</strong> ${distillation.sourceUrl || distillation.sourceFile || 'Unknown'}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Type:</strong> ${summary.sourceType || 'Unknown'}</span>
+                        <span class="log-message"><strong>Type:</strong> ${distillation.sourceType || 'Unknown'}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Status:</strong> ${summary.status}</span>
+                        <span class="log-message"><strong>Status:</strong> ${distillation.status}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Processing Step:</strong> ${summary.processingStep || 'N/A'}</span>
+                        <span class="log-message"><strong>Processing Step:</strong> ${distillation.processingStep || 'N/A'}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Created:</strong> ${new Date(summary.createdAt).toLocaleString()}</span>
+                        <span class="log-message"><strong>Created:</strong> ${new Date(distillation.createdAt).toLocaleString()}</span>
                     </div>
-                    ${summary.completedAt ? `
+                    ${distillation.completedAt ? `
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Completed:</strong> ${new Date(summary.completedAt).toLocaleString()}</span>
+                            <span class="log-message"><strong>Completed:</strong> ${new Date(distillation.completedAt).toLocaleString()}</span>
                         </div>
                     ` : ''}
-                    ${summary.elapsedTime ? `
+                    ${distillation.processingTime ? `
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Elapsed Time:</strong> ${Math.floor(summary.elapsedTime / 60)}m ${Math.floor(summary.elapsedTime % 60)}s</span>
+                            <span class="log-message"><strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s</span>
+                        </div>
+                    ` : distillation.elapsedTime ? `
+                        <div class="log-entry log-info">
+                            <span class="log-message"><strong>Processing Time:</strong> ${Math.floor(distillation.elapsedTime / 60)}m ${Math.floor(distillation.elapsedTime % 60)}s</span>
                         </div>
                     ` : ''}
-                    ${summary.processingTime ? `
+                    ${distillation.processingTime ? `
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Processing Time:</strong> ${summary.processingTime.toFixed(1)}s</span>
+                            <span class="log-message"><strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s</span>
                         </div>
                     ` : ''}
-                    ${summary.wordCount ? `
+                    ${distillation.wordCount ? `
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Word Count:</strong> ${summary.wordCount} words</span>
+                            <span class="log-message"><strong>Word Count:</strong> ${distillation.wordCount} words</span>
                         </div>
                     ` : ''}
-                    ${summary.error ? `
+                    ${distillation.error ? `
                         <div class="log-entry log-error">
-                            <span class="log-message"><strong>Error:</strong> ${summary.error}</span>
+                            <span class="log-message"><strong>Error:</strong> ${distillation.error}</span>
                         </div>
                     ` : ''}
                 </div>
             `;
 
             // Add processing logs section
-            if (summary.logs && summary.logs.length > 0) {
+            if (distillation.logs && distillation.logs.length > 0) {
                 logsHtml += `
                     <div class="log-section">
                         <h4 class="log-section-title">📋 Processing Logs</h4>
                 `;
 
-                summary.logs.forEach(log => {
+                distillation.logs.forEach(log => {
                     const timestamp = new Date(log.timestamp);
                     const formattedTime = timestamp.toLocaleTimeString();
                     const levelClass = `log-${log.level}`;
@@ -734,18 +742,18 @@ class SawronApp {
             }
 
             // Add extraction metadata if available
-            if (summary.extractionMetadata) {
+            if (distillation.extractionMetadata) {
                 logsHtml += `
                     <div class="log-section">
                         <h4 class="log-section-title">🔍 Extraction Details</h4>
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Content Type:</strong> ${summary.extractionMetadata.contentType || 'Unknown'}</span>
+                            <span class="log-message"><strong>Content Type:</strong> ${distillation.extractionMetadata.contentType || 'Unknown'}</span>
                         </div>
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Extraction Method:</strong> ${summary.extractionMetadata.extractionMethod || 'Unknown'}</span>
+                            <span class="log-message"><strong>Extraction Method:</strong> ${distillation.extractionMetadata.extractionMethod || 'Unknown'}</span>
                         </div>
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Fallback Used:</strong> ${summary.extractionMetadata.fallbackUsed ? 'Yes' : 'No'}</span>
+                            <span class="log-message"><strong>Fallback Used:</strong> ${distillation.extractionMetadata.fallbackUsed ? 'Yes' : 'No'}</span>
                         </div>
                     </div>
                 `;
@@ -778,12 +786,12 @@ class SawronApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.message || 'Failed to download summary');
+                throw new Error(error.message || 'Failed to download distillation');
             }
 
             // Get filename from Content-Disposition header
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = `summary-${id}.pdf`;
+            let filename = `distillation-${id}.pdf`;
 
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
@@ -813,7 +821,7 @@ class SawronApp {
             }, 100);
 
         } catch (error) {
-            console.error('Error downloading summary:', error);
+            console.error('Error downloading distillation:', error);
             alert('Error downloading PDF: ' + error.message);
         }
     }
@@ -838,7 +846,7 @@ class SawronApp {
     }
 
     async deleteDistillation(id) {
-        if (!confirm('Are you sure you want to delete this summary?')) {
+        if (!confirm('Are you sure you want to delete this distillation?')) {
             return;
         }
 
@@ -849,13 +857,13 @@ class SawronApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.message || 'Failed to delete summary');
+                throw new Error(error.message || 'Failed to delete distillation');
             }
 
             this.loadKnowledgeBase();
 
         } catch (error) {
-            console.error('Error deleting summary:', error);
+            console.error('Error deleting distillation:', error);
             alert('Error: ' + error.message);
         }
     }

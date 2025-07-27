@@ -1,8 +1,8 @@
 /**
- * Summary model for SAWRON
- * Represents a processed content summary with metadata
+ * Distillation model for SAWRON
+ * Represents a processed content distillation with metadata
  */
-class Summary {
+class Distillation {
     constructor({
         id = null,
         title = '',
@@ -28,7 +28,7 @@ class Summary {
         this.sourceUrl = sourceUrl;
         this.sourceType = sourceType; // 'url', 'youtube', 'file'
         this.sourceFile = sourceFile;
-        this.status = status; // 'pending', 'initializing', 'extracting', 'summarizing', 'completed', 'error'
+        this.status = status; // 'pending', 'initializing', 'extracting', 'distilling', 'completed', 'error'
         this.processingStep = processingStep; // More detailed status message
         this.rawContent = rawContent; // Store the raw extracted content for debugging
         this.createdAt = createdAt;
@@ -68,7 +68,7 @@ class Summary {
     }
 
     static fromJSON(json) {
-        return new Summary({
+        return new Distillation({
             id: json.id,
             title: json.title,
             content: json.content,
@@ -90,7 +90,7 @@ class Summary {
     }
     
     /**
-     * Add a log entry to the summary
+     * Add a log entry to the distillation
      * @param {string} message - The log message
      * @param {string} level - The log level (info, warn, error)
      */
@@ -137,4 +137,4 @@ class Summary {
     }
 }
 
-module.exports = Summary;
+module.exports = Distillation;

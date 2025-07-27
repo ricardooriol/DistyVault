@@ -1185,7 +1185,7 @@ ol.manual-numbered li .list-number,
     color: var(--status-error);
 }
 
-/* Summary meta info */
+/* Distilly meta info */
 .distillation-meta {
     display: flex;
     gap: 1rem;
