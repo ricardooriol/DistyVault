@@ -588,6 +588,14 @@ class SawronApp {
         // Toggle current dropdown
         const dropdown = event.currentTarget;
         dropdown.classList.toggle('show');
+        
+        // Debug: Log dropdown state
+        console.log('Dropdown toggled:', dropdown.classList.contains('show'));
+        const dropdownContent = dropdown.querySelector('.action-dropdown-content');
+        if (dropdownContent) {
+            console.log('Dropdown content found:', dropdownContent);
+            console.log('Dropdown content display:', window.getComputedStyle(dropdownContent).display);
+        }
 
         // Close dropdown when clicking outside
         const closeDropdown = (e) => {

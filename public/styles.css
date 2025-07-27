@@ -538,6 +538,10 @@ body {
     position: relative;
 }
 
+.knowledge-base-table tbody tr td {
+    overflow: visible;
+}
+
 .knowledge-base-table tbody tr:last-child td {
     border-bottom: none;
 }
@@ -2068,7 +2072,11 @@ rocessing Queue Configuration Styles */
 }
 
 .action-dropdown.show {
-    z-index: 9998;
+    z-index: 99998;
+}
+
+.action-dropdown.show .action-dropdown-content {
+    display: block !important;
 }
 
 .action-dropdown-btn {
@@ -2096,21 +2104,19 @@ rocessing Queue Configuration Styles */
 .action-dropdown-content {
     display: none;
     position: absolute;
-    right: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--primary-orange);
     border-radius: 8px;
-    box-shadow: 0 4px 12px var(--shadow-dark);
-    z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 99999;
     min-width: 140px;
-    top: 100%;
-    margin-top: 4px;
+    top: calc(100% + 4px);
     white-space: nowrap;
 }
 
-.action-dropdown.show .action-dropdown-content {
-    display: block;
-}
+
 
 .action-dropdown-item {
     display: block;
