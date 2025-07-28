@@ -390,13 +390,13 @@ class NumberingProcessor {
                 const restOfContent = sentences[2].trim();
 
                 if (restOfContent.length > 0) {
-                    return `${number}. ${firstSentence}\n${restOfContent}`;
+                    return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
                 } else {
-                    return `${number}. ${firstSentence}`;
+                    return `<strong>${number}. ${firstSentence}</strong>`;
                 }
             } else {
                 // No clear sentence structure, use as is
-                return `${number}. ${content}`;
+                return `<strong>${number}. ${content}</strong>`;
             }
         });
 
@@ -522,7 +522,7 @@ class NumberingProcessor {
             return text;
         }
 
-        console.log('ForceFormat: Processing text with length:', text.length);
+        // Processing text for bold formatting
 
         // BULLETPROOF APPROACH: Split by numbered patterns and renumber everything sequentially
         // This regex splits the text at every numbered pattern while keeping the content
@@ -540,22 +540,22 @@ class NumberingProcessor {
             // Only include sections with substantial content
             if (cleanedSection.length > 5) {
                 sections.push(cleanedSection);
-                console.log(`ForceFormat: Extracted section ${sections.length}:`, cleanedSection.substring(0, 100) + '...');
+                // Extracted section for processing
             }
         }
 
         // If no numbered sections found, try splitting by double line breaks
         if (sections.length === 0) {
-            console.log('ForceFormat: No numbered sections found, trying paragraph split');
+            // No numbered sections found, trying paragraph split
             const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 10);
 
             if (paragraphs.length === 0) {
-                return `1. ${text.trim()}`;
+                return `<strong>1. ${text.trim()}</strong>`;
             }
 
             return paragraphs.map((paragraph, index) => {
                 const cleaned = paragraph.trim().replace(/^\s*\d+[\.\)\:\-]\s*/, '');
-                return `${index + 1}. ${cleaned}`;
+                return `<strong>${index + 1}. ${cleaned}</strong>`;
             }).join('\n\n');
         }
 
@@ -571,16 +571,16 @@ class NumberingProcessor {
                 const restOfContent = sentences[2].trim();
 
                 if (restOfContent.length > 0) {
-                    return `${number}. ${firstSentence}\n${restOfContent}`;
+                    return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
                 } else {
-                    return `${number}. ${firstSentence}`;
+                    return `<strong>${number}. ${firstSentence}</strong>`;
                 }
             } else {
-                return `${number}. ${section}`;
+                return `<strong>${number}. ${section}</strong>`;
             }
         }).join('\n\n');
 
-        console.log('ForceFormat: Generated', sections.length, 'numbered sections');
+        // Generated numbered sections with bold formatting
         return result;
     }
 }

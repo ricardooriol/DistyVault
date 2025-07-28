@@ -1138,6 +1138,11 @@ ol.manual-numbered li .list-number,
     margin-bottom: 0.5rem;
 }
 
+.distillation-content strong {
+    font-weight: bold;
+    /* Ensure bold rendering across all browsers */
+}
+
 /* Raw content and logs */
 .raw-content {
     background: var(--bg-primary);

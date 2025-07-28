@@ -140,7 +140,7 @@ SAWRON gives you complete control over how your data is processed:
 ### Understanding Output
 
 Each processed item generates:
-- **Structured Insights**: Numbered points with detailed explanations
+- **Structured Insights**: Numbered points with **bold main sentences** and detailed explanations
 - **Source Metadata**: Original URL, processing time, word count
 - **Processing Logs**: Detailed information about extraction and analysis
 - **Raw Content**: Access to original extracted text
@@ -160,7 +160,7 @@ SAWRON is built with:
 
 ## Future Enhancements
 
-- **Web Search**: Real time web search to complement AI processing
+- **Web Search**: Real time web search to complement processing for all AI providers (only available in Gemini models at the moment)
 - **Additional AI Providers**: Integration with more AI services and local models
 - **Export Formats**: Markdown, JSON, XML, and custom templates
 - **Automation**: Scheduled processing, webhooks, and workflow triggers
