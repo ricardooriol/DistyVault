@@ -669,21 +669,8 @@ class SawronApp {
             console.log('Dropdown content display:', window.getComputedStyle(dropdownContent).display);
         }
     
-        // If the dropdown is opened, add a click event listener to the document
-        if (isOpen) {
-            document.addEventListener('click', closeDropdown);
-        } else {
-            document.removeEventListener('click', closeDropdown);
-        }
-    
-        // Function to close the dropdown when clicking outside
-        function closeDropdown(event) {
-            const dropdowns = document.querySelectorAll('.action-dropdown');
-            dropdowns.forEach(dropdown => {
-                dropdown.classList.remove('show');
-            });
-            document.removeEventListener('click', closeDropdown); // Remove listener after closing
-        }
+        // Dropdown will stay open until manually toggled
+        // No auto-close behavior - user must click the action button again to close
     }
     
 
