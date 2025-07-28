@@ -522,84 +522,66 @@ class NumberingProcessor {
             return text;
         }
 
-        // Step 1: Split text into logical sections based on numbered patterns
-        // This improved approach handles mixed content better
+        console.log('ForceFormat: Processing text with length:', text.length);
+
+        // BULLETPROOF APPROACH: Split by numbered patterns and renumber everything sequentially
+        // This regex splits the text at every numbered pattern while keeping the content
+        const numberedSections = text.split(/(?=(?:^|\n)\s*\d+[\.\)\:\-])/);
         const sections = [];
-        const lines = text.split('\n');
-        let currentSection = '';
-        let inNumberedContent = false;
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+        for (let i = 0; i < numberedSections.length; i++) {
+            const section = numberedSections[i].trim();
 
-            // Check if this line starts with a number pattern
-            const isNumberedLine = /^\s*(?:\d+[\.\)\:\-]|\(\d+\))\s*/.test(line);
+            if (section.length === 0) continue;
 
-            if (isNumberedLine) {
-                // If we have accumulated content, save it as a section
-                if (currentSection.trim().length > 5) {
-                    sections.push(currentSection.trim());
-                }
+            // Remove the number from the beginning if it exists
+            const cleanedSection = section.replace(/^\s*\d+[\.\)\:\-]\s*/, '').trim();
 
-                // Start new section with this numbered line (remove the number)
-                currentSection = line.replace(/^\s*(?:\d+[\.\)\:\-]|\(\d+\))\s*/, '');
-                inNumberedContent = true;
-            } else if (line.length > 0) {
-                // Add non-empty lines to current section
-                if (currentSection.length > 0) {
-                    currentSection += '\n' + line;
-                } else {
-                    currentSection = line;
-                }
-            } else if (inNumberedContent && currentSection.trim().length > 0) {
-                // Empty line - if we have content, it might be end of section
-                // But continue accumulating in case there's more content
-                currentSection += '\n';
+            // Only include sections with substantial content
+            if (cleanedSection.length > 5) {
+                sections.push(cleanedSection);
+                console.log(`ForceFormat: Extracted section ${sections.length}:`, cleanedSection.substring(0, 100) + '...');
             }
         }
 
-        // Don't forget the last section
-        if (currentSection.trim().length > 5) {
-            sections.push(currentSection.trim());
-        }
-
-        // Step 2: If no sections found, try paragraph-based approach
+        // If no numbered sections found, try splitting by double line breaks
         if (sections.length === 0) {
-            // Remove any stray numbering and split by paragraphs
-            let cleaned = text.replace(/(?:^|\n)\s*(?:\d+[\.\)\:\-]|\(\d+\))\s*/g, ' ');
-            const paragraphs = cleaned.split(/\n\s*\n/).filter(p => p.trim().length > 10);
+            console.log('ForceFormat: No numbered sections found, trying paragraph split');
+            const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 10);
 
             if (paragraphs.length === 0) {
                 return `1. ${text.trim()}`;
             }
 
             return paragraphs.map((paragraph, index) => {
-                const trimmed = paragraph.trim().replace(/\s+/g, ' ');
-                return `${index + 1}. ${trimmed}`;
+                const cleaned = paragraph.trim().replace(/^\s*\d+[\.\)\:\-]\s*/, '');
+                return `${index + 1}. ${cleaned}`;
             }).join('\n\n');
         }
 
-        // Step 3: Apply perfect numbering to extracted sections
-        return sections.map((section, index) => {
-            // Clean up the content while preserving internal structure
-            const cleaned = section.replace(/\s+/g, ' ').trim();
+        // Apply sequential numbering to all sections
+        const result = sections.map((section, index) => {
+            const number = index + 1;
 
             // Split into first sentence and rest for proper formatting
-            const sentences = cleaned.match(/^([^.!?]*[.!?])\s*(.*)/s);
+            const sentences = section.match(/^([^.!?]*[.!?])\s*(.*)/s);
 
             if (sentences && sentences[1] && sentences[2]) {
                 const firstSentence = sentences[1].trim();
                 const restOfContent = sentences[2].trim();
 
                 if (restOfContent.length > 0) {
-                    return `${index + 1}. ${firstSentence}\n${restOfContent}`;
+                    return `${number}. ${firstSentence}\n${restOfContent}`;
                 } else {
-                    return `${index + 1}. ${firstSentence}`;
+                    return `${number}. ${firstSentence}`;
                 }
             } else {
-                return `${index + 1}. ${cleaned}`;
+                return `${number}. ${section}`;
             }
         }).join('\n\n');
+
+        console.log('ForceFormat: Generated', sections.length, 'numbered sections');
+        return result;
     }
 }
 
