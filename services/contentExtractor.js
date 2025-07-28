@@ -797,6 +797,7 @@ class ContentExtractor {
             url.includes('youtu.be/') ||
             url.includes('youtube.com/embed/') ||
             url.includes('youtube.com/playlist') ||
+            url.includes('youtube.com/live') ||
             url.includes('m.youtube.com/watch');
     }
 
