@@ -33,20 +33,48 @@ class AIProvider {
         }
 
         try {
-            // Apply numbering fixes
-            const fixedDistillation = NumberingProcessor.fixNumbering(rawDistillation);
+            // Apply numbering fixes (multiple passes for bulletproof processing)
+            let processedDistillation = rawDistillation;
+            let passCount = 0;
+            const maxPasses = 3;
+            
+            while (passCount < maxPasses) {
+                const beforeFix = processedDistillation;
+                processedDistillation = NumberingProcessor.fixNumbering(processedDistillation);
+                
+                // If no changes were made, we're done
+                if (processedDistillation === beforeFix) {
+                    break;
+                }
+                
+                passCount++;
+            }
+            
+            // Final validation - ensure we have proper numbering
+            const finalStats = NumberingProcessor.getNumberingStats(processedDistillation);
+            if (finalStats.hasNumbering && finalStats.hasIssues) {
+                console.warn(`[${this.name}] Numbering issues persist after ${passCount} passes:`, {
+                    totalPoints: finalStats.totalPoints,
+                    issueTypes: finalStats.issueTypes,
+                    numbers: finalStats.numbers
+                });
+                
+                // Last resort: force sequential numbering
+                processedDistillation = this.forceSequentialNumbering(processedDistillation);
+            }
             
             // Log if numbering issues were detected and fixed
-            if (fixedDistillation !== rawDistillation) {
-                const stats = NumberingProcessor.getNumberingStats(rawDistillation);
-                console.log(`[${this.name}] Fixed numbering issues:`, {
-                    totalPoints: stats.totalPoints,
-                    issueTypes: stats.issueTypes,
-                    originalNumbers: stats.numbers
+            if (processedDistillation !== rawDistillation) {
+                const originalStats = NumberingProcessor.getNumberingStats(rawDistillation);
+                console.log(`[${this.name}] Fixed numbering issues in ${passCount} passes:`, {
+                    originalPoints: originalStats.totalPoints,
+                    originalNumbers: originalStats.numbers,
+                    finalPoints: finalStats.totalPoints,
+                    issuesFixed: originalStats.issueTypes
                 });
             }
             
-            return fixedDistillation;
+            return processedDistillation;
         } catch (error) {
             console.warn(`[${this.name}] Error in post-processing distillation:`, error.message);
             return rawDistillation; // Return original if processing fails
@@ -181,6 +209,39 @@ class AIProvider {
     }
 
     /**
+     * Force sequential numbering as a last resort
+     * @param {string} text - The text to fix
+     * @returns {string} - Text with forced sequential numbering
+     */
+    forceSequentialNumbering(text) {
+        try {
+            // Split text into lines and identify potential numbered points
+            const lines = text.split('\n');
+            const processedLines = [];
+            let currentNumber = 1;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Check if this line starts with a number pattern
+                if (/^\s*\d+[\.\)\:\-]/.test(line)) {
+                    // Replace with sequential number
+                    const cleanedLine = line.replace(/^\s*\d+[\.\)\:\-]\s*/, `${currentNumber}. `);
+                    processedLines.push(cleanedLine);
+                    currentNumber++;
+                } else {
+                    processedLines.push(line);
+                }
+            }
+            
+            return processedLines.join('\n');
+        } catch (error) {
+            console.warn('Error in forceSequentialNumbering:', error.message);
+            return text;
+        }
+    }
+
+    /**
      * Format the prompt for knowledge distillation
      * @param {string} text - The text to analyze
      * @returns {string} - The formatted prompt
@@ -210,7 +271,7 @@ Directness: Your response MUST begin directly with the first key insight (Point 
 
 4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)
 
-Your entire response MUST be a numbered list. Each item in the list MUST adhere to the following two-part structure without exception:
+Your entire response MUST be a numbered list starting with "1." and continuing sequentially (1., 2., 3., etc.). Each item in the list MUST adhere to the following two-part structure without exception:
 
 1. Core Idea Sentence
 Begin with a single, bolded sentence that captures one complete, fundamental idea. This sentence must stand on its own as a key takeaway.
@@ -220,7 +281,15 @@ Then, in one or two subsequent paragraphs, elaborate on this core idea. Deconstr
 This follows the exact same pattern. A single, bolded, impactful sentence distilling the next fundamental concept.
 Follow up with one or two paragraphs of in-depth explanation. Connect this idea to previous points if it helps build a cohesive mental model.
 
-Continue this pattern for as many points as are necessary to cover all essential knowledge.
+3. Continue Sequential Numbering
+Continue this exact pattern (3., 4., 5., etc.) for as many points as are necessary to cover all essential knowledge. NEVER repeat numbers or skip numbers in the sequence.
+
+CRITICAL NUMBERING RULES:
+- Start with "1." (not "1)", "(1)", "1:", or "1 -")
+- Use sequential numbering: 1., 2., 3., 4., etc.
+- Never repeat a number (no multiple "1." entries)
+- Never skip numbers in the sequence
+- Each numbered point must be substantial (at least 50 words)
 
 Here is the text to distill:
 

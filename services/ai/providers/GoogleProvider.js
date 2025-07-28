@@ -27,7 +27,6 @@ class GoogleProvider extends AIProvider {
         try {
             const { GoogleGenerativeAI } = require('@google/generative-ai');
             this.ai = new GoogleGenerativeAI(this.apiKey);
-            console.log('Google GenAI initialized successfully');
         } catch (error) {
             console.warn('Google GenAI library not found. Please install it with: npm install @google/generative-ai');
             this.ai = null;
@@ -35,7 +34,7 @@ class GoogleProvider extends AIProvider {
     }
 
     /**
-     * Generate a distillation using Google Gemini
+     * Generate a distillation using Google Gemini with web search
      * @param {string} text - The text to distill
      * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
@@ -46,14 +45,20 @@ class GoogleProvider extends AIProvider {
             const prompt = this.createDistillationPrompt(processedText, options);
 
             console.log(`Sending request to Google Gemini with ${processedText.length} characters`);
-            console.log(`Using model: ${this.model}`);
+            console.log(`Using model: ${this.model} with web search enabled`);
 
             const startTime = Date.now();
             console.log(`Google Gemini request started at: ${new Date().toISOString()}`);
 
             if (this.ai) {
-                // Use the Google GenAI SDK
-                const model = this.ai.getGenerativeModel({ model: this.model });
+                // Use the Google GenAI SDK with web search
+                const model = this.ai.getGenerativeModel({ 
+                    model: this.model,
+                    tools: [{
+                        googleSearch: {}
+                    }]
+                });
+                
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
 
@@ -64,6 +69,7 @@ class GoogleProvider extends AIProvider {
                     const rawDistillation = response.text().trim();
                     console.log(`Google Gemini response received in ${duration.toFixed(2)}s`);
                     console.log(`Distillation length: ${rawDistillation.length} characters`);
+                    console.log(`Web search was used to enhance the distillation`);
                     
                     // Apply post-processing to fix numbering and other issues
                     const processedDistillation = this.postProcessDistillation(rawDistillation);
@@ -92,7 +98,7 @@ class GoogleProvider extends AIProvider {
     }
 
     /**
-     * Fallback method using REST API
+     * Fallback method using REST API with web search
      * @param {string} prompt - The prompt to send
      * @param {Object} options - Generation options
      * @returns {Promise<string>} - The generated distillation
@@ -110,6 +116,11 @@ class GoogleProvider extends AIProvider {
                     ]
                 }
             ],
+            tools: [
+                {
+                    googleSearch: {}
+                }
+            ],
             generationConfig: {
                 temperature: options.temperature || 0.7,
                 topP: options.top_p || 0.8,
@@ -117,6 +128,8 @@ class GoogleProvider extends AIProvider {
                 maxOutputTokens: options.max_tokens || 1000
             }
         };
+
+        console.log(`Using REST API with web search for model: ${this.model}`);
 
         const response = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
@@ -134,6 +147,8 @@ class GoogleProvider extends AIProvider {
             
             if (candidate.content && candidate.content.parts && candidate.content.parts[0]) {
                 const rawDistillation = candidate.content.parts[0].text.trim();
+                console.log(`REST API web search response received`);
+                
                 // Apply post-processing to fix numbering and other issues
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
@@ -309,7 +324,7 @@ class GoogleProvider extends AIProvider {
         
         try {
             if (this.ai) {
-                // Use SDK for testing
+                // Use SDK for testing (without web search for simple test)
                 const model = this.ai.getGenerativeModel({ model: this.model });
                 const result = await model.generateContent('Please respond with "Gemini connection test successful" to confirm the connection.');
                 const response = await result.response;

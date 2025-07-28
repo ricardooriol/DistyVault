@@ -64,25 +64,12 @@ class AISettingsManager {
      */
     loadSettings() {
         try {
-            console.log('Loading AI provider settings from shared memory...');
-
             if (sharedSettings) {
-                console.log('AI provider settings loaded from shared memory successfully');
-                console.log('Loaded settings:', JSON.stringify(sharedSettings, (key, value) => {
-                    // Hide API key in logs
-                    if (key === 'apiKey' && value) {
-                        return '***HIDDEN***';
-                    }
-                    return value;
-                }, 2));
                 return sharedSettings;
             } else {
-                console.log('No settings in shared memory, using defaults');
                 return this.getDefaultSettings();
             }
         } catch (error) {
-            console.error('Error loading AI provider settings:', error);
-            console.log('Using default settings due to load error');
             return this.getDefaultSettings();
         }
     }

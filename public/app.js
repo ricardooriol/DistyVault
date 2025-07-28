@@ -13,6 +13,7 @@ class SawronApp {
         this.setupEventListeners();
         this.loadKnowledgeBase();
         this.startAutoRefresh();
+        this.startChronometer();
     }
 
     setupEventListeners() {
@@ -236,16 +237,66 @@ class SawronApp {
     }
 
     startAutoRefresh() {
-        // Refresh knowledge base every 5 seconds to update status
+        // Refresh knowledge base every 2 seconds to update status
         this.refreshInterval = setInterval(() => {
             this.loadKnowledgeBase();
-        }, 5000);
+        }, 2000);
+    }
+
+    startChronometer() {
+        // Update chronometer every second for processing items
+        this.chronometerInterval = setInterval(() => {
+            this.updateProcessingTimes();
+        }, 1000);
+    }
+
+    updateProcessingTimes() {
+        // Update processing times for items that are currently processing
+        const rows = document.querySelectorAll('#knowledge-base-tbody tr[data-id]');
+        
+        rows.forEach((row) => {
+            const statusCell = row.querySelector('.status-cell');
+            const timeCell = row.querySelector('.time-cell');
+            
+            if (statusCell && timeCell) {
+                const statusText = statusCell.textContent.trim();
+                const isProcessing = ['Initializing', 'Extracting', 'Distilling'].includes(statusText);
+                
+                if (isProcessing) {
+                    // Find the corresponding item data
+                    const itemId = row.dataset.id;
+                    if (itemId && this.knowledgeBaseData) {
+                        const item = this.knowledgeBaseData.find(i => i.id === itemId);
+                        if (item && item.startTime) {
+                            const startTime = new Date(item.startTime);
+                            const currentTime = new Date();
+                            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                            
+                            let timeDisplay;
+                            if (elapsedSeconds < 60) {
+                                timeDisplay = `${elapsedSeconds}s`;
+                            } else {
+                                const minutes = Math.floor(elapsedSeconds / 60);
+                                const seconds = elapsedSeconds % 60;
+                                timeDisplay = `${minutes}m ${seconds}s`;
+                            }
+                            
+                            timeCell.textContent = timeDisplay;
+                        }
+                    }
+                }
+            }
+        });
     }
 
     stopAutoRefresh() {
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
             this.refreshInterval = null;
+        }
+        if (this.chronometerInterval) {
+            clearInterval(this.chronometerInterval);
+            this.chronometerInterval = null;
         }
     }
 
@@ -257,6 +308,7 @@ class SawronApp {
             }
 
             this.knowledgeBase = await response.json();
+            this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
             this.renderKnowledgeBase();
         } catch (error) {
             console.error('Error loading knowledge base:', error);
@@ -454,11 +506,26 @@ class SawronApp {
             </div>
         `;
 
-        // Format processing time
+        // Format processing time with live chronometer
         let processingTimeDisplay = '-';
         if (item.processingTime) {
+            // Completed items show final processing time
             processingTimeDisplay = `${item.processingTime.toFixed(1)}s`;
+        } else if (isProcessing && item.startTime) {
+            // Live chronometer for processing items
+            const startTime = new Date(item.startTime);
+            const currentTime = new Date();
+            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+            
+            if (elapsedSeconds < 60) {
+                processingTimeDisplay = `${elapsedSeconds}s`;
+            } else {
+                const minutes = Math.floor(elapsedSeconds / 60);
+                const seconds = elapsedSeconds % 60;
+                processingTimeDisplay = `${minutes}m ${seconds}s`;
+            }
         } else if (item.elapsedTime) {
+            // Fallback to stored elapsed time
             const minutes = Math.floor(item.elapsedTime / 60);
             const seconds = Math.floor(item.elapsedTime % 60);
             processingTimeDisplay = `${minutes}m ${seconds}s`;
@@ -557,10 +624,6 @@ class SawronApp {
                 const minutes = Math.floor(distillation.elapsedTime / 60);
                 const seconds = Math.floor(distillation.elapsedTime % 60);
                 metaHtml += `<strong>Processing Time:</strong> ${minutes}m ${seconds}s<br>`;
-            }
-
-            if (distillation.processingTime) {
-                metaHtml += `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>`;
             }
 
             if (distillation.wordCount) {
@@ -688,11 +751,6 @@ class SawronApp {
                     ` : distillation.elapsedTime ? `
                         <div class="log-entry log-info">
                             <span class="log-message"><strong>Processing Time:</strong> ${Math.floor(distillation.elapsedTime / 60)}m ${Math.floor(distillation.elapsedTime % 60)}s</span>
-                        </div>
-                    ` : ''}
-                    ${distillation.processingTime ? `
-                        <div class="log-entry log-info">
-                            <span class="log-message"><strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s</span>
                         </div>
                     ` : ''}
                     ${distillation.wordCount ? `
