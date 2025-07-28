@@ -2168,6 +2168,11 @@ rocessing Queue Configuration Styles */
 .action-dropdown-item.delete-item:hover {
     background: var(--error-bg);
     color: var(--error-color);
+}
+
+.action-dropdown-item.retry-item:hover {
+    background: var(--primary-orange);
+    color: white;
 }/* Enhan
 ced Logs Styling */
 .log-section {

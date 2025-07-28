@@ -601,6 +601,139 @@ class Processor {
     }
 
     /**
+     * Retry file processing for a failed distillation
+     * @param {string} originalId - The ID of the original failed distillation
+     * @param {Object} mockFile - Mock file object with metadata
+     * @param {string} rawContent - The raw content to process
+     * @returns {Promise<Distillation>} - The new distillation object
+     */
+    async retryFileProcessing(originalId, mockFile, rawContent) {
+        console.log(`Retrying file processing for distillation ${originalId}: ${mockFile.originalname}`);
+
+        // Create a new distillation record for the retry
+        const distillation = new Distillation({
+            title: `Retrying ${mockFile.originalname}...`,
+            sourceType: 'file',
+            sourceFile: {
+                name: mockFile.originalname,
+                type: mockFile.mimetype,
+                size: mockFile.size
+            },
+            status: 'initializing',
+            processingStep: 'Retrying file processing',
+            startTime: new Date()
+        });
+
+        // Add initial log
+        distillation.addLog(`🔄 Retrying processing of file: ${mockFile.originalname}`);
+        distillation.addLog(`📋 Retry Process ID: ${distillation.id}`);
+        distillation.addLog(`📋 Original Process ID: ${originalId}`);
+        distillation.addLog(`⏰ Retry started at: ${new Date().toISOString()}`);
+
+        // Save initial record to database
+        await database.saveDistillation(distillation);
+
+        // Start processing in background
+        this.processInBackground(distillation.id, async () => {
+            try {
+                const startTime = Date.now();
+
+                // Update status to distilling (skip extraction since we have raw content)
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'distilling',
+                    'Generating distillation with AI provider'
+                );
+
+                const distillationObj = await database.getDistillation(distillation.id);
+                distillationObj.addLog(`🔄 Using existing raw content from original processing`);
+                distillationObj.addLog(`📝 Content length: ${rawContent.length.toLocaleString()} characters`);
+                distillationObj.addLog(`🤖 Phase 2: AI Distillation (Retry)`);
+
+                // Store raw content
+                distillationObj.rawContent = rawContent;
+                distillationObj.title = mockFile.originalname;
+
+                // Get AI provider info for logging
+                const aiProvider = await this.getCurrentAIProvider();
+                distillationObj.addLog(`🧠 AI Provider: ${aiProvider.name}`);
+                distillationObj.addLog(`🎯 Model: ${aiProvider.model}`);
+                distillationObj.addLog(`🔗 Endpoint: ${aiProvider.endpoint || 'Default'}`);
+
+                await database.saveDistillation(distillationObj);
+
+                console.log(`[${distillation.id}] Starting distillation with AI provider (retry)`);
+
+                // Generate distillation
+                const distillationContent = await aiProvider.generateSummary(rawContent);
+
+                console.log(`[${distillation.id}] Distillation generated successfully (retry). Length: ${distillationContent.length} chars`);
+
+                // Calculate processing time and word count
+                const processingTime = (Date.now() - startTime) / 1000;
+                const wordCount = distillationContent.split(/\s+/).length;
+
+                console.log(`[${distillation.id}] Retry processing completed in ${processingTime.toFixed(2)}s. Word count: ${wordCount}`);
+
+                // Update distillation in database
+                await database.updateDistillationContent(
+                    distillation.id,
+                    distillationContent,
+                    rawContent,
+                    processingTime,
+                    wordCount
+                );
+
+                // Update title
+                await this.updateDistillationTitle(distillation.id, mockFile.originalname);
+
+                // Add completion logs
+                const completedDistillation = await database.getDistillation(distillation.id);
+                completedDistillation.addLog(`✅ Retry processing completed successfully`);
+                completedDistillation.addLog(`📊 Final statistics:`);
+                completedDistillation.addLog(`   • Original content: ${rawContent.length.toLocaleString()} chars`);
+                completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
+                completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
+                completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
+                completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / rawContent.length) * 100).toFixed(1)}%`);
+                completedDistillation.addLog(`🎯 Retry completed successfully`);
+                await database.saveDistillation(completedDistillation);
+
+                return { success: true };
+            } catch (error) {
+                console.error(`[${distillation.id}] Error in retry processing:`, error);
+
+                // Add detailed error logging
+                const errorDistillation = await database.getDistillation(distillation.id);
+                if (errorDistillation) {
+                    errorDistillation.addLog(`❌ Retry processing failed with error`, 'error');
+                    errorDistillation.addLog(`🔍 Error type: ${error.constructor.name}`, 'error');
+                    errorDistillation.addLog(`📝 Error message: ${error.message}`, 'error');
+                    errorDistillation.addLog(`📊 Processing time before error: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, 'error');
+
+                    if (error.stack) {
+                        const stackLines = error.stack.split('\n').slice(0, 3);
+                        errorDistillation.addLog(`🔧 Stack trace: ${stackLines.join(' → ')}`, 'error');
+                    }
+
+                    await database.saveDistillation(errorDistillation);
+                }
+
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'error',
+                    `Retry failed: ${error.message}`,
+                    error.message
+                );
+
+                return { success: false, error: error.message };
+            }
+        });
+
+        return distillation;
+    }
+
+    /**
      * Process a task in the background
      * @param {string} distillationId - The ID of the distillation to process
      * @param {Function} processFn - The function to execute

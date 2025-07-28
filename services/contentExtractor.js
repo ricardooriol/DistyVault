@@ -825,6 +825,10 @@ class ContentExtractor {
             return 'video'; // Embed format is always individual video
         }
 
+        if (url.includes('youtube.com/live/')) {
+            return 'video'; // Live stream is treated as a video
+        }
+
         // Check for channel URLs
         if (url.includes('youtube.com/channel/') || url.includes('youtube.com/c/') || url.includes('youtube.com/@')) {
             return 'channel';
@@ -899,6 +903,11 @@ class ContentExtractor {
                 {
                     regex: /(?:music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
                     name: 'music.youtube.com'
+                },
+                // YouTube Live format: https://www.youtube.com/live/VIDEO_ID
+                {
+                    regex: /(?:youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+                    name: 'youtube.com/live'
                 }
             ];
 

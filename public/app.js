@@ -556,6 +556,11 @@ class SawronApp {
                             ⏹️ Stop Processing
                         </button>
                     ` : ''}
+                    ${isError ? `
+                        <button class="action-dropdown-item retry-item" onclick="app.retryDistillation('${item.id}')">
+                            🔄 Retry
+                        </button>
+                    ` : ''}
                     ${(isCompleted || isError) && item.rawContent ? `
                         <button class="action-dropdown-item" onclick="app.showRawContent('${item.id}')">
                             🔍 View Raw Content
@@ -644,40 +649,43 @@ class SawronApp {
 
     toggleActionDropdown(event, id) {
         event.stopPropagation();
-
+    
         // Close all other dropdowns
         document.querySelectorAll('.action-dropdown').forEach(dropdown => {
             if (dropdown !== event.currentTarget) {
                 dropdown.classList.remove('show');
             }
         });
-
+    
         // Toggle current dropdown
         const dropdown = event.currentTarget;
-        dropdown.classList.toggle('show');
-        
+        const isOpen = dropdown.classList.toggle('show');
+    
         // Debug: Log dropdown state
-        console.log('Dropdown toggled:', dropdown.classList.contains('show'));
+        console.log('Dropdown toggled:', isOpen);
         const dropdownContent = dropdown.querySelector('.action-dropdown-content');
         if (dropdownContent) {
             console.log('Dropdown content found:', dropdownContent);
             console.log('Dropdown content display:', window.getComputedStyle(dropdownContent).display);
         }
-
-        // Close dropdown when clicking outside
-        const closeDropdown = (e) => {
-            if (!dropdown.contains(e.target)) {
+    
+        // If the dropdown is opened, add a click event listener to the document
+        if (isOpen) {
+            document.addEventListener('click', closeDropdown);
+        } else {
+            document.removeEventListener('click', closeDropdown);
+        }
+    
+        // Function to close the dropdown when clicking outside
+        function closeDropdown(event) {
+            const dropdowns = document.querySelectorAll('.action-dropdown');
+            dropdowns.forEach(dropdown => {
                 dropdown.classList.remove('show');
-                document.removeEventListener('click', closeDropdown);
-            }
-        };
-
-        if (dropdown.classList.contains('show')) {
-            setTimeout(() => {
-                document.addEventListener('click', closeDropdown);
-            }, 0);
+            });
+            document.removeEventListener('click', closeDropdown); // Remove listener after closing
         }
     }
+    
 
     async showRawContent(id) {
         try {
@@ -899,6 +907,41 @@ class SawronApp {
 
         } catch (error) {
             console.error('Error stopping processing:', error);
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async retryDistillation(id) {
+        try {
+            console.log(`Retrying distillation ${id}`);
+            const url = `/api/summaries/${id}/retry`;
+            console.log(`Making POST request to: ${url}`);
+            
+            const response = await fetch(url, {
+                method: 'POST'
+            });
+            
+            console.log(`Response status: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+                let errorMessage = 'Failed to retry distillation';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.message || errorMessage;
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            console.log(`Distillation ${id} retry initiated successfully`);
+            
+            // Refresh the knowledge base to show updated status
+            this.loadKnowledgeBase();
+
+        } catch (error) {
+            console.error('Error retrying distillation:', error);
             alert('Error: ' + error.message);
         }
     }

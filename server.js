@@ -181,6 +181,88 @@ app.post('/api/summaries/:id/stop', async (req, res) => {
     }
 });
 
+// Retry a failed distillation
+app.post('/api/summaries/:id/retry', async (req, res) => {
+    console.log(`Retry endpoint hit for distillation ID: ${req.params.id}`);
+    try {
+        console.log('Attempting to get distillation from database...');
+        const distillation = await database.getDistillation(req.params.id);
+        console.log('Distillation retrieved:', distillation ? 'Found' : 'Not found');
+        
+        if (!distillation) {
+            console.log('Distillation not found, returning 404');
+            return res.status(404).json({
+                status: 'error',
+                message: 'Distillation not found'
+            });
+        }
+        
+        console.log(`Distillation status: ${distillation.status}`);
+        console.log('Distillation sourceUrl:', distillation.sourceUrl);
+        console.log('Distillation sourceFile:', distillation.sourceFile);
+        console.log('Distillation sourceType:', distillation.sourceType);
+
+        // Check if the distillation is in an error state
+        if (distillation.status !== 'error') {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Can only retry distillations that have failed'
+            });
+        }
+
+        // Retry the distillation based on its source type
+        let retryResult;
+        
+        if ((distillation.sourceType === 'url' || distillation.sourceType === 'youtube' || distillation.sourceType === 'channel') && distillation.sourceUrl) {
+            // Retry URL processing
+            console.log('Retrying URL processing for:', distillation.sourceUrl);
+            retryResult = await processor.processUrl(distillation.sourceUrl);
+        } else if (distillation.sourceType === 'file' && distillation.sourceFile) {
+            // For file retries, we need to check if we still have the raw content
+            if (!distillation.rawContent) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Cannot retry file processing - original file content not available'
+                });
+            }
+            
+            console.log('Retrying file processing for:', distillation.sourceFile.name);
+            
+            // Create a mock file object from the stored data
+            const mockFile = {
+                originalname: distillation.sourceFile.name,
+                mimetype: distillation.sourceFile.type,
+                size: distillation.sourceFile.size,
+                path: null // We'll use rawContent instead
+            };
+            
+            retryResult = await processor.retryFileProcessing(req.params.id, mockFile, distillation.rawContent);
+        } else {
+            console.log('Cannot determine retry method. sourceType:', distillation.sourceType, 'sourceUrl:', !!distillation.sourceUrl, 'sourceFile:', !!distillation.sourceFile, 'rawContent:', !!distillation.rawContent);
+            return res.status(400).json({
+                status: 'error',
+                message: 'Cannot determine how to retry this distillation'
+            });
+        }
+
+        // Delete the old failed distillation
+        await database.deleteDistillation(req.params.id);
+
+        res.json({ 
+            status: 'ok',
+            message: 'Distillation retry initiated successfully',
+            newId: retryResult.id
+        });
+
+    } catch (error) {
+        console.error('Error retrying distillation:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+});
+
 // Download distillation as PDF
 app.get('/api/summaries/:id/pdf', async (req, res) => {
     try {

@@ -23,9 +23,9 @@ class AIProvider {
     }
 
     /**
-     * Post-process the AI-generated distillation to fix common issues
+     * Post-process the AI-generated distillation to fix common issues - BULLETPROOF VERSION
      * @param {string} rawDistillation - The raw distillation from the AI provider
-     * @returns {string} - The processed distillation with fixes applied
+     * @returns {string} - The processed distillation with perfect numbering format
      */
     postProcessDistillation(rawDistillation) {
         if (!rawDistillation || typeof rawDistillation !== 'string') {
@@ -33,51 +33,50 @@ class AIProvider {
         }
 
         try {
-            // Apply numbering fixes (multiple passes for bulletproof processing)
-            let processedDistillation = rawDistillation;
-            let passCount = 0;
-            const maxPasses = 3;
+            console.log(`[${this.name}] Starting bulletproof numbering processing...`);
             
-            while (passCount < maxPasses) {
-                const beforeFix = processedDistillation;
-                processedDistillation = NumberingProcessor.fixNumbering(processedDistillation);
-                
-                // If no changes were made, we're done
-                if (processedDistillation === beforeFix) {
-                    break;
-                }
-                
-                passCount++;
+            // Step 1: Apply the bulletproof numbering processor
+            let processedDistillation = NumberingProcessor.fixNumbering(rawDistillation);
+            
+            // Step 2: Validate the result
+            const isProperlyFormatted = NumberingProcessor.isProperlyFormatted(processedDistillation);
+            
+            if (!isProperlyFormatted) {
+                console.warn(`[${this.name}] First pass failed, applying force format...`);
+                // Nuclear option: force perfect format
+                processedDistillation = NumberingProcessor.forceFormat(rawDistillation);
             }
             
-            // Final validation - ensure we have proper numbering
+            // Step 3: Final validation
+            const finalValidation = NumberingProcessor.isProperlyFormatted(processedDistillation);
+            
+            if (!finalValidation) {
+                console.error(`[${this.name}] CRITICAL: Numbering processor failed completely, using emergency format`);
+                // Absolute last resort
+                processedDistillation = `1. ${rawDistillation.trim()}`;
+            }
+            
+            // Step 4: Log the results
+            const originalStats = NumberingProcessor.getNumberingStats(rawDistillation);
             const finalStats = NumberingProcessor.getNumberingStats(processedDistillation);
-            if (finalStats.hasNumbering && finalStats.hasIssues) {
-                console.warn(`[${this.name}] Numbering issues persist after ${passCount} passes:`, {
-                    totalPoints: finalStats.totalPoints,
-                    issueTypes: finalStats.issueTypes,
-                    numbers: finalStats.numbers
-                });
-                
-                // Last resort: force sequential numbering
-                processedDistillation = this.forceSequentialNumbering(processedDistillation);
-            }
             
-            // Log if numbering issues were detected and fixed
             if (processedDistillation !== rawDistillation) {
-                const originalStats = NumberingProcessor.getNumberingStats(rawDistillation);
-                console.log(`[${this.name}] Fixed numbering issues in ${passCount} passes:`, {
+                console.log(`[${this.name}] Numbering processing completed:`, {
+                    originalHadNumbering: originalStats.hasNumbering,
                     originalPoints: originalStats.totalPoints,
-                    originalNumbers: originalStats.numbers,
+                    originalSequential: originalStats.isSequential,
                     finalPoints: finalStats.totalPoints,
-                    issuesFixed: originalStats.issueTypes
+                    finalSequential: finalStats.isSequential,
+                    processingSuccess: finalValidation
                 });
             }
             
             return processedDistillation;
+            
         } catch (error) {
-            console.warn(`[${this.name}] Error in post-processing distillation:`, error.message);
-            return rawDistillation; // Return original if processing fails
+            console.error(`[${this.name}] CRITICAL ERROR in numbering processor:`, error.message);
+            // Emergency fallback
+            return `1. ${rawDistillation.trim()}`;
         }
     }
 
@@ -208,38 +207,7 @@ class AIProvider {
         return this.formatPrompt(text);
     }
 
-    /**
-     * Force sequential numbering as a last resort
-     * @param {string} text - The text to fix
-     * @returns {string} - Text with forced sequential numbering
-     */
-    forceSequentialNumbering(text) {
-        try {
-            // Split text into lines and identify potential numbered points
-            const lines = text.split('\n');
-            const processedLines = [];
-            let currentNumber = 1;
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Check if this line starts with a number pattern
-                if (/^\s*\d+[\.\)\:\-]/.test(line)) {
-                    // Replace with sequential number
-                    const cleanedLine = line.replace(/^\s*\d+[\.\)\:\-]\s*/, `${currentNumber}. `);
-                    processedLines.push(cleanedLine);
-                    currentNumber++;
-                } else {
-                    processedLines.push(line);
-                }
-            }
-            
-            return processedLines.join('\n');
-        } catch (error) {
-            console.warn('Error in forceSequentialNumbering:', error.message);
-            return text;
-        }
-    }
+
 
     /**
      * Format the prompt for knowledge distillation
@@ -271,25 +239,35 @@ Directness: Your response MUST begin directly with the first key insight (Point 
 
 4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)
 
-Your entire response MUST be a numbered list starting with "1." and continuing sequentially (1., 2., 3., etc.). Each item in the list MUST adhere to the following two-part structure without exception:
+Your entire response MUST follow this EXACT format with NO EXCEPTIONS:
 
-1. Core Idea Sentence
-Begin with a single, bolded sentence that captures one complete, fundamental idea. This sentence must stand on its own as a key takeaway.
-Then, in one or two subsequent paragraphs, elaborate on this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context. Use analogies or simple examples where they can aid understanding. Explain not just what the idea is, but why it matters and how it works based on your synthesis of the text and your research.
+1. First sentence of the key insight goes here immediately after the number and period
+This is where you elaborate on the first sentence. You can have multiple paragraphs here to explain the concept fully. The key is that the first sentence comes RIGHT AFTER the number, and then elaboration follows on the next line.
 
-2. Next Core Idea Sentence
-This follows the exact same pattern. A single, bolded, impactful sentence distilling the next fundamental concept.
-Follow up with one or two paragraphs of in-depth explanation. Connect this idea to previous points if it helps build a cohesive mental model.
+2. Second key insight sentence goes here immediately after the number and period
+Again, elaboration follows on the next line. This creates a clean, consistent format where each numbered point starts with the main idea sentence, then provides detailed explanation.
 
-3. Continue Sequential Numbering
-Continue this exact pattern (3., 4., 5., etc.) for as many points as are necessary to cover all essential knowledge. NEVER repeat numbers or skip numbers in the sequence.
+3. Continue this exact pattern for all subsequent points
+Each point follows the same structure: number, period, space, then the main sentence, then a line break, then elaboration.
 
-CRITICAL NUMBERING RULES:
-- Start with "1." (not "1)", "(1)", "1:", or "1 -")
-- Use sequential numbering: 1., 2., 3., 4., etc.
-- Never repeat a number (no multiple "1." entries)
-- Never skip numbers in the sequence
-- Each numbered point must be substantial (at least 50 words)
+CRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):
+- Format: "1. Main sentence here\nElaboration here\n\n2. Next main sentence here\nElaboration here"
+- Start with "1." (period and space, nothing else)
+- Continue sequentially: 1., 2., 3., 4., etc.
+- NEVER use: 1), (1), 1:, 1-, or any other format
+- NEVER repeat numbers (no multiple "1." entries)
+- NEVER skip numbers in sequence
+- Main sentence comes IMMEDIATELY after "1. " on the same line
+- Elaboration starts on the next line
+- Double line break between numbered points
+- Each point must be substantial (minimum 50 words total)
+
+EXAMPLE OF PERFECT FORMAT:
+1. VMware's licensing changes are driving enterprise migration decisions
+Following Broadcom's acquisition, VMware shifted from perpetual licenses to subscription models. This fundamental change in pricing structure has prompted many organizations to evaluate alternatives, as the new model significantly increases long-term costs for existing deployments.
+
+2. Container orchestration platforms offer compelling migration paths
+Kubernetes and similar technologies provide infrastructure abstraction that reduces vendor lock-in. Organizations can maintain application portability while gaining access to cloud-native features that weren't available in traditional virtualization platforms.
 
 Here is the text to distill:
 
