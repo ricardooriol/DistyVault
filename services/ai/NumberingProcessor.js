@@ -383,11 +383,25 @@ class NumberingProcessor {
             content = content.replace(/^\(\d+\)\s*/, '');
 
             // Split content into first sentence and rest
-            const sentences = content.match(/^([^.!?]*[.!?])\s*(.*)/s);
+            const lines = content.split('\n');
+            const firstLine = lines[0].trim();
 
-            if (sentences && sentences[1] && sentences[2]) {
-                const firstSentence = sentences[1].trim();
-                const restOfContent = sentences[2].trim();
+            // Try to find a sentence ending in the first line
+            const sentenceMatch = firstLine.match(/^([^.!?]*[.!?])/);
+
+            if (sentenceMatch) {
+                // First line has a sentence ending, use that as the bold part
+                const firstSentence = sentenceMatch[1].trim();
+                const remainingFirstLine = firstLine.substring(sentenceMatch[0].length).trim();
+                const restOfLines = lines.slice(1).join('\n').trim();
+
+                let restOfContent = '';
+                if (remainingFirstLine.length > 0) {
+                    restOfContent = remainingFirstLine;
+                }
+                if (restOfLines.length > 0) {
+                    restOfContent = restOfContent.length > 0 ? restOfContent + '\n' + restOfLines : restOfLines;
+                }
 
                 if (restOfContent.length > 0) {
                     return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
@@ -395,8 +409,18 @@ class NumberingProcessor {
                     return `<strong>${number}. ${firstSentence}</strong>`;
                 }
             } else {
-                // No clear sentence structure, use as is
-                return `<strong>${number}. ${content}</strong>`;
+                // No sentence ending in first line, use entire first line as bold
+                if (lines.length > 1) {
+                    const restOfLines = lines.slice(1).join('\n').trim();
+                    if (restOfLines.length > 0) {
+                        return `<strong>${number}. ${firstLine}</strong>\n${restOfLines}`;
+                    } else {
+                        return `<strong>${number}. ${firstLine}</strong>`;
+                    }
+                } else {
+                    // Single line, make it all bold
+                    return `<strong>${number}. ${content}</strong>`;
+                }
             }
         });
 
@@ -564,11 +588,25 @@ class NumberingProcessor {
             const number = index + 1;
 
             // Split into first sentence and rest for proper formatting
-            const sentences = section.match(/^([^.!?]*[.!?])\s*(.*)/s);
+            const lines = section.split('\n');
+            const firstLine = lines[0].trim();
 
-            if (sentences && sentences[1] && sentences[2]) {
-                const firstSentence = sentences[1].trim();
-                const restOfContent = sentences[2].trim();
+            // Try to find a sentence ending in the first line
+            const sentenceMatch = firstLine.match(/^([^.!?]*[.!?])/);
+
+            if (sentenceMatch) {
+                // First line has a sentence ending, use that as the bold part
+                const firstSentence = sentenceMatch[1].trim();
+                const remainingFirstLine = firstLine.substring(sentenceMatch[0].length).trim();
+                const restOfLines = lines.slice(1).join('\n').trim();
+
+                let restOfContent = '';
+                if (remainingFirstLine.length > 0) {
+                    restOfContent = remainingFirstLine;
+                }
+                if (restOfLines.length > 0) {
+                    restOfContent = restOfContent.length > 0 ? restOfContent + '\n' + restOfLines : restOfLines;
+                }
 
                 if (restOfContent.length > 0) {
                     return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
@@ -576,7 +614,18 @@ class NumberingProcessor {
                     return `<strong>${number}. ${firstSentence}</strong>`;
                 }
             } else {
-                return `<strong>${number}. ${section}</strong>`;
+                // No sentence ending in first line, use entire first line as bold
+                if (lines.length > 1) {
+                    const restOfLines = lines.slice(1).join('\n').trim();
+                    if (restOfLines.length > 0) {
+                        return `<strong>${number}. ${firstLine}</strong>\n${restOfLines}`;
+                    } else {
+                        return `<strong>${number}. ${firstLine}</strong>`;
+                    }
+                } else {
+                    // Single line, make it all bold
+                    return `<strong>${number}. ${section}</strong>`;
+                }
             }
         }).join('\n\n');
 

@@ -341,6 +341,10 @@ class SawronApp {
     renderFilteredKnowledgeBase(items) {
         const tbody = document.getElementById('knowledge-base-tbody');
 
+        // Preserve dropdown state before re-rendering
+        const openDropdown = document.querySelector('.action-dropdown.show');
+        const openDropdownId = openDropdown ? openDropdown.closest('tr')?.dataset.id : null;
+
         if (!items || items.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -363,6 +367,16 @@ class SawronApp {
 
         // Restore checkbox states after rendering
         this.restoreCheckboxStates();
+        
+        // Restore dropdown state after rendering
+        if (openDropdownId) {
+            const restoredDropdown = document.querySelector(`tr[data-id="${openDropdownId}"] .action-dropdown`);
+            if (restoredDropdown) {
+                restoredDropdown.classList.add('show');
+                // Re-add event listeners for the restored dropdown
+                this.addDropdownEventListeners();
+            }
+        }
     }
 
     restoreCheckboxStates() {
@@ -542,34 +556,34 @@ class SawronApp {
                     Action
                     <span style="font-size: 0.7rem;">▼</span>
                 </button>
-                <div class="action-dropdown-content" id="dropdown-${item.id}">
+                <div class="action-dropdown-content" id="dropdown-${item.id}" onclick="event.stopPropagation()">
                     ${isCompleted ? `
-                        <button class="action-dropdown-item" onclick="app.showDistillationModal('${item.id}')">
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showDistillationModal('${item.id}'); app.closeAllDropdowns();">
                             📄 View Distillation
                         </button>
-                        <button class="action-dropdown-item" onclick="app.downloadDistillation('${item.id}')">
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.downloadDistillation('${item.id}'); app.closeAllDropdowns();">
                             📥 Download
                         </button>
                     ` : ''}
                     ${isProcessing ? `
-                        <button class="action-dropdown-item" onclick="app.stopProcessing('${item.id}')">
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.stopProcessing('${item.id}'); app.closeAllDropdowns();">
                             ⏹️ Stop Processing
                         </button>
                     ` : ''}
                     ${isError ? `
-                        <button class="action-dropdown-item retry-item" onclick="app.retryDistillation('${item.id}')">
+                        <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
                             🔄 Retry
                         </button>
                     ` : ''}
                     ${(isCompleted || isError) && item.rawContent ? `
-                        <button class="action-dropdown-item" onclick="app.showRawContent('${item.id}')">
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showRawContent('${item.id}'); app.closeAllDropdowns();">
                             🔍 View Raw Content
                         </button>
                     ` : ''}
-                    <button class="action-dropdown-item" onclick="app.showLogs('${item.id}')">
+                    <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showLogs('${item.id}'); app.closeAllDropdowns();">
                         📋 Processing Logs
                     </button>
-                    <button class="action-dropdown-item delete-item" onclick="app.deleteDistillation('${item.id}')">
+                    <button class="action-dropdown-item delete-item" onclick="event.stopPropagation(); app.deleteDistillation('${item.id}'); app.closeAllDropdowns();">
                         🗑️ Delete
                     </button>
                 </div>
@@ -661,16 +675,60 @@ class SawronApp {
         const dropdown = event.currentTarget;
         const isOpen = dropdown.classList.toggle('show');
     
-        // Debug: Log dropdown state
-        console.log('Dropdown toggled:', isOpen);
-        const dropdownContent = dropdown.querySelector('.action-dropdown-content');
-        if (dropdownContent) {
-            console.log('Dropdown content found:', dropdownContent);
-            console.log('Dropdown content display:', window.getComputedStyle(dropdownContent).display);
+        if (isOpen) {
+            // Add event listeners when dropdown opens
+            this.addDropdownEventListeners();
+        } else {
+            // Remove event listeners when dropdown closes
+            this.removeDropdownEventListeners();
         }
-    
-        // Dropdown will stay open until manually toggled
-        // No auto-close behavior - user must click the action button again to close
+    }
+
+    addDropdownEventListeners() {
+        // Remove existing listeners first to prevent duplicates
+        this.removeDropdownEventListeners();
+        
+        // Add document click listener for outside clicks
+        this.documentClickHandler = (event) => {
+            const openDropdown = document.querySelector('.action-dropdown.show');
+            if (openDropdown && !openDropdown.contains(event.target)) {
+                openDropdown.classList.remove('show');
+                this.removeDropdownEventListeners();
+            }
+        };
+        
+        // Add keyboard listener for Escape key
+        this.keyboardHandler = (event) => {
+            if (event.key === 'Escape') {
+                const openDropdown = document.querySelector('.action-dropdown.show');
+                if (openDropdown) {
+                    openDropdown.classList.remove('show');
+                    this.removeDropdownEventListeners();
+                }
+            }
+        };
+        
+        // Add listeners immediately
+        document.addEventListener('click', this.documentClickHandler);
+        document.addEventListener('keydown', this.keyboardHandler);
+    }
+
+    removeDropdownEventListeners() {
+        if (this.documentClickHandler) {
+            document.removeEventListener('click', this.documentClickHandler);
+            this.documentClickHandler = null;
+        }
+        if (this.keyboardHandler) {
+            document.removeEventListener('keydown', this.keyboardHandler);
+            this.keyboardHandler = null;
+        }
+    }
+
+    closeAllDropdowns() {
+        document.querySelectorAll('.action-dropdown.show').forEach(dropdown => {
+            dropdown.classList.remove('show');
+        });
+        this.removeDropdownEventListeners();
     }
     
 
@@ -977,7 +1035,44 @@ class SawronApp {
     formatContent(content) {
         if (!content) return '';
 
-        // Convert markdown to HTML
+        // If content already contains HTML tags (like <strong>), preserve them but enhance numbered lists
+        if (content.includes('<strong>') || content.includes('<')) {
+            // Content already has HTML formatting, process it to enhance numbered lists
+            let processedContent = content
+                .split('\n\n')
+                .map(paragraph => {
+                    if (paragraph.trim()) {
+                        // Check if this paragraph contains numbered list patterns that need bold formatting
+                        const lines = paragraph.split('\n');
+                        const processedLines = lines.map(line => {
+                            const trimmedLine = line.trim();
+                            // Handle nested numbering patterns like "1. 1. Text"
+                            const nestedNumberMatch = trimmedLine.match(/^(\d+\.\s*)+(.+)$/);
+                            if (nestedNumberMatch && !trimmedLine.includes('<strong>')) {
+                                // Apply bold formatting to the entire line if not already present
+                                return `<strong>${trimmedLine}</strong>`;
+                            }
+                            return line;
+                        });
+                        
+                        const processedParagraph = processedLines.join('\n');
+                        
+                        // If paragraph already has HTML tags, don't wrap in <p>
+                        if (processedParagraph.includes('<')) {
+                            return processedParagraph.replace(/\n/g, '<br>');
+                        } else {
+                            return `<p>${processedParagraph.replace(/\n/g, '<br>')}</p>`;
+                        }
+                    }
+                    return '';
+                })
+                .filter(p => p)
+                .join('');
+                
+            return processedContent;
+        }
+
+        // Convert markdown to HTML for content without HTML tags
         return this.markdownToHtml(content);
     }
 
@@ -1055,8 +1150,8 @@ class SawronApp {
                 continue;
             }
 
-            // SIMPLE NUMBERED LIST SOLUTION - Just increment counter for ANY numbered item
-            const orderedMatch = trimmedLine.match(/^\d+\. (.+)$/);
+            // Enhanced numbered list processing - handles nested numbering like "1. 1. Text"
+            const orderedMatch = trimmedLine.match(/^(\d+\.\s*)+(.+)$/);
             if (orderedMatch) {
                 if (currentParagraph.length > 0) {
                     result.push(`<p>${currentParagraph.join('<br>')}</p>`);
@@ -1072,8 +1167,15 @@ class SawronApp {
                 }
 
                 numberedItemCounter++;
-                const content = this.processInlineMarkdown(orderedMatch[1]);
-                const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
+                // Extract the original numbering and content
+                const originalNumbering = orderedMatch[1].trim(); // e.g., "1. 1."
+                const textContent = orderedMatch[2]; // The actual content
+                
+                // Process the content for inline markdown (including bold)
+                const processedContent = this.processInlineMarkdown(textContent);
+                
+                // Create list item with bold formatting for the entire line
+                const listItem = `<li><strong><span class="list-number">${numberedItemCounter}.</span> ${processedContent}</strong></li>`;
                 result.push(listItem);
                 continue;
             }
@@ -2008,14 +2110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load initial settings
     const settings = await aiSettingsManager.loadSettings();
 
-    // Add global click handler to close dropdowns
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.action-dropdown')) {
-            document.querySelectorAll('.action-dropdown.show').forEach(dropdown => {
-                dropdown.classList.remove('show');
-            });
-        }
-    });
+    // Dropdown auto-close behavior removed - dropdowns stay open until manually toggled
     aiSettingsManager.settings = settings;
 
 });// Processing Queue Configuration Functions

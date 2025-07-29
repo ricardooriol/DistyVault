@@ -881,8 +881,8 @@ class Processor {
             minute: '2-digit'
         }).format(distillation.createdAt);
 
-        // Convert markdown to HTML
-        const contentHtml = this.markdownToHtml(distillation.content || '');
+        // Convert markdown to HTML with enhanced formatting
+        const contentHtml = this.formatContent(distillation.content || '');
 
         return `
         <!DOCTYPE html>
@@ -974,6 +974,7 @@ class Processor {
                     margin-bottom: 8px;
                     position: relative;
                     list-style: none;
+                    font-weight: bold;
                 }
                 
                 .content ol.manual-numbered li .list-number {
@@ -982,6 +983,10 @@ class Processor {
                     margin-right: 8px;
                     display: inline-block;
                     min-width: 20px;
+                }
+                
+                .content ol.manual-numbered li strong {
+                    font-weight: bold;
                 }
                 
                 /* Fallback for regular ol elements */
@@ -1009,7 +1014,14 @@ class Processor {
                 
                 .content strong {
                     color: #333;
-                    font-weight: 600;
+                    font-weight: bold;
+                    font-weight: 700;
+                }
+                
+                .content b {
+                    color: #333;
+                    font-weight: bold;
+                    font-weight: 700;
                 }
                 
                 .content em {
@@ -1098,6 +1110,55 @@ class Processor {
     }
 
     /**
+     * Format content with enhanced processing for numbered lists
+     * @param {string} content - Content to format
+     * @returns {string} - Formatted HTML content
+     */
+    formatContent(content) {
+        if (!content) return '';
+
+        // If content already contains HTML tags (like <strong>), preserve them but enhance numbered lists
+        if (content.includes('<strong>') || content.includes('<')) {
+            // Content already has HTML formatting, process it to enhance numbered lists
+            let processedContent = content
+                .split('\n\n')
+                .map(paragraph => {
+                    if (paragraph.trim()) {
+                        // Check if this paragraph contains numbered list patterns that need bold formatting
+                        const lines = paragraph.split('\n');
+                        const processedLines = lines.map(line => {
+                            const trimmedLine = line.trim();
+                            // Handle nested numbering patterns like "1. 1. Text"
+                            const nestedNumberMatch = trimmedLine.match(/^(\d+\.\s*)+(.+)$/);
+                            if (nestedNumberMatch && !trimmedLine.includes('<strong>')) {
+                                // Apply bold formatting to the entire line if not already present
+                                return `<strong>${trimmedLine}</strong>`;
+                            }
+                            return line;
+                        });
+
+                        const processedParagraph = processedLines.join('\n');
+
+                        // If paragraph already has HTML tags, don't wrap in <p>
+                        if (processedParagraph.includes('<')) {
+                            return processedParagraph.replace(/\n/g, '<br>');
+                        } else {
+                            return `<p>${processedParagraph.replace(/\n/g, '<br>')}</p>`;
+                        }
+                    }
+                    return '';
+                })
+                .filter(p => p)
+                .join('');
+
+            return processedContent;
+        }
+
+        // Convert markdown to HTML for content without HTML tags
+        return this.markdownToHtml(content);
+    }
+
+    /**
      * Convert markdown to HTML for PDF generation
      * @param {string} markdown - Markdown content
      * @returns {string} - HTML content
@@ -1176,8 +1237,8 @@ class Processor {
                 continue;
             }
 
-            // SIMPLE NUMBERED LIST SOLUTION - Just increment counter for ANY numbered item
-            const orderedMatch = trimmedLine.match(/^\d+\. (.+)$/);
+            // Enhanced numbered list processing - handles nested numbering like "1. 1. Text"
+            const orderedMatch = trimmedLine.match(/^(\d+\.\s*)+(.+)$/);
             if (orderedMatch) {
                 if (currentParagraph.length > 0) {
                     result.push(`<p>${currentParagraph.join('<br>')}</p>`);
@@ -1193,8 +1254,15 @@ class Processor {
                 }
 
                 numberedItemCounter++;
-                const content = this.processInlineMarkdown(orderedMatch[1]);
-                const listItem = `<li><span class="list-number">${numberedItemCounter}.</span> ${content}</li>`;
+                // Extract the original numbering and content
+                const originalNumbering = orderedMatch[1].trim(); // e.g., "1. 1."
+                const textContent = orderedMatch[2]; // The actual content
+
+                // Process the content for inline markdown (including bold)
+                const processedContent = this.processInlineMarkdown(textContent);
+
+                // Create list item with bold formatting for the entire line
+                const listItem = `<li><strong><span class="list-number">${numberedItemCounter}.</span> ${processedContent}</strong></li>`;
                 result.push(listItem);
                 continue;
             }

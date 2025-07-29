@@ -683,6 +683,102 @@ body {
     outline: none;
 }
 
+/* Action Dropdown Styles */
+.action-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.action-dropdown-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    min-height: 32px;
+}
+
+.action-dropdown-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--text-primary);
+}
+
+.action-dropdown-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.action-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    min-width: 200px;
+    max-width: 280px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.action-dropdown.show .action-dropdown-content {
+    display: block;
+}
+
+.action-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.3;
+}
+
+.action-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.action-dropdown-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.action-dropdown-item:focus {
+    outline: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.action-dropdown-item.delete-item:hover {
+    background: var(--status-error);
+    color: white;
+}
+
+.action-dropdown-item.retry-item:hover {
+    background: var(--primary-orange);
+    color: white;
+}
+
 /* Bulk Actions Bar */
 .bulk-actions-bar {
     display: flex;
@@ -1139,8 +1235,16 @@ ol.manual-numbered li .list-number,
 }
 
 .distillation-content strong {
-    font-weight: bold;
-    /* Ensure bold rendering across all browsers */
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    /* Bulletproof bold rendering across all browsers */
+}
+
+/* Additional bulletproof bold styling */
+.distillation-content b,
+.distillation-content strong {
+    font-weight: bold !important;
+    font-weight: 700 !important;
 }
 
 /* Raw content and logs */
@@ -2280,4 +2384,122 @@ ced Logs Styling */
         right: 5px;
         min-width: 180px;
     }
+}
+/* Enh
+anced Bold Formatting Rules - Bulletproof Implementation */
+
+/* List number styling with strong bold formatting */
+.list-number {
+    color: #ff6b35 !important;
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: rgba(255, 107, 53, 0.2) !important;
+    border: 1px solid #ff6b35 !important;
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+}
+
+/* Modal content bold formatting */
+.modal-body strong,
+.modal-body b {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Distillation content bold formatting */
+.distillation-content strong,
+.distillation-content b {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Manual numbered lists bold formatting */
+.modal-body ol.manual-numbered li,
+ol.manual-numbered li {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-body ol.manual-numbered li strong,
+ol.manual-numbered li strong,
+.modal-body ol.manual-numbered li .list-number,
+ol.manual-numbered li .list-number {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+    color: #ff6b35 !important;
+}
+
+/* Cross-browser bold compatibility */
+.modal-body ol.manual-numbered,
+ol.manual-numbered,
+.distillation-content ol.manual-numbered {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+}
+
+.modal-body ol.manual-numbered *,
+ol.manual-numbered *,
+.distillation-content ol.manual-numbered * {
+    font-weight: inherit !important;
+}
+
+/* Ensure numbered list items are always bold */
+.modal-body ol li,
+.distillation-content ol li {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+}
+
+/* Webkit/Blink specific bold rendering */
+@supports (-webkit-appearance: none) {
+    .modal-body strong,
+    .distillation-content strong,
+    .list-number,
+    ol.manual-numbered li {
+        -webkit-font-smoothing: antialiased;
+        font-weight: 700 !important;
+    }
+}
+
+/* Firefox specific bold rendering */
+@-moz-document url-prefix() {
+    .modal-body strong,
+    .distillation-content strong,
+    .list-number,
+    ol.manual-numbered li {
+        font-weight: 700 !important;
+    }
+}
+
+/* Edge/IE specific bold rendering */
+@supports (-ms-ime-align: auto) {
+    .modal-body strong,
+    .distillation-content strong,
+    .list-number,
+    ol.manual-numbered li {
+        font-weight: 700 !important;
+    }
+}
+
+/* Ultimate fallback for any missed elements */
+.modal-body [class*="list-number"],
+.distillation-content [class*="list-number"],
+.modal-body [class*="manual-numbered"] li,
+.distillation-content [class*="manual-numbered"] li {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+}
+
+/* Additional bold formatting for nested patterns - handled by JavaScript */
+.modal-body .nested-numbered,
+.distillation-content .nested-numbered {
+    font-weight: bold !important;
+    font-weight: 700 !important;
 }
