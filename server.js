@@ -202,13 +202,8 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
         console.log('Distillation sourceFile:', distillation.sourceFile);
         console.log('Distillation sourceType:', distillation.sourceType);
 
-        // Check if the distillation is in an error state
-        if (distillation.status !== 'error') {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Can only retry distillations that have failed'
-            });
-        }
+        // Allow retrying any distillation (successful or failed)
+        console.log(`Retrying distillation with status: ${distillation.status}`);
 
         // Retry the distillation based on its source type
         let retryResult;
@@ -371,6 +366,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         
         let successCount = 0;
         let errorCount = 0;
+        const usedFilenames = new Set(); // Track used filenames to avoid duplicates
         
         // Process each ID sequentially to avoid overwhelming the system
         for (const id of ids) {
@@ -422,12 +418,20 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                     continue;
                 }
                 
-                const finalFilename = filename || `distillation-${id}.pdf`;
+                let finalFilename = filename || `distillation-${id}.pdf`;
+                
+                // Handle duplicate filenames by adding (1), (2), etc.
+                let counter = 1;
+                let uniqueFilename = finalFilename;
+                while (usedFilenames.has(uniqueFilename)) {
+                    const nameWithoutExt = finalFilename.replace('.pdf', '');
+                    uniqueFilename = `${nameWithoutExt}-(${counter}).pdf`;
+                    counter++;
+                }
+                usedFilenames.add(uniqueFilename);
                 
                 // Add PDF to ZIP archive
-                
-                // Add to archive
-                archive.append(finalBuffer, { name: finalFilename });
+                archive.append(finalBuffer, { name: uniqueFilename });
                 successCount++;
                 
             } catch (error) {
@@ -499,6 +503,40 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
         
     } catch (error) {
         console.error('Bulk delete error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+});
+
+// Cancel individual download
+app.post('/api/summaries/:id/cancel-download', async (req, res) => {
+    try {
+        // For now, just return success since downloads are client-side
+        // In a real implementation, you might track server-side download processes
+        res.json({ 
+            status: 'ok',
+            message: 'Download cancellation requested'
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+});
+
+// Cancel bulk download
+app.post('/api/summaries/cancel-bulk-download', async (req, res) => {
+    try {
+        // For now, just return success since downloads are client-side
+        // In a real implementation, you might track server-side download processes
+        res.json({ 
+            status: 'ok',
+            message: 'Bulk download cancellation requested'
+        });
+    } catch (error) {
         res.status(500).json({
             status: 'error',
             message: error.message

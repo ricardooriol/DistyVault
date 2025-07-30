@@ -57,6 +57,16 @@ class Database {
                     console.warn('Warning adding distillingStartTime column:', err.message);
                 }
             });
+
+            // Add queuePosition column if it doesn't exist (for existing databases)
+            this.db.run(`
+                ALTER TABLE summaries ADD COLUMN queuePosition INTEGER
+            `, (err) => {
+                // Ignore error if column already exists
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.warn('Warning adding queuePosition column:', err.message);
+                }
+            });
         });
         // Database initialized successfully
     }
@@ -66,8 +76,8 @@ class Database {
             const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO summaries 
                 (id, title, content, sourceUrl, sourceType, sourceFile, status, processingStep, rawContent,
-                createdAt, completedAt, processingTime, elapsedTime, startTime, distillingStartTime, wordCount, error, logs)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                createdAt, completedAt, processingTime, elapsedTime, startTime, distillingStartTime, wordCount, error, logs, queuePosition)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
 
             stmt.run(
@@ -89,6 +99,7 @@ class Database {
                 distillation.wordCount,
                 distillation.error,
                 JSON.stringify(distillation.logs || []),
+                distillation.queuePosition || null,
                 function (err) {
                     if (err) {
                         reject(err);
@@ -251,7 +262,8 @@ class Database {
             distillingStartTime: row.distillingStartTime ? new Date(row.distillingStartTime) : null,
             wordCount: row.wordCount,
             error: row.error,
-            logs: row.logs ? JSON.parse(row.logs) : []
+            logs: row.logs ? JSON.parse(row.logs) : [],
+            queuePosition: row.queuePosition
         });
     }
 

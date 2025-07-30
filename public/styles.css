@@ -21,7 +21,7 @@
     --shadow-light: rgba(255, 107, 53, 0.1);
     --shadow-medium: rgba(255, 107, 53, 0.2);
     --shadow-heavy: rgba(0, 0, 0, 0.3);
-    
+
     /* Status colors */
     --status-completed: #4caf50;
     --status-processing: #2196f3;
@@ -322,8 +322,15 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .status-title {
@@ -429,8 +436,10 @@ body {
     background: var(--bg-secondary);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    overflow: visible;
+    overflow-x: auto;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .knowledge-base-table {
@@ -439,23 +448,101 @@ body {
     table-layout: fixed;
     border-radius: 12px;
     overflow: visible;
+    max-width: 100%;
 }
 
-.knowledge-base-table th:nth-child(1) { width: 40px; } /* Checkbox */
-.knowledge-base-table th:nth-child(2) { width: 22%; } /* Name */
-.knowledge-base-table th:nth-child(3) { width: 22%; } /* Source */
-.knowledge-base-table th:nth-child(4) { width: 10%; } /* Type */
-.knowledge-base-table th:nth-child(5) { width: 15%; } /* Status */
-.knowledge-base-table th:nth-child(6) { width: 10%; } /* Time */
-.knowledge-base-table th:nth-child(7) { width: 15%; } /* Date */
-.knowledge-base-table th:nth-child(8) { width: 100px; } /* Actions */
+.knowledge-base-table th:nth-child(1) {
+    width: 40px;
+}
+
+/* Checkbox */
+.knowledge-base-table th:nth-child(2) {
+    width: 22%;
+}
+
+/* Name */
+.knowledge-base-table th:nth-child(3) {
+    width: 22%;
+}
+
+/* Source */
+.knowledge-base-table th:nth-child(4) {
+    width: 10%;
+}
+
+/* Type */
+.knowledge-base-table th:nth-child(5) {
+    width: 15%;
+}
+
+/* Status */
+.knowledge-base-table th:nth-child(6) {
+    width: 10%;
+}
+
+/* Time */
+.knowledge-base-table th:nth-child(7) {
+    width: 15%;
+}
+
+/* Date */
+.knowledge-base-table th:nth-child(8) {
+    width: 100px;
+}
+
+/* Actions */
+
+.knowledge-base-table td:nth-child(1) {
+    width: 40px;
+}
+
+/* Checkbox */
+.knowledge-base-table td:nth-child(2) {
+    width: 22%;
+    max-width: 0;
+    min-width: 0;
+}
+
+/* Name */
+.knowledge-base-table td:nth-child(3) {
+    width: 22%;
+    max-width: 0;
+    min-width: 0;
+}
+
+/* Source */
+.knowledge-base-table td:nth-child(4) {
+    width: 10%;
+}
+
+/* Type */
+.knowledge-base-table td:nth-child(5) {
+    width: 15%;
+}
+
+/* Status */
+.knowledge-base-table td:nth-child(6) {
+    width: 10%;
+}
+
+/* Time */
+.knowledge-base-table td:nth-child(7) {
+    width: 15%;
+}
+
+/* Date */
+.knowledge-base-table td:nth-child(8) {
+    width: 100px;
+}
+
+/* Actions */
 
 .knowledge-base-table th {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     font-weight: 600;
     padding: 1rem;
-    text-align: left;
+    text-align: center;
     border-bottom: 1px solid var(--border-color);
     font-size: 0.9rem;
 }
@@ -503,13 +590,22 @@ body {
 .name-cell {
     font-weight: 500;
     color: var(--text-primary);
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 0 !important;
+    width: 22%;
+    min-width: 0 !important;
+    position: relative;
 }
 
-.name-cell,
 .source-cell {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 0 !important;
+    width: 22%;
+    min-width: 0 !important;
 }
 
 .source-cell a,
@@ -518,6 +614,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
 }
 
 /* Type column */
@@ -529,6 +626,11 @@ body {
 /* Status column */
 .status-cell {
     text-align: center;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 0 !important;
+    min-width: 0 !important;
 }
 
 /* Time and date columns */
@@ -564,11 +666,61 @@ body {
 }
 
 /* Table cell styles */
-.source-cell {
-    max-width: 200px;
+
+/* Text truncation classes */
+.truncate-text {
     overflow: hidden;
     text-overflow: ellipsis;
+    -webkit-text-overflow: ellipsis;
+    /* Safari */
     white-space: nowrap;
+    position: relative;
+}
+
+/* Tooltip styles */
+.tooltip {
+    position: absolute;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    border: 2px solid var(--primary-orange);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    max-width: 400px;
+    word-wrap: break-word;
+    white-space: normal;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    line-height: 1.4;
+}
+
+.tooltip.show {
+    opacity: 1;
+}
+
+.tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid var(--primary-orange);
+}
+
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid var(--bg-primary);
 }
 
 .source-link {
@@ -605,18 +757,45 @@ body {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .status-cell.status-completed .status-text {
     color: var(--status-completed);
 }
 
+.status-cell.status-queued .status-text {
+    color: var(--status-pending);
+}
+
 .status-cell.status-processing .status-text {
     color: var(--status-processing);
 }
 
+.status-cell.status-processing .status-icon {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
 .status-cell.status-error .status-text {
     color: var(--status-error);
+}
+
+.status-cell.status-unknown .status-text {
+    color: var(--text-muted);
 }
 
 .time-cell {
@@ -722,10 +901,10 @@ body {
     position: absolute;
     right: 0;
     top: 100%;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    border: 2px solid var(--primary-orange);
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     z-index: 1000;
     min-width: 200px;
     max-width: 280px;
@@ -811,13 +990,18 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    -webkit-transition: all 0.2s ease;
+    -moz-transition: all 0.2s ease;
     border: none;
     white-space: nowrap;
     flex-shrink: 0;
     min-height: 32px;
     display: inline-flex;
+    display: -webkit-inline-flex;
     align-items: center;
+    -webkit-align-items: center;
     justify-content: center;
+    -webkit-justify-content: center;
     gap: 6px;
     appearance: none;
     -webkit-appearance: none;
@@ -866,6 +1050,33 @@ body {
 
 .bulk-action-btn.delete-btn:hover:not(:disabled) {
     background: #d32f2f;
+}
+
+.bulk-action-btn.retry-btn {
+    background: var(--primary-orange);
+    color: white;
+}
+
+.bulk-action-btn.retry-btn:hover:not(:disabled) {
+    background: var(--orange-hover);
+}
+
+.bulk-action-btn.retry-all-btn {
+    background: #2196f3;
+    color: white;
+}
+
+.bulk-action-btn.retry-all-btn:hover:not(:disabled) {
+    background: #1976d2;
+}
+
+.bulk-action-btn.retry-failed-btn {
+    background: #ff9800;
+    color: white;
+}
+
+.bulk-action-btn.retry-failed-btn:hover:not(:disabled) {
+    background: #f57c00;
 }
 
 .selected-count {
@@ -1135,7 +1346,7 @@ ol.manual-numbered li .list-number,
     padding-left: 1.5rem;
 }
 
-.modal-body ul > li {
+.modal-body ul>li {
     margin-bottom: 0.5rem;
     list-style-type: disc;
 }
@@ -1145,7 +1356,9 @@ ol.manual-numbered li .list-number,
     line-height: 1.6;
 }
 
-.modal-body h1, .modal-body h2, .modal-body h3 {
+.modal-body h1,
+.modal-body h2,
+.modal-body h3 {
     margin-top: 1.5rem;
     margin-bottom: 0.8rem;
     color: var(--primary-orange);
@@ -1302,7 +1515,8 @@ ol.manual-numbered li .list-number,
     margin-bottom: 1rem;
 }
 
-.elapsed-time, .word-count {
+.elapsed-time,
+.word-count {
     font-size: 0.8rem;
     color: var(--text-muted);
     display: flex;
@@ -1311,70 +1525,255 @@ ol.manual-numbered li .list-number,
 }
 
 /* Responsive Design */
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .knowledge-base-table th:nth-child(2) {
+        width: 20%;
+    }
+
+    /* Name */
+    .knowledge-base-table th:nth-child(3) {
+        width: 20%;
+    }
+
+    /* Source */
+    .knowledge-base-table th:nth-child(5) {
+        width: 12%;
+    }
+
+    /* Status */
+
+    .knowledge-base-table td:nth-child(2) {
+        width: 20%;
+    }
+
+    /* Name */
+    .knowledge-base-table td:nth-child(3) {
+        width: 20%;
+    }
+
+    /* Source */
+    .knowledge-base-table td:nth-child(5) {
+        width: 12%;
+    }
+
+    /* Status */
+}
+
+/* Mobile breakpoint */
 @media (max-width: 768px) {
     .main-content {
         padding: 1rem;
     }
-    
+
     .main-input-group {
         gap: 1rem;
     }
-    
+
     .url-input-container {
         position: relative;
     }
-    
+
     .main-input-field {
         padding: 1rem 4rem 1rem 1rem;
     }
-    
+
     .action-buttons {
         flex-direction: column;
     }
-    
+
     .upload-btn,
     .distill-btn {
         min-width: auto;
     }
-    
+
     .knowledge-base-header {
         flex-direction: column;
         align-items: stretch;
         gap: 1rem;
     }
-    
+
     .knowledge-base-controls {
         flex-direction: column;
     }
-    
+
     .search-input {
         width: 100%;
     }
-    
+
     .knowledge-base-table {
         display: table;
         overflow: visible;
+        font-size: 0.8rem;
     }
-    
+
+    .knowledge-base-table th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
     .knowledge-base-table td {
         padding: 0.75rem 0.5rem;
     }
-    
+
+    /* Adjust column widths for mobile */
+    .knowledge-base-table th:nth-child(1) {
+        width: 30px;
+    }
+
+    /* Checkbox */
+    .knowledge-base-table th:nth-child(2) {
+        width: 25%;
+    }
+
+    /* Name */
+    .knowledge-base-table th:nth-child(3) {
+        width: 20%;
+    }
+
+    /* Source */
+    .knowledge-base-table th:nth-child(4) {
+        width: 8%;
+    }
+
+    /* Type */
+    .knowledge-base-table th:nth-child(5) {
+        width: 12%;
+    }
+
+    /* Status */
+    .knowledge-base-table th:nth-child(6) {
+        width: 10%;
+    }
+
+    /* Duration */
+    .knowledge-base-table th:nth-child(7) {
+        width: 15%;
+    }
+
+    /* Date */
+    .knowledge-base-table th:nth-child(8) {
+        width: 80px;
+    }
+
+    /* Actions */
+
+    .knowledge-base-table td:nth-child(1) {
+        width: 30px;
+    }
+
+    /* Checkbox */
+    .knowledge-base-table td:nth-child(2) {
+        width: 25%;
+        max-width: 0;
+        min-width: 0;
+    }
+
+    /* Name */
+    .knowledge-base-table td:nth-child(3) {
+        width: 20%;
+        max-width: 0;
+        min-width: 0;
+    }
+
+    /* Source */
+    .knowledge-base-table td:nth-child(4) {
+        width: 8%;
+    }
+
+    /* Type */
+    .knowledge-base-table td:nth-child(5) {
+        width: 12%;
+    }
+
+    /* Status */
+    .knowledge-base-table td:nth-child(6) {
+        width: 10%;
+    }
+
+    /* Duration */
+    .knowledge-base-table td:nth-child(7) {
+        width: 15%;
+    }
+
+    /* Date */
+    .knowledge-base-table td:nth-child(8) {
+        width: 80px;
+    }
+
+    /* Actions */
+
     .table-actions {
         gap: 0.25rem;
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .action-btn {
         padding: 0.4rem 0.5rem;
         font-size: 0.7rem;
-        min-height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
-    
+
+    /* Ensure text truncation works on mobile */
+    .name-cell,
+    .source-cell {
+        max-width: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .knowledge-base-table {
+        min-width: 600px;
+        /* Force horizontal scroll on very small screens */
+    }
+
+    .knowledge-base-table-container {
+        overflow-x: scroll;
+    }
+
+    .action-dropdown-content {
+        right: 0;
+        min-width: 180px;
+        max-width: 200px;
+    }
+}
+
+.actions-cell {
+    min-width: 80px;
+    text-align: center;
+    padding: 0.75rem 0.5rem !important;
+}
+
+/* Ensure text truncation works on mobile */
+.name-cell,
+.source-cell {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tablet responsive styles */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .knowledge-base-table {
+        font-size: 0.9rem;
+    }
+
+    .table-actions {
+        gap: 0.3rem;
+    }
+
+    .action-btn {
+        padding: 0.35rem 0.55rem;
+        font-size: 0.75rem;
+    }
+
     .actions-cell {
         min-width: 100px;
         text-align: center;
@@ -1387,16 +1786,16 @@ ol.manual-numbered li .list-number,
     .knowledge-base-table {
         font-size: 0.9rem;
     }
-    
+
     .table-actions {
         gap: 0.3rem;
     }
-    
+
     .action-btn {
         padding: 0.35rem 0.55rem;
         font-size: 0.75rem;
     }
-    
+
     .actions-cell {
         min-width: 100px;
         text-align: center;
@@ -1409,9 +1808,53 @@ ol.manual-numbered li .list-number,
         width: 95%;
         margin: 2.5% auto;
     }
-    
+
     .modal-body {
         padding: 1.5rem;
+    }
+}
+
+/* Download Button States */
+.downloading {
+    position: relative;
+    opacity: 0.8;
+}
+
+.downloading .btn-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.downloading.cancellable {
+    opacity: 1;
+    background: var(--status-error) !important;
+    color: white !important;
+}
+
+.downloading.cancellable:hover {
+    background: #d32f2f !important;
+}
+
+.download-error {
+    background: var(--status-error) !important;
+    color: white !important;
+    animation: errorFlash 0.3s ease-in-out;
+}
+
+.download-error:hover {
+    background: #d32f2f !important;
+}
+
+@keyframes errorFlash {
+    0% {
+        background: var(--status-error);
+    }
+
+    50% {
+        background: #ff6b6b;
+    }
+
+    100% {
+        background: var(--status-error);
     }
 }
 
@@ -1438,9 +1881,27 @@ ol.manual-numbered li .list-number,
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
 /* AI 
 Settings Styles */
 .header {
@@ -1543,12 +2004,12 @@ Settings Styles */
     border-radius: 50%;
 }
 
-input:checked + .toggle-slider {
+input:checked+.toggle-slider {
     background-color: var(--primary-orange);
     border-color: var(--primary-orange);
 }
 
-input:checked + .toggle-slider:before {
+input:checked+.toggle-slider:before {
     transform: translateX(30px);
     background-color: white;
 }
@@ -1809,26 +2270,27 @@ input:checked + .toggle-slider:before {
         gap: 1rem;
         text-align: center;
     }
-    
+
     .header-actions {
         justify-content: center;
     }
-    
+
     .mode-labels {
         flex-direction: column;
         gap: 0.5rem;
         text-align: center;
     }
-    
+
     .modal-actions {
         flex-direction: column;
     }
-    
+
     .large-modal {
         width: 95vw;
         margin: 1rem;
     }
 }
+
 /* NUMBERE
 D LIST FIX - Black Bold Numbers */
 /* Force override browser defaults for manual numbered lists */
@@ -1905,7 +2367,7 @@ ol.manual-numbered li .list-number,
     padding-left: 1.5rem;
 }
 
-.modal-body ul > li {
+.modal-body ul>li {
     margin-bottom: 0.5rem;
     list-style-type: disc;
 }
@@ -1915,7 +2377,9 @@ ol.manual-numbered li .list-number,
     line-height: 1.6;
 }
 
-.modal-body h1, .modal-body h2, .modal-body h3 {
+.modal-body h1,
+.modal-body h2,
+.modal-body h3 {
     margin-top: 1.5rem;
     margin-bottom: 0.8rem;
     color: var(--primary-orange);
@@ -2003,6 +2467,7 @@ ol.manual-numbered li .list-number,
 .distillation-content li {
     margin-bottom: 0.5rem;
 }
+
 /* ==
 === NUMBERED LIST FIX - COMPREHENSIVE RESET ===== */
 
@@ -2065,7 +2530,9 @@ ol.manual-numbered li::after {
 .modal-body ol.manual-numbered li::after {
     display: none !important;
     content: none !important;
-}/* ===
+}
+
+/* ===
 == BLACK BOLD NUMBER STYLING ===== */
 
 /* Primary styling for list numbers - black bold without decoration */
@@ -2146,8 +2613,9 @@ html body .list-number {
     background: none !important;
     border: none !important;
     padding: 0 !important;
-}/* P
-rocessing Queue Configuration Styles */
+}
+
+/* Processing Queue Configuration Styles */
 .number-input-container {
     display: flex;
     align-items: center;
@@ -2159,7 +2627,7 @@ rocessing Queue Configuration Styles */
     width: 80px !important;
     text-align: center;
     padding: 8px 12px !important;
-    -moz-appearance: textfield; /* Firefox */
+    appearance: textfield;
 }
 
 /* Remove arrows from number input in Chrome, Safari, Edge */
@@ -2203,50 +2671,7 @@ rocessing Queue Configuration Styles */
     width: 100%;
 }
 
-.action-dropdown.show {
-    z-index: 99998;
-}
-
-.action-dropdown.show .action-dropdown-content {
-    display: block !important;
-}
-
-.action-dropdown-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.4rem 0.6rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 0.8rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    transition: all 0.2s ease;
-    min-width: 70px;
-    justify-content: center;
-}
-
-.action-dropdown-btn:hover {
-    background: var(--bg-primary);
-    border-color: var(--primary-orange);
-    color: var(--primary-orange);
-}
-
-.action-dropdown-content {
-    display: none;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--bg-primary);
-    border: 2px solid var(--primary-orange);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    z-index: 99999;
-    min-width: 140px;
-    top: calc(100% + 4px);
-    white-space: nowrap;
-}
+/* Duplicate rules removed */
 
 
 
@@ -2282,7 +2707,9 @@ rocessing Queue Configuration Styles */
 .action-dropdown-item.retry-item:hover {
     background: var(--primary-orange);
     color: white;
-}/* Enhan
+}
+
+/* Enhan
 ced Logs Styling */
 .log-section {
     margin-bottom: 1.5rem;
@@ -2359,32 +2786,29 @@ ced Logs Styling */
 
 .log-success .log-level {
     color: var(--success-color);
-}/* Ensure
+}
+
+/* Ensure
  dropdown is visible on smaller screens */
 @media (max-width: 768px) {
     .action-dropdown-content {
         right: 10px;
         min-width: 160px;
     }
-    
+
     .action-dropdown-btn {
         min-width: 60px;
         padding: 0.3rem 0.5rem;
         font-size: 0.75rem;
     }
-    
+
     .actions-cell {
         padding: 0.75rem 0.5rem !important;
     }
 }
 
-/* Fix for very narrow screens */
-@media (max-width: 480px) {
-    .action-dropdown-content {
-        right: 5px;
-        min-width: 180px;
-    }
-}
+/* Duplicate media query removed */
+
 /* Enh
 anced Bold Formatting Rules - Bulletproof Implementation */
 
@@ -2459,6 +2883,7 @@ ol.manual-numbered *,
 
 /* Webkit/Blink specific bold rendering */
 @supports (-webkit-appearance: none) {
+
     .modal-body strong,
     .distillation-content strong,
     .list-number,
@@ -2470,6 +2895,7 @@ ol.manual-numbered *,
 
 /* Firefox specific bold rendering */
 @-moz-document url-prefix() {
+
     .modal-body strong,
     .distillation-content strong,
     .list-number,
@@ -2480,6 +2906,7 @@ ol.manual-numbered *,
 
 /* Edge/IE specific bold rendering */
 @supports (-ms-ime-align: auto) {
+
     .modal-body strong,
     .distillation-content strong,
     .list-number,

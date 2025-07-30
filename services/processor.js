@@ -68,9 +68,8 @@ class Processor {
             title: 'Processing URL...',
             sourceUrl: url,
             sourceType: this.detectUrlType(url),
-            status: 'initializing',
-            processingStep: 'Initializing processing',
-            startTime: new Date()
+            status: 'pending',
+            processingStep: 'Queued for processing'
         });
 
         // Add initial log with system information
@@ -88,15 +87,33 @@ class Processor {
                 const startTime = Date.now();
                 const distillationObj = await database.getDistillation(distillation.id);
 
+                // Update status to initializing and set actual start time when background processing begins
+                console.log(`[${distillation.id}] Setting status to initializing`);
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'initializing',
+                    'Starting processing'
+                );
+                console.log(`[${distillation.id}] Status set to initializing`);
+
+                // Set the actual start time when processing begins (not when queued)
+                distillationObj.startTime = new Date(startTime);
+                await database.saveDistillation(distillationObj);
+
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
+                // Small delay to ensure frontend can see the initializing status
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 // Update status to extracting
+                console.log(`[${distillation.id}] Setting status to extracting`);
                 await database.updateDistillationStatus(
                     distillation.id,
                     'extracting',
                     'Extracting content from URL'
                 );
+                console.log(`[${distillation.id}] Status set to extracting`);
 
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`🌐 Target URL: ${url}`);
@@ -135,6 +152,9 @@ class Processor {
 
                 console.log(`[${distillation.id}] Content extracted successfully. Title: ${title}, Content length: ${text.length} chars`);
                 console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+
+                // Delay to ensure frontend can see the extracting status
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Update status to distilling
                 await database.updateDistillationStatus(
@@ -209,7 +229,12 @@ class Processor {
                     errorDistillation.addLog(`❌ Processing failed with error`, 'error');
                     errorDistillation.addLog(`🔍 Error type: ${error.constructor.name}`, 'error');
                     errorDistillation.addLog(`📝 Error message: ${error.message}`, 'error');
-                    errorDistillation.addLog(`📊 Processing time before error: ${((Date.now() - startTime) / 1000).toFixed(2)}s`, 'error');
+
+                    // Calculate processing time if startTime is available
+                    const processingTime = errorDistillation.startTime ?
+                        ((Date.now() - new Date(errorDistillation.startTime).getTime()) / 1000).toFixed(2) :
+                        'unknown';
+                    errorDistillation.addLog(`📊 Processing time before error: ${processingTime}s`, 'error');
 
                     if (error.stack) {
                         const stackLines = error.stack.split('\n').slice(0, 3);
@@ -245,9 +270,8 @@ class Processor {
             title: 'Processing YouTube Playlist...',
             sourceUrl: playlistUrl,
             sourceType: 'youtube',
-            status: 'initializing',
-            processingStep: 'Extracting playlist videos',
-            startTime: new Date()
+            status: 'pending',
+            processingStep: 'Queued for processing'
         });
 
         trackingDistillation.addLog(`Starting playlist processing: ${playlistUrl}`);
@@ -256,7 +280,14 @@ class Processor {
         // Start processing in background
         this.processInBackground(trackingDistillation.id, async () => {
             try {
-                // Update status
+                // Update status to initializing when background processing starts
+                await database.updateDistillationStatus(
+                    trackingDistillation.id,
+                    'initializing',
+                    'Starting playlist processing'
+                );
+
+                // Update status to extracting
                 await database.updateDistillationStatus(
                     trackingDistillation.id,
                     'extracting',
@@ -440,9 +471,8 @@ class Processor {
                 type: file.mimetype,
                 size: file.size
             },
-            status: 'initializing',
-            processingStep: 'Initializing file processing',
-            startTime: new Date()
+            status: 'pending',
+            processingStep: 'Queued for processing'
         });
 
         // Add initial log with file information
@@ -463,8 +493,22 @@ class Processor {
                 const startTime = Date.now();
                 const distillationObj = await database.getDistillation(distillation.id);
 
+                // Update status to initializing when background processing starts
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'initializing',
+                    'Starting file processing'
+                );
+
+                // Set the actual start time when processing begins (not when queued)
+                distillationObj.startTime = new Date(startTime);
+                await database.saveDistillation(distillationObj);
+
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+
+                // Small delay to ensure frontend can see the initializing status
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // Update status to extracting
                 await database.updateDistillationStatus(
@@ -491,6 +535,9 @@ class Processor {
 
                 console.log(`[${distillation.id}] File content extracted successfully. Content length: ${text.length} chars`);
                 console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+
+                // Small delay to ensure frontend can see the extracting status
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // Update status to distilling
                 await database.updateDistillationStatus(
@@ -619,8 +666,8 @@ class Processor {
                 type: mockFile.mimetype,
                 size: mockFile.size
             },
-            status: 'initializing',
-            processingStep: 'Retrying file processing',
+            status: 'pending',
+            processingStep: 'Queued for retry processing',
             startTime: new Date()
         });
 
@@ -638,6 +685,17 @@ class Processor {
             try {
                 const startTime = Date.now();
 
+                // Update status to initializing when background processing starts
+                await database.updateDistillationStatus(
+                    distillation.id,
+                    'initializing',
+                    'Starting retry processing'
+                );
+
+                const distillationObj = await database.getDistillation(distillation.id);
+                distillationObj.startTime = new Date(startTime);
+                await database.saveDistillation(distillationObj);
+
                 // Update status to distilling (skip extraction since we have raw content)
                 await database.updateDistillationStatus(
                     distillation.id,
@@ -645,7 +703,6 @@ class Processor {
                     'Generating distillation with AI provider'
                 );
 
-                const distillationObj = await database.getDistillation(distillation.id);
                 distillationObj.addLog(`🔄 Using existing raw content from original processing`);
                 distillationObj.addLog(`📝 Content length: ${rawContent.length.toLocaleString()} characters`);
                 distillationObj.addLog(`🤖 Phase 2: AI Distillation (Retry)`);
@@ -855,8 +912,8 @@ class Processor {
 
             await browser.close();
 
-            // Generate filename from title
-            const filename = this.generatePdfFilename(distillation.title);
+            // Generate filename from title with ID for uniqueness
+            const filename = this.generatePdfFilename(distillation.title, distillationId);
 
             // PDF generated successfully
             return { buffer: pdfBuffer, filename };
@@ -921,6 +978,16 @@ class Processor {
                 
                 .meta strong {
                     color: #333;
+                }
+                
+                .meta a {
+                    color: #007acc;
+                    text-decoration: none;
+                    word-break: break-all;
+                }
+                
+                .meta a:hover {
+                    text-decoration: underline;
                 }
                 
                 .content {
@@ -1089,7 +1156,7 @@ class Processor {
             <div class="header">
                 <h1 class="title">${distillation.title}</h1>
                 <div class="meta">
-                    ${distillation.sourceUrl ? `<strong>Source:</strong> ${distillation.sourceUrl}<br>` : ''}
+                    ${distillation.sourceUrl ? `<strong>Source:</strong> <a href="${distillation.sourceUrl}" target="_blank">${distillation.sourceUrl}</a><br>` : ''}
                     ${distillation.sourceFile ? `<strong>Source:</strong> ${distillation.sourceFile.name}<br>` : ''}
                     <strong>Generated:</strong> ${formattedDate}<br>
                     ${distillation.wordCount ? `<strong>Word Count:</strong> ${distillation.wordCount} words<br>` : ''}
@@ -1188,7 +1255,7 @@ class Processor {
                     result.push(`</${listType}>`);
                     inList = false;
                     listType = null;
-                    numberedItemCounter = 0; // Reset counter when list ends
+                    // DON'T reset numberedItemCounter here - keep it going across the document
                 }
                 continue;
             }
@@ -1198,7 +1265,7 @@ class Processor {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h3>${trimmedLine.substring(4)}</h3>`);
                 continue;
             }
@@ -1206,7 +1273,7 @@ class Processor {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h2>${trimmedLine.substring(3)}</h2>`);
                 continue;
             }
@@ -1214,7 +1281,7 @@ class Processor {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h1>${trimmedLine.substring(2)}</h1>`);
                 continue;
             }
@@ -1230,7 +1297,7 @@ class Processor {
                     result.push('<ul>');
                     inList = true;
                     listType = 'ul';
-                    numberedItemCounter = 0; // Reset counter for unordered lists
+                    // DON'T reset counter for unordered lists - keep numbering continuous
                 }
                 const content = this.processInlineMarkdown(trimmedLine.substring(2));
                 result.push(`<li>${content}</li>`);
@@ -1331,10 +1398,11 @@ class Processor {
     /**
      * Generate a clean filename from the distillation title
      * @param {string} title - The distillation title
+     * @param {string} distillationId - The distillation ID for uniqueness
      * @returns {string} - Clean filename
      */
-    generatePdfFilename(title) {
-        if (!title) return 'distillation.pdf';
+    generatePdfFilename(title, distillationId) {
+        if (!title) return `distillation-${distillationId}.pdf`;
 
         // Clean the title for use as filename
         let filename = title
@@ -1342,7 +1410,7 @@ class Processor {
             .replace(/\s+/g, '-') // Replace spaces with hyphens
             .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
             .toLowerCase()
-            .substring(0, 50); // Limit length
+            .substring(0, 80); // Increased length to 80 characters
 
         // Remove leading/trailing hyphens
         filename = filename.replace(/^-+|-+$/g, '');
@@ -1350,7 +1418,8 @@ class Processor {
         // Ensure it's not empty
         if (!filename) filename = 'distillation';
 
-        return `${filename}.pdf`;
+        // Add distillation ID to ensure uniqueness
+        return `${filename}-${distillationId}.pdf`;
     }
 
     /**

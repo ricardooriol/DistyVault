@@ -1,3 +1,185 @@
+// Download State Management System
+class DownloadStateManager {
+    constructor() {
+        this.downloadStates = new Map(); // buttonId -> DownloadState
+    }
+
+    createDownloadState(buttonId) {
+        const state = {
+            buttonId: buttonId,
+            state: 'idle', // 'idle', 'loading', 'cancellable', 'error'
+            downloadId: null,
+            abortController: null,
+            errorMessage: null,
+            startTime: null,
+            originalContent: null
+        };
+        this.downloadStates.set(buttonId, state);
+        return state;
+    }
+
+    getDownloadState(buttonId) {
+        return this.downloadStates.get(buttonId) || this.createDownloadState(buttonId);
+    }
+
+    setDownloadState(buttonId, newState, options = {}) {
+        const state = this.getDownloadState(buttonId);
+        
+        // Validate state transition
+        if (!this.isValidStateTransition(state.state, newState)) {
+            console.warn(`Invalid state transition from ${state.state} to ${newState} for button ${buttonId}`);
+            return state;
+        }
+        
+        state.state = newState;
+        
+        if (options.downloadId) state.downloadId = options.downloadId;
+        if (options.abortController) state.abortController = options.abortController;
+        if (options.errorMessage) state.errorMessage = options.errorMessage;
+        if (options.startTime) state.startTime = options.startTime;
+        if (options.originalContent) state.originalContent = options.originalContent;
+
+        // Set timeout for stuck states
+        if (newState === 'loading') {
+            this.setDownloadTimeout(buttonId);
+        } else {
+            this.clearDownloadTimeout(buttonId);
+        }
+
+        this.updateButtonUI(buttonId, state);
+        return state;
+    }
+
+    isValidStateTransition(currentState, newState) {
+        const validTransitions = {
+            'idle': ['loading', 'error'],
+            'loading': ['cancellable', 'idle', 'error'],
+            'cancellable': ['loading', 'idle', 'error'],
+            'error': ['idle', 'loading']
+        };
+        
+        return validTransitions[currentState]?.includes(newState) || false;
+    }
+
+    setDownloadTimeout(buttonId) {
+        this.clearDownloadTimeout(buttonId);
+        const state = this.getDownloadState(buttonId);
+        
+        // Set 5 minute timeout for downloads
+        state.timeoutId = setTimeout(() => {
+            console.warn(`Download timeout for button ${buttonId}`);
+            this.setDownloadState(buttonId, 'error', {
+                errorMessage: 'Download timed out. Please try again.'
+            });
+        }, 5 * 60 * 1000);
+    }
+
+    clearDownloadTimeout(buttonId) {
+        const state = this.getDownloadState(buttonId);
+        if (state.timeoutId) {
+            clearTimeout(state.timeoutId);
+            state.timeoutId = null;
+        }
+    }
+
+    updateButtonUI(buttonId, state) {
+        const button = document.getElementById(buttonId);
+        if (!button) return;
+
+        // Store original content if not already stored
+        if (!state.originalContent && state.state === 'idle') {
+            state.originalContent = button.innerHTML;
+        }
+
+        switch (state.state) {
+            case 'idle':
+                button.disabled = false;
+                button.classList.remove('downloading', 'download-error', 'cancellable');
+                if (state.originalContent) {
+                    button.innerHTML = state.originalContent;
+                }
+                button.title = '';
+                break;
+
+            case 'loading':
+                button.disabled = true;
+                button.classList.add('downloading');
+                button.classList.remove('download-error', 'cancellable');
+                const iconSpan = button.querySelector('.btn-icon');
+                const textSpan = button.querySelector('.btn-text');
+                if (iconSpan && textSpan) {
+                    iconSpan.innerHTML = '⏳';
+                    textSpan.innerHTML = 'Downloading...';
+                } else {
+                    button.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
+                }
+                button.title = 'Hover to cancel';
+                break;
+
+            case 'cancellable':
+                button.disabled = false;
+                button.classList.add('downloading', 'cancellable');
+                const cancelIconSpan = button.querySelector('.btn-icon');
+                const cancelTextSpan = button.querySelector('.btn-text');
+                if (cancelIconSpan && cancelTextSpan) {
+                    cancelIconSpan.innerHTML = '❌';
+                    cancelTextSpan.innerHTML = 'Cancel';
+                } else {
+                    button.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">Cancel</span>';
+                }
+                button.title = 'Click to cancel download';
+                break;
+
+            case 'error':
+                button.disabled = false;
+                button.classList.add('download-error');
+                button.classList.remove('downloading', 'cancellable');
+                const errorIconSpan = button.querySelector('.btn-icon');
+                const errorTextSpan = button.querySelector('.btn-text');
+                if (errorIconSpan && errorTextSpan) {
+                    errorIconSpan.innerHTML = '⚠️';
+                    errorTextSpan.innerHTML = 'Error';
+                } else {
+                    button.innerHTML = '<span class="btn-icon">⚠️</span><span class="btn-text">Error</span>';
+                }
+                button.title = state.errorMessage || 'Download failed';
+                
+                // Auto-reset to idle after 3 seconds
+                setTimeout(() => {
+                    if (this.getDownloadState(buttonId).state === 'error') {
+                        this.setDownloadState(buttonId, 'idle');
+                    }
+                }, 3000);
+                break;
+        }
+    }
+
+    cancelDownload(buttonId) {
+        const state = this.getDownloadState(buttonId);
+        
+        // Abort the download if in progress
+        if (state.abortController) {
+            state.abortController.abort();
+            state.abortController = null;
+        }
+        
+        // Clear timeout
+        this.clearDownloadTimeout(buttonId);
+        
+        // Reset all state properties
+        state.downloadId = null;
+        state.errorMessage = null;
+        state.startTime = null;
+        
+        // Set to idle state
+        this.setDownloadState(buttonId, 'idle');
+    }
+
+    clearDownloadState(buttonId) {
+        this.downloadStates.delete(buttonId);
+    }
+}
+
 // SAWRON App JavaScript
 class SawronApp {
     constructor() {
@@ -6,6 +188,7 @@ class SawronApp {
         this.selectedFile = null;
         this.refreshInterval = null;
         this.selectedItems = new Set(); // Track selected item IDs
+        this.downloadStateManager = new DownloadStateManager();
         this.init();
     }
 
@@ -14,6 +197,7 @@ class SawronApp {
         this.loadKnowledgeBase();
         this.startAutoRefresh();
         this.startChronometer();
+        this.initializeTooltips();
     }
 
     setupEventListeners() {
@@ -237,10 +421,10 @@ class SawronApp {
     }
 
     startAutoRefresh() {
-        // Refresh knowledge base every 2 seconds to update status
+        // Refresh knowledge base every 500ms to catch rapid status changes
         this.refreshInterval = setInterval(() => {
             this.loadKnowledgeBase();
-        }, 2000);
+        }, 500);
     }
 
     startChronometer() {
@@ -251,42 +435,83 @@ class SawronApp {
     }
 
     updateProcessingTimes() {
-        // Update processing times for items that are currently processing
-        const rows = document.querySelectorAll('#knowledge-base-tbody tr[data-id]');
-        
-        rows.forEach((row) => {
-            const statusCell = row.querySelector('.status-cell');
-            const timeCell = row.querySelector('.time-cell');
-            
-            if (statusCell && timeCell) {
-                const statusText = statusCell.textContent.trim();
-                const isProcessing = ['Initializing', 'Extracting', 'Distilling'].includes(statusText);
-                
-                if (isProcessing) {
-                    // Find the corresponding item data
-                    const itemId = row.dataset.id;
-                    if (itemId && this.knowledgeBaseData) {
-                        const item = this.knowledgeBaseData.find(i => i.id === itemId);
-                        if (item && item.startTime) {
-                            const startTime = new Date(item.startTime);
-                            const currentTime = new Date();
-                            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-                            
-                            let timeDisplay;
-                            if (elapsedSeconds < 60) {
-                                timeDisplay = `${elapsedSeconds}s`;
-                            } else {
-                                const minutes = Math.floor(elapsedSeconds / 60);
-                                const seconds = elapsedSeconds % 60;
-                                timeDisplay = `${minutes}m ${seconds}s`;
+        try {
+            // Update processing times for items that are currently processing
+            const rows = document.querySelectorAll('#knowledge-base-tbody tr[data-id]');
+
+            rows.forEach((row) => {
+                try {
+                    const statusCell = row.querySelector('.status-cell');
+                    const timeCell = row.querySelector('.time-cell');
+
+                    if (statusCell && timeCell) {
+                        const statusText = statusCell.querySelector('.status-text')?.textContent.trim();
+                        const isProcessing = ['INITIALIZING', 'EXTRACTING', 'DISTILLING'].includes(statusText);
+                        const isQueued = statusText === 'QUEUED';
+
+                        if (isQueued || isProcessing) {
+                            // Find the corresponding item data
+                            const itemId = row.dataset.id;
+                            if (itemId && this.knowledgeBaseData) {
+                                const item = this.knowledgeBaseData.find(i => i.id === itemId);
+
+                                if (!item) {
+                                    // Item not found, show fallback
+                                    timeCell.textContent = 'Unknown';
+                                    return;
+                                }
+
+                                // Show "Waiting..." for queued items
+                                if (item.status === 'pending') {
+                                    timeCell.textContent = 'Waiting...';
+                                } else if (item.startTime && isProcessing) {
+                                    // Only show live timer for actively processing items
+                                    try {
+                                        const startTime = new Date(item.startTime);
+                                        const currentTime = new Date();
+                                        
+                                        // Validate dates
+                                        if (isNaN(startTime.getTime()) || isNaN(currentTime.getTime())) {
+                                            timeCell.textContent = 'Unknown';
+                                            return;
+                                        }
+
+                                        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+
+                                        // Ensure elapsed time is not negative
+                                        if (elapsedSeconds < 0) {
+                                            timeCell.textContent = '0s';
+                                            return;
+                                        }
+
+                                        let timeDisplay;
+                                        if (elapsedSeconds < 60) {
+                                            timeDisplay = `${elapsedSeconds}s`;
+                                        } else {
+                                            const minutes = Math.floor(elapsedSeconds / 60);
+                                            const seconds = elapsedSeconds % 60;
+                                            timeDisplay = `${minutes}m ${seconds}s`;
+                                        }
+
+                                        timeCell.textContent = timeDisplay;
+                                    } catch (timeError) {
+                                        console.warn('Error calculating processing time:', timeError);
+                                        timeCell.textContent = 'Unknown';
+                                    }
+                                } else if (isProcessing) {
+                                    // Processing but no start time available
+                                    timeCell.textContent = 'Processing...';
+                                }
                             }
-                            
-                            timeCell.textContent = timeDisplay;
                         }
                     }
+                } catch (rowError) {
+                    console.warn('Error updating processing time for row:', rowError);
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.warn('Error in updateProcessingTimes:', error);
+        }
     }
 
     stopAutoRefresh() {
@@ -300,18 +525,154 @@ class SawronApp {
         }
     }
 
+    initializeTooltips() {
+        // Initialize tooltip system
+        this.tooltip = null;
+        this.tooltipTimeout = null;
+        
+        // Add event delegation for tooltips
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.hasAttribute('data-tooltip') || e.target.closest('[data-tooltip]')) {
+                const element = e.target.hasAttribute('data-tooltip') ? e.target : e.target.closest('[data-tooltip]');
+                this.showTooltip(element, element.getAttribute('data-tooltip'));
+            }
+        });
+        
+        document.addEventListener('mouseout', (e) => {
+            if (e.target.hasAttribute('data-tooltip') || e.target.closest('[data-tooltip]')) {
+                this.hideTooltip();
+            }
+        });
+    }
+
+    showTooltip(element, text) {
+        try {
+            // Clear any existing timeout
+            if (this.tooltipTimeout) {
+                clearTimeout(this.tooltipTimeout);
+            }
+
+            // Validate inputs
+            if (!element || !text || typeof text !== 'string') {
+                return;
+            }
+
+            // Always show tooltip for truncated elements (don't rely on scrollWidth check)
+            // The CSS truncation might make scrollWidth detection unreliable
+
+            // Create tooltip if it doesn't exist
+            if (!this.tooltip) {
+                this.tooltip = document.createElement('div');
+                this.tooltip.className = 'tooltip';
+                document.body.appendChild(this.tooltip);
+            }
+
+            // Set tooltip content and position
+            this.tooltip.textContent = text;
+            
+            // Position tooltip
+            const rect = element.getBoundingClientRect();
+            
+            // Set initial position to calculate tooltip size
+            this.tooltip.style.left = '0px';
+            this.tooltip.style.top = '0px';
+            this.tooltip.style.visibility = 'hidden';
+            this.tooltip.classList.add('show');
+            
+            const tooltipRect = this.tooltip.getBoundingClientRect();
+            
+            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            let top = rect.top - tooltipRect.height - 10;
+            
+            // Adjust if tooltip goes off screen
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top < 10) {
+                top = rect.bottom + 10;
+            }
+            
+            // Apply final position and make visible
+            this.tooltip.style.left = left + 'px';
+            this.tooltip.style.top = top + 'px';
+            this.tooltip.style.visibility = 'visible';
+            
+        } catch (error) {
+            console.warn('Error showing tooltip:', error);
+        }
+    }
+
+    hideTooltip() {
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
+        
+        if (this.tooltip) {
+            this.tooltip.classList.remove('show');
+        }
+    }
+
     async loadKnowledgeBase() {
         try {
             const response = await fetch('/api/summaries');
             if (!response.ok) {
-                throw new Error('Failed to load knowledge base');
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
 
-            this.knowledgeBase = await response.json();
+            const data = await response.json();
+            
+            // Validate data structure
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format received from server');
+            }
+
+            // Check for status changes before updating
+            if (window.DEBUG_STATUS && this.knowledgeBase) {
+                const oldStatuses = new Map(this.knowledgeBase.map(item => [item.id, item.status]));
+                data.forEach(item => {
+                    const oldStatus = oldStatuses.get(item.id);
+                    if (oldStatus && oldStatus !== item.status) {
+                        console.log(`[STATUS CHANGE] Item ${item.id}: ${oldStatus} → ${item.status}`);
+                    }
+                });
+            }
+
+            this.knowledgeBase = data;
             this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
+            
+            // Debug logging for status tracking
+            if (window.DEBUG_STATUS) {
+                this.knowledgeBase.forEach(item => {
+                    if (['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)) {
+                        console.log(`[DEBUG] Processing item ${item.id}: status="${item.status}", step="${item.processingStep}"`);
+                    }
+                });
+            }
+            
             this.renderKnowledgeBase();
         } catch (error) {
             console.error('Error loading knowledge base:', error);
+            
+            // Show fallback UI or retry mechanism
+            if (this.knowledgeBase.length === 0) {
+                // If we have no cached data, show error state
+                const tbody = document.getElementById('knowledge-base-tbody');
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="empty-state-cell">
+                                <div class="empty-state">
+                                    <div class="empty-icon">⚠️</div>
+                                    <h3>Failed to Load Knowledge Base</h3>
+                                    <p>Unable to connect to server. Please check your connection and try again.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
         }
     }
 
@@ -365,9 +726,12 @@ class SawronApp {
 
         tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
 
+        // Fix any text overflow issues after rendering
+        this.fixTextOverflow();
+
         // Restore checkbox states after rendering
         this.restoreCheckboxStates();
-        
+
         // Restore dropdown state after rendering
         if (openDropdownId) {
             const restoredDropdown = document.querySelector(`tr[data-id="${openDropdownId}"] .action-dropdown`);
@@ -377,6 +741,24 @@ class SawronApp {
                 this.addDropdownEventListeners();
             }
         }
+    }
+
+    fixTextOverflow() {
+        // Ensure text truncation is working properly
+        const nameElements = document.querySelectorAll('.name-cell');
+        const statusElements = document.querySelectorAll('.status-cell');
+        const sourceElements = document.querySelectorAll('.source-cell');
+
+        [...nameElements, ...statusElements, ...sourceElements].forEach(element => {
+            if (element.scrollWidth > element.clientWidth) {
+                // Force CSS properties if they're not being applied
+                element.style.overflow = 'hidden';
+                element.style.textOverflow = 'ellipsis';
+                element.style.whiteSpace = 'nowrap';
+                element.style.maxWidth = '0';
+                element.style.minWidth = '0';
+            }
+        });
     }
 
     restoreCheckboxStates() {
@@ -481,43 +863,54 @@ class SawronApp {
     createTableRow(item) {
         const status = item.status;
         const isCompleted = status === 'completed';
+        const isPending = status === 'pending';
         const isProcessing = ['initializing', 'extracting', 'distilling'].includes(status);
         const isError = status === 'error';
 
-        let statusClass = '';
-        let statusIcon = '';
-
-        if (isCompleted) {
-            statusClass = 'status-completed';
-            statusIcon = '✅';
-        } else if (isProcessing) {
-            statusClass = 'status-processing';
-            statusIcon = '⏳';
-        } else if (isError) {
-            statusClass = 'status-error';
-            statusIcon = '❌';
+        // Debug logging for status issues
+        if (window.DEBUG_STATUS) {
+            console.log(`[DEBUG] Item ${item.id}: status="${status}", processingStep="${item.processingStep}"`);
         }
+
+        // Enhanced status mapping
+        const STATUS_CONFIG = {
+            'pending': { icon: '⏸️', text: 'QUEUED', class: 'status-queued' },
+            'initializing': { icon: '🔄', text: 'INITIALIZING', class: 'status-processing' },
+            'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
+            'distilling': { icon: '🤖', text: 'DISTILLING', class: 'status-processing' },
+            'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
+            'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
+        };
+
+        const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['pending'] || {
+            icon: '❓', text: 'UNKNOWN', class: 'status-unknown'
+        };
+        const statusClass = statusConfig.class;
+        const statusIcon = statusConfig.icon;
+        const statusText = statusConfig.text;
 
         const title = item.title || 'Processing...';
 
         // Extract name for display
-        const name = this.extractItemName(item);
+        const fullName = this.extractItemName(item);
+        // Ensure name isn't excessively long (fallback if CSS fails)
+        const name = fullName.length > 100 ? fullName.substring(0, 97) + '...' : fullName;
 
         // Format source display
         let sourceDisplay = '';
         if (item.sourceUrl) {
-            sourceDisplay = `<a href="${item.sourceUrl}" target="_blank" class="source-link">${this.truncateText(item.sourceUrl, 30)}</a>`;
+            const truncatedUrl = this.truncateText(item.sourceUrl, 40);
+            sourceDisplay = `<a href="${item.sourceUrl}" target="_blank" class="source-link" title="${item.sourceUrl}">${truncatedUrl}</a>`;
         } else if (item.sourceFile) {
-            sourceDisplay = `<span class="file-source">${item.sourceFile.name}</span>`;
+            const truncatedFileName = this.truncateText(item.sourceFile.name, 30);
+            sourceDisplay = `<span class="file-source" title="${item.sourceFile.name}">${truncatedFileName}</span>`;
         }
 
         // Format status display with step
         const statusDisplay = `
-            <div class="status-cell ${statusClass}">
-                <span class="status-icon">${statusIcon}</span>
-                <span class="status-text">${status.toUpperCase()}</span>
-                ${item.processingStep ? `<div class="processing-step">${item.processingStep}</div>` : ''}
-            </div>
+            <span class="status-icon">${statusIcon}</span>
+            <span class="status-text">${statusText}</span>
+            ${item.processingStep && item.processingStep !== statusText ? `<div class="processing-step">${item.processingStep}</div>` : ''}
         `;
 
         // Format processing time with live chronometer
@@ -525,12 +918,15 @@ class SawronApp {
         if (item.processingTime) {
             // Completed items show final processing time
             processingTimeDisplay = `${item.processingTime.toFixed(1)}s`;
+        } else if (status === 'pending') {
+            // Show "Waiting..." for items that are pending (in queue)
+            processingTimeDisplay = 'Waiting...';
         } else if (isProcessing && item.startTime) {
-            // Live chronometer for processing items
+            // Live chronometer for processing items (initializing, extracting, distilling)
             const startTime = new Date(item.startTime);
             const currentTime = new Date();
             const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-            
+
             if (elapsedSeconds < 60) {
                 processingTimeDisplay = `${elapsedSeconds}s`;
             } else {
@@ -559,10 +955,14 @@ class SawronApp {
                 <div class="action-dropdown-content" id="dropdown-${item.id}" onclick="event.stopPropagation()">
                     ${isCompleted ? `
                         <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showDistillationModal('${item.id}'); app.closeAllDropdowns();">
-                            📄 View Distillation
+                            📄 View
                         </button>
-                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.downloadDistillation('${item.id}'); app.closeAllDropdowns();">
-                            📥 Download
+                        <button class="action-dropdown-item" id="download-btn-${item.id}" 
+                                onclick="event.stopPropagation(); app.handleDownloadClick('${item.id}'); app.closeAllDropdowns();"
+                                onmouseenter="app.handleDownloadHover('${item.id}', true)"
+                                onmouseleave="app.handleDownloadHover('${item.id}', false)">
+                            <span class="btn-icon">📥</span>
+                            <span class="btn-text">Download</span>
                         </button>
                     ` : ''}
                     ${isProcessing ? `
@@ -570,18 +970,16 @@ class SawronApp {
                             ⏹️ Stop Processing
                         </button>
                     ` : ''}
-                    ${isError ? `
-                        <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
-                            🔄 Retry
-                        </button>
-                    ` : ''}
+                    <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
+                        🔄 Retry
+                    </button>
                     ${(isCompleted || isError) && item.rawContent ? `
                         <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showRawContent('${item.id}'); app.closeAllDropdowns();">
-                            🔍 View Raw Content
+                            🔍 View Raw
                         </button>
                     ` : ''}
                     <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showLogs('${item.id}'); app.closeAllDropdowns();">
-                        📋 Processing Logs
+                        📋 Logs
                     </button>
                     <button class="action-dropdown-item delete-item" onclick="event.stopPropagation(); app.deleteDistillation('${item.id}'); app.closeAllDropdowns();">
                         🗑️ Delete
@@ -595,10 +993,10 @@ class SawronApp {
                 <td class="checkbox-column">
                     <input type="checkbox" class="row-checkbox" data-id="${item.id}" onchange="app.handleRowSelection()">
                 </td>
-                <td class="name-cell" title="${name}">${this.truncateText(name, 30)}</td>
-                <td class="source-cell">${sourceDisplay}</td>
+                <td class="name-cell truncate-text" data-tooltip="${fullName}">${name}</td>
+                <td class="source-cell truncate-text" data-tooltip="${item.sourceUrl || (item.sourceFile ? item.sourceFile.name : '')}">${sourceDisplay}</td>
                 <td class="type-cell">${this.getTypeLabel(item.sourceType)}</td>
-                <td class="status-cell">${statusDisplay}</td>
+                <td class="status-cell ${statusClass} truncate-text" data-tooltip="${statusText}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}">${statusDisplay}</td>
                 <td class="time-cell">${processingTimeDisplay}</td>
                 <td class="date-cell">${formattedDate}</td>
                 <td class="actions-cell">${actions}</td>
@@ -663,18 +1061,18 @@ class SawronApp {
 
     toggleActionDropdown(event, id) {
         event.stopPropagation();
-    
+
         // Close all other dropdowns
         document.querySelectorAll('.action-dropdown').forEach(dropdown => {
             if (dropdown !== event.currentTarget) {
                 dropdown.classList.remove('show');
             }
         });
-    
+
         // Toggle current dropdown
         const dropdown = event.currentTarget;
         const isOpen = dropdown.classList.toggle('show');
-    
+
         if (isOpen) {
             // Add event listeners when dropdown opens
             this.addDropdownEventListeners();
@@ -687,7 +1085,7 @@ class SawronApp {
     addDropdownEventListeners() {
         // Remove existing listeners first to prevent duplicates
         this.removeDropdownEventListeners();
-        
+
         // Add document click listener for outside clicks
         this.documentClickHandler = (event) => {
             const openDropdown = document.querySelector('.action-dropdown.show');
@@ -696,7 +1094,7 @@ class SawronApp {
                 this.removeDropdownEventListeners();
             }
         };
-        
+
         // Add keyboard listener for Escape key
         this.keyboardHandler = (event) => {
             if (event.key === 'Escape') {
@@ -707,7 +1105,7 @@ class SawronApp {
                 }
             }
         };
-        
+
         // Add listeners immediately
         document.addEventListener('click', this.documentClickHandler);
         document.addEventListener('keydown', this.keyboardHandler);
@@ -730,7 +1128,7 @@ class SawronApp {
         });
         this.removeDropdownEventListeners();
     }
-    
+
 
     async showRawContent(id) {
         try {
@@ -891,9 +1289,47 @@ class SawronApp {
         document.getElementById('logs-modal').style.display = 'none';
     }
 
+    handleDownloadClick(id) {
+        const buttonId = `download-btn-${id}`;
+        const state = this.downloadStateManager.getDownloadState(buttonId);
+        
+        if (state.state === 'loading' || state.state === 'cancellable') {
+            // Cancel the download
+            this.downloadStateManager.cancelDownload(buttonId);
+        } else {
+            // Start the download
+            this.downloadDistillation(id);
+        }
+    }
+
+    handleDownloadHover(id, isEntering) {
+        const buttonId = `download-btn-${id}`;
+        const state = this.downloadStateManager.getDownloadState(buttonId);
+        
+        if (state.state === 'loading') {
+            if (isEntering) {
+                this.downloadStateManager.setDownloadState(buttonId, 'cancellable');
+            } else {
+                this.downloadStateManager.setDownloadState(buttonId, 'loading');
+            }
+        }
+    }
+
     async downloadDistillation(id) {
+        const buttonId = `download-btn-${id}`;
+        
         try {
-            const response = await fetch(`/api/summaries/${id}/pdf`);
+            // Set loading state
+            const abortController = new AbortController();
+            this.downloadStateManager.setDownloadState(buttonId, 'loading', {
+                downloadId: id,
+                abortController: abortController,
+                startTime: Date.now()
+            });
+
+            const response = await fetch(`/api/summaries/${id}/pdf`, {
+                signal: abortController.signal
+            });
 
             if (!response.ok) {
                 const error = await response.json();
@@ -931,9 +1367,21 @@ class SawronApp {
                 window.URL.revokeObjectURL(url);
             }, 100);
 
+            // Reset to idle state on success
+            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+
         } catch (error) {
+            if (error.name === 'AbortError') {
+                // Download was cancelled, state already reset by cancelDownload
+                return;
+            }
+            
             console.error('Error downloading distillation:', error);
-            alert('Error downloading PDF: ' + error.message);
+            
+            // Set error state
+            this.downloadStateManager.setDownloadState(buttonId, 'error', {
+                errorMessage: error.message || 'Download failed'
+            });
         }
     }
 
@@ -961,11 +1409,11 @@ class SawronApp {
             console.log(`Retrying distillation ${id}`);
             const url = `/api/summaries/${id}/retry`;
             console.log(`Making POST request to: ${url}`);
-            
+
             const response = await fetch(url, {
                 method: 'POST'
             });
-            
+
             console.log(`Response status: ${response.status} ${response.statusText}`);
 
             if (!response.ok) {
@@ -981,7 +1429,7 @@ class SawronApp {
             }
 
             console.log(`Distillation ${id} retry initiated successfully`);
-            
+
             // Refresh the knowledge base to show updated status
             this.loadKnowledgeBase();
 
@@ -1054,9 +1502,9 @@ class SawronApp {
                             }
                             return line;
                         });
-                        
+
                         const processedParagraph = processedLines.join('\n');
-                        
+
                         // If paragraph already has HTML tags, don't wrap in <p>
                         if (processedParagraph.includes('<')) {
                             return processedParagraph.replace(/\n/g, '<br>');
@@ -1068,7 +1516,7 @@ class SawronApp {
                 })
                 .filter(p => p)
                 .join('');
-                
+
             return processedContent;
         }
 
@@ -1101,7 +1549,7 @@ class SawronApp {
                     result.push(`</${listType}>`);
                     inList = false;
                     listType = null;
-                    numberedItemCounter = 0; // Reset counter when list ends
+                    // DON'T reset numberedItemCounter here - keep it going across the document
                 }
                 continue;
             }
@@ -1111,7 +1559,7 @@ class SawronApp {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h3>${trimmedLine.substring(4)}</h3>`);
                 continue;
             }
@@ -1119,7 +1567,7 @@ class SawronApp {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h2>${trimmedLine.substring(3)}</h2>`);
                 continue;
             }
@@ -1127,7 +1575,7 @@ class SawronApp {
                 const state = this.flushParagraph(result, currentParagraph, inList, listType);
                 inList = state.inList;
                 listType = state.listType;
-                numberedItemCounter = 0; // Reset counter after headers
+                // DON'T reset counter after headers - keep numbering continuous
                 result.push(`<h1>${trimmedLine.substring(2)}</h1>`);
                 continue;
             }
@@ -1143,7 +1591,7 @@ class SawronApp {
                     result.push('<ul>');
                     inList = true;
                     listType = 'ul';
-                    numberedItemCounter = 0; // Reset counter for unordered lists
+                    // DON'T reset counter for unordered lists - keep numbering continuous
                 }
                 const content = this.processInlineMarkdown(trimmedLine.substring(2));
                 result.push(`<li>${content}</li>`);
@@ -1170,10 +1618,10 @@ class SawronApp {
                 // Extract the original numbering and content
                 const originalNumbering = orderedMatch[1].trim(); // e.g., "1. 1."
                 const textContent = orderedMatch[2]; // The actual content
-                
+
                 // Process the content for inline markdown (including bold)
                 const processedContent = this.processInlineMarkdown(textContent);
-                
+
                 // Create list item with bold formatting for the entire line
                 const listItem = `<li><strong><span class="list-number">${numberedItemCounter}.</span> ${processedContent}</strong></li>`;
                 result.push(listItem);
@@ -1243,6 +1691,11 @@ class SawronApp {
     }
 
     truncateText(text, maxLength) {
+        // Handle null, undefined, or non-string values
+        if (!text || typeof text !== 'string') {
+            return '';
+        }
+        
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
     }
@@ -1255,10 +1708,14 @@ class SawronApp {
             const bulkActionsBar = document.getElementById('bulk-actions-bar');
             const selectedCount = document.getElementById('selected-count');
             const selectAllBtn = document.getElementById('select-all-btn');
-            const headerCheckbox = document.getElementById('header-checkbox');
+
+            // Get all action buttons
+            const bulkRetryBtn = document.getElementById('bulk-retry-btn');
+            const bulkDownloadBtn = document.getElementById('bulk-download-btn');
+            const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
 
             // Ensure all elements exist
-            if (!bulkActionsBar || !selectedCount || !selectAllBtn || !headerCheckbox) {
+            if (!bulkActionsBar || !selectedCount || !selectAllBtn) {
                 return;
             }
 
@@ -1276,30 +1733,24 @@ class SawronApp {
             // Update selected count
             selectedCount.textContent = `${selectedCount_num} selected`;
 
-            // Show/hide bulk actions bar
-            if (selectedCount_num > 0) {
-                bulkActionsBar.style.display = 'flex';
-            } else {
-                bulkActionsBar.style.display = 'none';
-            }
+            // Bulk actions bar is always visible now
+            // Update button states based on selection
+            const hasSelection = selectedCount_num > 0;
 
-            // Update header checkbox state
+            if (bulkRetryBtn) bulkRetryBtn.disabled = !hasSelection;
+            if (bulkDownloadBtn) bulkDownloadBtn.disabled = !hasSelection;
+            if (bulkDeleteBtn) bulkDeleteBtn.disabled = !hasSelection;
+
+            // Update Select All button text and state
             if (selectedCount_num === 0) {
-                headerCheckbox.indeterminate = false;
-                headerCheckbox.checked = false;
+                selectAllBtn.querySelector('.btn-text').textContent = 'Select All';
+                selectAllBtn.disabled = false;
             } else if (selectedCount_num === totalCount && totalCount > 0) {
-                headerCheckbox.indeterminate = false;
-                headerCheckbox.checked = true;
+                selectAllBtn.querySelector('.btn-text').textContent = 'Unselect All';
+                selectAllBtn.disabled = false;
             } else {
-                headerCheckbox.indeterminate = true;
-                headerCheckbox.checked = false;
-            }
-
-            // Update select all button text
-            if (selectedCount_num === totalCount && totalCount > 0) {
-                selectAllBtn.innerHTML = '<span class="btn-icon">☐</span><span class="btn-text">Unselect All</span>';
-            } else {
-                selectAllBtn.innerHTML = '<span class="btn-icon">☑️</span><span class="btn-text">Select All</span>';
+                selectAllBtn.querySelector('.btn-text').textContent = 'Select All';
+                selectAllBtn.disabled = false;
             }
         } catch (error) {
             // Handle selection errors silently
@@ -1329,6 +1780,45 @@ class SawronApp {
         return Array.from(checkedBoxes).map(checkbox => checkbox.dataset.id);
     }
 
+    handleBulkDownloadClick() {
+        const buttonId = 'bulk-download-btn';
+        const state = this.downloadStateManager.getDownloadState(buttonId);
+        
+        if (state.state === 'loading' || state.state === 'cancellable') {
+            // Cancel the download
+            this.downloadStateManager.cancelDownload(buttonId);
+        } else {
+            // Start the download
+            this.bulkDownload();
+        }
+    }
+
+    handleBulkDownloadHover(isEntering) {
+        const buttonId = 'bulk-download-btn';
+        const state = this.downloadStateManager.getDownloadState(buttonId);
+        
+        if (state.state === 'loading') {
+            if (isEntering) {
+                this.downloadStateManager.setDownloadState(buttonId, 'cancellable');
+            } else {
+                this.downloadStateManager.setDownloadState(buttonId, 'loading');
+            }
+        }
+    }
+
+    handleBulkDownloadClick() {
+        const buttonId = 'bulk-download-btn';
+        const state = this.downloadStateManager.getDownloadState(buttonId);
+        
+        if (state.state === 'cancellable') {
+            // Cancel the download
+            this.downloadStateManager.cancelDownload(buttonId);
+        } else {
+            // Start the download
+            this.bulkDownload();
+        }
+    }
+
     async bulkDownload() {
         const selectedIds = this.getSelectedIds();
         if (selectedIds.length === 0) {
@@ -1336,19 +1826,24 @@ class SawronApp {
             return;
         }
 
-        // Disable download button during operation
-        const downloadBtn = document.getElementById('bulk-download-btn');
-        const originalText = downloadBtn.innerHTML;
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
+        const buttonId = 'bulk-download-btn';
 
         try {
+            // Set loading state
+            const abortController = new AbortController();
+            this.downloadStateManager.setDownloadState(buttonId, 'loading', {
+                downloadId: 'bulk',
+                abortController: abortController,
+                startTime: Date.now()
+            });
+
             const response = await fetch('/api/summaries/bulk-download', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ ids: selectedIds })
+                body: JSON.stringify({ ids: selectedIds }),
+                signal: abortController.signal
             });
 
             if (!response.ok) {
@@ -1404,7 +1899,15 @@ class SawronApp {
             const itemText = selectedIds.length === 1 ? 'item' : 'items';
             this.showTemporaryMessage(`Successfully downloaded ${selectedIds.length} ${itemText}`, 'success');
 
+            // Reset to idle state on success
+            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+
         } catch (error) {
+            if (error.name === 'AbortError') {
+                // Download was cancelled, state already reset by cancelDownload
+                return;
+            }
+            
             console.error('Error downloading items:', error);
 
             // Show user-friendly error message
@@ -1417,11 +1920,10 @@ class SawronApp {
                 userMessage += error.message;
             }
 
-            alert(userMessage);
-        } finally {
-            // Re-enable download button
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = originalText;
+            // Set error state
+            this.downloadStateManager.setDownloadState(buttonId, 'error', {
+                errorMessage: userMessage
+            });
         }
     }
 
@@ -1508,6 +2010,86 @@ class SawronApp {
             deleteBtn.innerHTML = originalText;
         }
     }
+
+    async bulkRetry() {
+        const selectedIds = this.getSelectedIds();
+        if (selectedIds.length === 0) {
+            alert('Please select items to retry.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to retry ${selectedIds.length} selected item(s)?`)) {
+            return;
+        }
+
+        try {
+            for (const id of selectedIds) {
+                await this.retryDistillation(id);
+            }
+
+            this.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
+
+            // Clear selection and refresh
+            this.selectedItems.clear();
+            this.handleRowSelection();
+            this.loadKnowledgeBase();
+
+        } catch (error) {
+            console.error('Error retrying selected items:', error);
+            alert('Error retrying selected items: ' + error.message);
+        }
+    }
+
+    async bulkRetryAll() {
+        if (!confirm('Are you sure you want to retry ALL items in the knowledge base? This will reprocess all distillations.')) {
+            return;
+        }
+
+        try {
+            const allItems = this.knowledgeBase;
+            if (allItems.length === 0) {
+                alert('No items to retry.');
+                return;
+            }
+
+            for (const item of allItems) {
+                await this.retryDistillation(item.id);
+            }
+
+            this.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
+            this.loadKnowledgeBase();
+
+        } catch (error) {
+            console.error('Error retrying all items:', error);
+            alert('Error retrying all items: ' + error.message);
+        }
+    }
+
+    async bulkRetryFailed() {
+        try {
+            const failedItems = this.knowledgeBase.filter(item => item.status === 'error');
+
+            if (failedItems.length === 0) {
+                alert('No failed items to retry.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to retry ${failedItems.length} failed item(s)?`)) {
+                return;
+            }
+
+            for (const item of failedItems) {
+                await this.retryDistillation(item.id);
+            }
+
+            this.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
+            this.loadKnowledgeBase();
+
+        } catch (error) {
+            console.error('Error retrying failed items:', error);
+            alert('Error retrying failed items: ' + error.message);
+        }
+    }
 }
 
 // Global functions for HTML onclick handlers
@@ -1516,7 +2098,7 @@ async function pasteFromClipboard(event) {
         event.preventDefault();
         event.stopPropagation();
     }
-    
+
     try {
         // Try to read from clipboard directly
         const text = await navigator.clipboard.readText();
@@ -1527,7 +2109,7 @@ async function pasteFromClipboard(event) {
         console.log('Text pasted from clipboard successfully');
     } catch (err) {
         console.error('Failed to read clipboard:', err);
-        
+
         // Fallback: show alert and focus input for manual paste
         alert('Unable to access clipboard automatically. Please paste manually using Ctrl+V (or Cmd+V on Mac).');
         const mainInput = document.getElementById('main-input');
@@ -1572,11 +2154,31 @@ function toggleSelectAll() {
 }
 
 function bulkDownload() {
-    app.bulkDownload();
+    app.handleBulkDownloadClick();
+}
+
+function handleBulkDownloadHover(isEntering) {
+    app.handleBulkDownloadHover(isEntering);
+}
+
+function handleBulkDownloadClick() {
+    app.handleBulkDownloadClick();
 }
 
 function bulkDelete() {
     app.bulkDelete();
+}
+
+function bulkRetry() {
+    app.bulkRetry();
+}
+
+function bulkRetryAll() {
+    app.bulkRetryAll();
+}
+
+function bulkRetryFailed() {
+    app.bulkRetryFailed();
 }
 
 // Initialize app
