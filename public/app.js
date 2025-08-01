@@ -180,6 +180,163 @@ class DownloadStateManager {
     }
 }
 
+// Viewport Boundary Detection Utilities
+class ViewportUtils {
+    static getViewportDimensions() {
+        return {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+    }
+
+    static getElementPosition(element) {
+        const rect = element.getBoundingClientRect();
+        return {
+            top: rect.top,
+            left: rect.left,
+            bottom: rect.bottom,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height
+        };
+    }
+
+    static calculateAvailableSpace(element) {
+        const elementPos = this.getElementPosition(element);
+        const viewport = this.getViewportDimensions();
+        
+        return {
+            top: elementPos.top,
+            bottom: viewport.height - elementPos.bottom,
+            left: elementPos.left,
+            right: viewport.width - elementPos.right
+        };
+    }
+
+    static wouldExtendBeyondViewport(element, dropdownWidth, dropdownHeight) {
+        const elementPos = this.getElementPosition(element);
+        const viewport = this.getViewportDimensions();
+        
+        return {
+            right: (elementPos.right + dropdownWidth) > viewport.width,
+            bottom: (elementPos.bottom + dropdownHeight) > viewport.height,
+            left: (elementPos.left - dropdownWidth) < 0,
+            top: (elementPos.top - dropdownHeight) < 0
+        };
+    }
+
+    static getOptimalDropdownPosition(triggerElement, dropdownElement) {
+        const triggerPos = this.getElementPosition(triggerElement);
+        const dropdownRect = dropdownElement.getBoundingClientRect();
+        const viewport = this.getViewportDimensions();
+        
+        let position = {
+            top: triggerPos.bottom + 4, // Default: below trigger
+            left: triggerPos.right - dropdownRect.width // Default: right-aligned
+        };
+
+        // Check if dropdown extends beyond right edge
+        if (position.left + dropdownRect.width > viewport.width - 10) {
+            position.left = triggerPos.left; // Left-align instead
+        }
+
+        // Check if dropdown extends beyond left edge
+        if (position.left < 10) {
+            position.left = 10;
+        }
+
+        // Check if dropdown extends beyond bottom edge
+        if (position.top + dropdownRect.height > viewport.height - 10) {
+            position.top = triggerPos.top - dropdownRect.height - 4; // Position above
+        }
+
+        // Check if dropdown extends beyond top edge
+        if (position.top < 10) {
+            position.top = triggerPos.bottom + 4; // Force below
+        }
+
+        return position;
+    }
+}
+
+// Enhanced Tooltip Manager
+class TooltipManager {
+    constructor() {
+        this.activeTooltip = null;
+        this.timeoutId = null;
+        this.targetElement = null;
+    }
+
+    showTooltip(element, text) {
+        try {
+            this.cleanup();
+
+            if (!element || !text || typeof text !== 'string') {
+                return;
+            }
+
+            // Create tooltip
+            this.activeTooltip = document.createElement('div');
+            this.activeTooltip.className = 'tooltip';
+            this.activeTooltip.textContent = text;
+            document.body.appendChild(this.activeTooltip);
+
+            // Position tooltip directly below the element
+            const elementRect = element.getBoundingClientRect();
+            const tooltipRect = this.activeTooltip.getBoundingClientRect();
+            
+            let left = elementRect.left;
+            let top = elementRect.bottom + 5;
+
+            // Adjust if tooltip goes off screen
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (left < 10) {
+                left = 10;
+            }
+            if (top + tooltipRect.height > window.innerHeight - 10) {
+                top = elementRect.top - tooltipRect.height - 5;
+            }
+
+            this.activeTooltip.style.left = left + 'px';
+            this.activeTooltip.style.top = top + 'px';
+            this.activeTooltip.classList.add('show');
+            
+            this.targetElement = element;
+
+        } catch (error) {
+            console.warn('Error showing tooltip:', error);
+            this.cleanup();
+        }
+    }
+
+    hideTooltip() {
+        this.cleanup();
+    }
+
+    cleanup() {
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+
+        if (this.activeTooltip) {
+            this.activeTooltip.remove();
+            this.activeTooltip = null;
+        }
+
+        this.targetElement = null;
+    }
+
+    cleanupStuckTooltips() {
+        // Emergency cleanup for any stuck tooltips
+        const stuckTooltips = document.querySelectorAll('.tooltip');
+        stuckTooltips.forEach(tooltip => tooltip.remove());
+        this.cleanup();
+    }
+}
+
 // SAWRON App JavaScript
 class SawronApp {
     constructor() {
@@ -189,6 +346,7 @@ class SawronApp {
         this.refreshInterval = null;
         this.selectedItems = new Set(); // Track selected item IDs
         this.downloadStateManager = new DownloadStateManager();
+        this.tooltipManager = new TooltipManager();
         this.init();
     }
 
@@ -526,93 +684,61 @@ class SawronApp {
     }
 
     initializeTooltips() {
-        // Initialize tooltip system
-        this.tooltip = null;
-        this.tooltipTimeout = null;
-        
-        // Add event delegation for tooltips
+        // Add event delegation for tooltips on truncated text elements
         document.addEventListener('mouseover', (e) => {
-            if (e.target.hasAttribute('data-tooltip') || e.target.closest('[data-tooltip]')) {
-                const element = e.target.hasAttribute('data-tooltip') ? e.target : e.target.closest('[data-tooltip]');
-                this.showTooltip(element, element.getAttribute('data-tooltip'));
+            const element = e.target;
+            
+            // Check if element is a truncated cell that should show tooltip
+            if (this.shouldShowTooltip(element)) {
+                const text = this.getTooltipText(element);
+                if (text) {
+                    this.tooltipManager.showTooltip(element, text);
+                }
             }
         });
         
         document.addEventListener('mouseout', (e) => {
-            if (e.target.hasAttribute('data-tooltip') || e.target.closest('[data-tooltip]')) {
-                this.hideTooltip();
+            const element = e.target;
+            
+            // Hide tooltip when leaving truncated elements
+            if (this.shouldShowTooltip(element)) {
+                this.tooltipManager.hideTooltip();
             }
+        });
+
+        // Emergency cleanup on window resize or scroll
+        window.addEventListener('resize', () => {
+            this.tooltipManager.cleanupStuckTooltips();
+        });
+
+        window.addEventListener('scroll', () => {
+            this.tooltipManager.cleanupStuckTooltips();
         });
     }
 
-    showTooltip(element, text) {
-        try {
-            // Clear any existing timeout
-            if (this.tooltipTimeout) {
-                clearTimeout(this.tooltipTimeout);
-            }
-
-            // Validate inputs
-            if (!element || !text || typeof text !== 'string') {
-                return;
-            }
-
-            // Always show tooltip for truncated elements (don't rely on scrollWidth check)
-            // The CSS truncation might make scrollWidth detection unreliable
-
-            // Create tooltip if it doesn't exist
-            if (!this.tooltip) {
-                this.tooltip = document.createElement('div');
-                this.tooltip.className = 'tooltip';
-                document.body.appendChild(this.tooltip);
-            }
-
-            // Set tooltip content and position
-            this.tooltip.textContent = text;
-            
-            // Position tooltip
-            const rect = element.getBoundingClientRect();
-            
-            // Set initial position to calculate tooltip size
-            this.tooltip.style.left = '0px';
-            this.tooltip.style.top = '0px';
-            this.tooltip.style.visibility = 'hidden';
-            this.tooltip.classList.add('show');
-            
-            const tooltipRect = this.tooltip.getBoundingClientRect();
-            
-            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
-            let top = rect.top - tooltipRect.height - 10;
-            
-            // Adjust if tooltip goes off screen
-            if (left < 10) left = 10;
-            if (left + tooltipRect.width > window.innerWidth - 10) {
-                left = window.innerWidth - tooltipRect.width - 10;
-            }
-            if (top < 10) {
-                top = rect.bottom + 10;
-            }
-            
-            // Apply final position and make visible
-            this.tooltip.style.left = left + 'px';
-            this.tooltip.style.top = top + 'px';
-            this.tooltip.style.visibility = 'visible';
-            
-        } catch (error) {
-            console.warn('Error showing tooltip:', error);
-        }
+    shouldShowTooltip(element) {
+        // Check if element is in columns 1, 2, or 4 (name, source, status)
+        return element.classList.contains('name-cell') || 
+               element.classList.contains('source-cell') || 
+               element.classList.contains('status-cell') ||
+               element.closest('.name-cell') ||
+               element.closest('.source-cell') ||
+               element.closest('.status-cell');
     }
 
-    hideTooltip() {
-        if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
-            this.tooltipTimeout = null;
+    getTooltipText(element) {
+        // Get the appropriate text content for tooltip
+        const cell = element.closest('.name-cell, .source-cell, .status-cell') || element;
+        
+        if (cell.classList.contains('source-cell')) {
+            const link = cell.querySelector('a');
+            return link ? link.href : cell.textContent.trim();
         }
         
-        if (this.tooltip) {
-            this.tooltip.classList.remove('show');
-        }
+        return cell.textContent.trim();
     }
+
+
 
     async loadKnowledgeBase() {
         try {
@@ -959,8 +1085,6 @@ class SawronApp {
                         </button>
                         <button class="action-dropdown-item" id="download-btn-${item.id}" 
                                 onclick="event.stopPropagation(); app.handleDownloadClick('${item.id}'); app.closeAllDropdowns();"
-                                onmouseenter="app.handleDownloadHover('${item.id}', true)"
-                                onmouseleave="app.handleDownloadHover('${item.id}', false)">
                             <span class="btn-icon">📥</span>
                             <span class="btn-text">Download</span>
                         </button>
@@ -1302,18 +1426,7 @@ class SawronApp {
         }
     }
 
-    handleDownloadHover(id, isEntering) {
-        const buttonId = `download-btn-${id}`;
-        const state = this.downloadStateManager.getDownloadState(buttonId);
-        
-        if (state.state === 'loading') {
-            if (isEntering) {
-                this.downloadStateManager.setDownloadState(buttonId, 'cancellable');
-            } else {
-                this.downloadStateManager.setDownloadState(buttonId, 'loading');
-            }
-        }
-    }
+
 
     async downloadDistillation(id) {
         const buttonId = `download-btn-${id}`;
@@ -1793,18 +1906,7 @@ class SawronApp {
         }
     }
 
-    handleBulkDownloadHover(isEntering) {
-        const buttonId = 'bulk-download-btn';
-        const state = this.downloadStateManager.getDownloadState(buttonId);
-        
-        if (state.state === 'loading') {
-            if (isEntering) {
-                this.downloadStateManager.setDownloadState(buttonId, 'cancellable');
-            } else {
-                this.downloadStateManager.setDownloadState(buttonId, 'loading');
-            }
-        }
-    }
+
 
     handleBulkDownloadClick() {
         const buttonId = 'bulk-download-btn';
@@ -2157,9 +2259,7 @@ function bulkDownload() {
     app.handleBulkDownloadClick();
 }
 
-function handleBulkDownloadHover(isEntering) {
-    app.handleBulkDownloadHover(isEntering);
-}
+
 
 function handleBulkDownloadClick() {
     app.handleBulkDownloadClick();

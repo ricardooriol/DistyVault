@@ -318,19 +318,7 @@ body {
 
 .status-icon {
     font-size: 1.5rem;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
+    /* Removed pulsating animation */
 }
 
 .status-title {
@@ -775,19 +763,7 @@ body {
 }
 
 .status-cell.status-processing .status-icon {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.6;
-    }
+    /* Removed pulsating animation */
 }
 
 .status-cell.status-error .status-text {
@@ -843,7 +819,8 @@ body {
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    will-change: background-color, border-color, color, transform;
     border: none;
     white-space: nowrap;
     flex-shrink: 0;
@@ -877,7 +854,8 @@ body {
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    will-change: background-color, border-color, color;
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -989,9 +967,10 @@ body {
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    -webkit-transition: all 0.2s ease;
-    -moz-transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    -webkit-transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    -moz-transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    will-change: background-color, border-color, color, transform;
     border: none;
     white-space: nowrap;
     flex-shrink: 0;
