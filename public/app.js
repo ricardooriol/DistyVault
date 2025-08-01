@@ -24,15 +24,15 @@ class DownloadStateManager {
 
     setDownloadState(buttonId, newState, options = {}) {
         const state = this.getDownloadState(buttonId);
-        
+
         // Validate state transition
         if (!this.isValidStateTransition(state.state, newState)) {
             console.warn(`Invalid state transition from ${state.state} to ${newState} for button ${buttonId}`);
             return state;
         }
-        
+
         state.state = newState;
-        
+
         if (options.downloadId) state.downloadId = options.downloadId;
         if (options.abortController) state.abortController = options.abortController;
         if (options.errorMessage) state.errorMessage = options.errorMessage;
@@ -57,14 +57,14 @@ class DownloadStateManager {
             'cancellable': ['loading', 'idle', 'error'],
             'error': ['idle', 'loading']
         };
-        
+
         return validTransitions[currentState]?.includes(newState) || false;
     }
 
     setDownloadTimeout(buttonId) {
         this.clearDownloadTimeout(buttonId);
         const state = this.getDownloadState(buttonId);
-        
+
         // Set 5 minute timeout for downloads
         state.timeoutId = setTimeout(() => {
             console.warn(`Download timeout for button ${buttonId}`);
@@ -143,7 +143,7 @@ class DownloadStateManager {
                     button.innerHTML = '<span class="btn-icon">⚠️</span><span class="btn-text">Error</span>';
                 }
                 button.title = state.errorMessage || 'Download failed';
-                
+
                 // Auto-reset to idle after 3 seconds
                 setTimeout(() => {
                     if (this.getDownloadState(buttonId).state === 'error') {
@@ -156,21 +156,21 @@ class DownloadStateManager {
 
     cancelDownload(buttonId) {
         const state = this.getDownloadState(buttonId);
-        
+
         // Abort the download if in progress
         if (state.abortController) {
             state.abortController.abort();
             state.abortController = null;
         }
-        
+
         // Clear timeout
         this.clearDownloadTimeout(buttonId);
-        
+
         // Reset all state properties
         state.downloadId = null;
         state.errorMessage = null;
         state.startTime = null;
-        
+
         // Set to idle state
         this.setDownloadState(buttonId, 'idle');
     }
@@ -204,7 +204,7 @@ class ViewportUtils {
     static calculateAvailableSpace(element) {
         const elementPos = this.getElementPosition(element);
         const viewport = this.getViewportDimensions();
-        
+
         return {
             top: elementPos.top,
             bottom: viewport.height - elementPos.bottom,
@@ -216,7 +216,7 @@ class ViewportUtils {
     static wouldExtendBeyondViewport(element, dropdownWidth, dropdownHeight) {
         const elementPos = this.getElementPosition(element);
         const viewport = this.getViewportDimensions();
-        
+
         return {
             right: (elementPos.right + dropdownWidth) > viewport.width,
             bottom: (elementPos.bottom + dropdownHeight) > viewport.height,
@@ -229,7 +229,7 @@ class ViewportUtils {
         const triggerPos = this.getElementPosition(triggerElement);
         const dropdownRect = dropdownElement.getBoundingClientRect();
         const viewport = this.getViewportDimensions();
-        
+
         let position = {
             top: triggerPos.bottom + 4, // Default: below trigger
             left: triggerPos.right - dropdownRect.width // Default: right-aligned
@@ -315,7 +315,7 @@ class TooltipManager {
             // Position tooltip above the element with proper centering
             const elementRect = element.getBoundingClientRect();
             const tooltipRect = this.activeTooltip.getBoundingClientRect();
-            
+
             let left = elementRect.left + (elementRect.width / 2) - (tooltipRect.width / 2);
             let top = elementRect.top;
 
@@ -337,7 +337,7 @@ class TooltipManager {
             this.activeTooltip.style.left = left + 'px';
             this.activeTooltip.style.top = top + 'px';
             this.activeTooltip.classList.add('show');
-            
+
             this.targetElement = element;
 
         } catch (error) {
@@ -362,10 +362,10 @@ class TooltipManager {
         tempSpan.style.font = window.getComputedStyle(element).font;
         tempSpan.textContent = text;
         document.body.appendChild(tempSpan);
-        
+
         const isOverflowing = tempSpan.offsetWidth > element.offsetWidth;
         document.body.removeChild(tempSpan);
-        
+
         return isOverflowing;
     }
 
@@ -602,7 +602,7 @@ class SawronApp {
                 setTimeout(() => this.hideStatus(), 2000);
 
                 this.removeFile();
-                this.loadKnowledgeBase();
+                // New item will be detected by status monitoring
 
             } else if (url) {
                 // Process URL
@@ -626,7 +626,7 @@ class SawronApp {
                 setTimeout(() => this.hideStatus(), 2000);
 
                 mainInput.value = '';
-                this.loadKnowledgeBase();
+                // New item will be detected by status monitoring
             }
 
             this.updateButtonStates();
@@ -639,23 +639,168 @@ class SawronApp {
     }
 
     startAutoRefresh() {
-        // Optimized refresh interval - faster for processing items, slower when idle
-        this.refreshInterval = setInterval(() => {
-            this.smartRefresh();
-        }, 1000);
+        // Start targeted status monitoring instead of full table refresh
+        this.startStatusMonitoring();
     }
 
-    smartRefresh() {
-        // Check if there are any processing items
-        const hasProcessingItems = this.knowledgeBase.some(item => 
+    startStatusMonitoring() {
+        // Monitor for status changes every 2 seconds (only for processing items)
+        this.statusMonitorInterval = setInterval(() => {
+            this.checkForStatusUpdates();
+        }, 2000);
+    }
+
+    async checkForStatusUpdates() {
+        // Only check processing items for status changes
+        const processingItems = this.knowledgeBase.filter(item =>
             ['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)
         );
 
-        // Only refresh if there are processing items or it's been a while since last refresh
-        if (hasProcessingItems || !this.lastRefresh || (Date.now() - this.lastRefresh) > 5000) {
-            this.loadKnowledgeBase();
-            this.lastRefresh = Date.now();
+        if (processingItems.length === 0) {
+            return; // No processing items, nothing to check
         }
+
+        try {
+            // Fetch only the items that are currently processing
+            const response = await fetch('/api/summaries');
+            if (!response.ok) return;
+
+            const latestData = await response.json();
+
+            // Update only items that have changed status
+            processingItems.forEach(oldItem => {
+                const newItem = latestData.find(item => item.id === oldItem.id);
+                if (newItem && (newItem.status !== oldItem.status || newItem.processingStep !== oldItem.processingStep)) {
+                    this.updateSingleRow(newItem);
+                    // Update our local data
+                    const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
+                    if (index !== -1) {
+                        this.knowledgeBase[index] = newItem;
+                    }
+                }
+            });
+
+            // Check for any new items that might have been added
+            const newItems = latestData.filter(item =>
+                !this.knowledgeBase.find(existing => existing.id === item.id)
+            );
+
+            if (newItems.length > 0) {
+                // Only add new items to the beginning of the list
+                this.knowledgeBase = [...newItems, ...this.knowledgeBase];
+                newItems.forEach(item => this.addSingleRow(item));
+            }
+
+        } catch (error) {
+            console.error('Error checking status updates:', error);
+        }
+    }
+
+    updateSingleRow(item) {
+        const row = document.querySelector(`tr[data-id="${item.id}"]`);
+        if (!row) return;
+
+        // Update status cell
+        const statusCell = row.querySelector('.status-cell');
+        if (statusCell) {
+            const statusConfig = this.getStatusConfig(item.status);
+            const statusDisplay = `
+                <span class="status-icon">${statusConfig.icon}</span>
+                <span class="status-text">${statusConfig.text}</span>
+                ${item.processingStep && item.processingStep !== statusConfig.text ? `<div class="processing-step">${item.processingStep}</div>` : ''}
+            `;
+            statusCell.innerHTML = statusDisplay;
+            statusCell.className = `status-cell ${statusConfig.class} truncate-text`;
+            statusCell.setAttribute('data-tooltip', `${statusConfig.text}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}`);
+        }
+
+        // Update actions cell if status changed to completed or error
+        if (item.status === 'completed' || item.status === 'error') {
+            const actionsCell = row.querySelector('.actions-cell');
+            if (actionsCell) {
+                actionsCell.innerHTML = this.createActionsDropdown(item);
+            }
+        }
+
+        // Update name if it changed
+        const nameCell = row.querySelector('.name-cell');
+        if (nameCell && item.title && !item.title.includes('Processing')) {
+            const fullName = this.extractItemName(item);
+            const name = fullName.length > 100 ? fullName.substring(0, 97) + '...' : fullName;
+            nameCell.textContent = name;
+            nameCell.setAttribute('data-tooltip', fullName);
+        }
+    }
+
+    addSingleRow(item) {
+        const tbody = document.getElementById('knowledge-base-tbody');
+        const newRowHtml = this.createTableRow(item);
+
+        // Check if table is empty (has empty state)
+        const emptyState = tbody.querySelector('.empty-state-cell');
+        if (emptyState) {
+            tbody.innerHTML = newRowHtml;
+        } else {
+            // Add to the beginning of the table
+            tbody.insertAdjacentHTML('afterbegin', newRowHtml);
+        }
+    }
+
+    getStatusConfig(status) {
+        const STATUS_CONFIG = {
+            'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
+            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
+            'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
+            'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
+            'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
+            'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
+        };
+        return STATUS_CONFIG[status] || { icon: '❓', text: 'UNKNOWN', class: 'status-unknown' };
+    }
+
+    createActionsDropdown(item) {
+        const isCompleted = item.status === 'completed';
+        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(item.status);
+        const isError = item.status === 'error';
+
+        return `
+            <div class="action-dropdown" onclick="app.toggleActionDropdown(event, '${item.id}')">
+                <button class="action-dropdown-btn">
+                    Action
+                    <span style="font-size: 0.7rem;">▼</span>
+                </button>
+                <div class="action-dropdown-content" id="dropdown-${item.id}" onclick="event.stopPropagation()">
+                    ${isCompleted ? `
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showDistillationModal('${item.id}'); app.closeAllDropdowns();">
+                            📄 View
+                        </button>
+                        <button class="action-dropdown-item" id="download-btn-${item.id}" 
+                                onclick="event.stopPropagation(); app.handleDownloadClick('${item.id}'); app.closeAllDropdowns();">
+                            📥 Download
+                        </button>
+                    ` : ''}
+                    ${isProcessing ? `
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.stopProcessing('${item.id}'); app.closeAllDropdowns();">
+                            ⏹️ Stop Processing
+                        </button>
+                    ` : ''}
+                    <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
+                        🔄 Retry
+                    </button>
+                    ${(isCompleted || isError) && item.rawContent ? `
+                        <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showRawContent('${item.id}'); app.closeAllDropdowns();">
+                            🔍 View Raw
+                        </button>
+                    ` : ''}
+                    <button class="action-dropdown-item" onclick="event.stopPropagation(); app.showLogs('${item.id}'); app.closeAllDropdowns();">
+                        📋 Logs
+                    </button>
+                    <button class="action-dropdown-item delete-item" onclick="event.stopPropagation(); app.deleteDistillation('${item.id}'); app.closeAllDropdowns();">
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     startChronometer() {
@@ -700,7 +845,7 @@ class SawronApp {
                                     try {
                                         const startTime = new Date(item.startTime);
                                         const currentTime = new Date();
-                                        
+
                                         // Validate dates
                                         if (isNaN(startTime.getTime()) || isNaN(currentTime.getTime())) {
                                             timeCell.textContent = 'Unknown';
@@ -746,9 +891,9 @@ class SawronApp {
     }
 
     stopAutoRefresh() {
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
-            this.refreshInterval = null;
+        if (this.statusMonitorInterval) {
+            clearInterval(this.statusMonitorInterval);
+            this.statusMonitorInterval = null;
         }
         if (this.chronometerInterval) {
             clearInterval(this.chronometerInterval);
@@ -760,7 +905,7 @@ class SawronApp {
         // Add event delegation for tooltips on truncated text elements
         document.addEventListener('mouseenter', (e) => {
             const element = e.target;
-            
+
             // Check if element is a truncated cell that should show tooltip
             if (this.shouldShowTooltip(element)) {
                 const text = this.getTooltipText(element);
@@ -769,10 +914,10 @@ class SawronApp {
                 }
             }
         }, true);
-        
+
         document.addEventListener('mouseleave', (e) => {
             const element = e.target;
-            
+
             // Hide tooltip when leaving truncated elements
             if (this.shouldShowTooltip(element)) {
                 this.tooltipManager.hideTooltip();
@@ -798,23 +943,23 @@ class SawronApp {
 
     shouldShowTooltip(element) {
         // Check if element is in columns 1, 2, or 4 (name, source, status)
-        return element.classList.contains('name-cell') || 
-               element.classList.contains('source-cell') || 
-               element.classList.contains('status-cell') ||
-               element.closest('.name-cell') ||
-               element.closest('.source-cell') ||
-               element.closest('.status-cell');
+        return element.classList.contains('name-cell') ||
+            element.classList.contains('source-cell') ||
+            element.classList.contains('status-cell') ||
+            element.closest('.name-cell') ||
+            element.closest('.source-cell') ||
+            element.closest('.status-cell');
     }
 
     getTooltipText(element) {
         // Get the appropriate text content for tooltip
         const cell = element.closest('.name-cell, .source-cell, .status-cell') || element;
-        
+
         if (cell.classList.contains('source-cell')) {
             const link = cell.querySelector('a');
             return link ? link.href : cell.textContent.trim();
         }
-        
+
         return cell.textContent.trim();
     }
 
@@ -828,41 +973,21 @@ class SawronApp {
             }
 
             const data = await response.json();
-            
+
             // Validate data structure
             if (!Array.isArray(data)) {
                 throw new Error('Invalid data format received from server');
             }
 
-            // Check for status changes before updating
-            if (window.DEBUG_STATUS && this.knowledgeBase) {
-                const oldStatuses = new Map(this.knowledgeBase.map(item => [item.id, item.status]));
-                data.forEach(item => {
-                    const oldStatus = oldStatuses.get(item.id);
-                    if (oldStatus && oldStatus !== item.status) {
-                        // Status change tracking for debugging
-                    }
-                });
-            }
-
             this.knowledgeBase = data;
             this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
-            
-            // Debug logging for status tracking
-            if (window.DEBUG_STATUS) {
-                this.knowledgeBase.forEach(item => {
-                    if (['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)) {
-                        // Processing item debug info
-                    }
-                });
-            }
-            
+
             this.renderKnowledgeBase();
         } catch (error) {
             console.error('Error loading knowledge base:', error);
-            
+
             // Show fallback UI or retry mechanism
-            if (this.knowledgeBase.length === 0) {
+            if (!this.knowledgeBase || this.knowledgeBase.length === 0) {
                 // If we have no cached data, show error state
                 const tbody = document.getElementById('knowledge-base-tbody');
                 if (tbody) {
@@ -873,6 +998,7 @@ class SawronApp {
                                     <div class="empty-icon">⚠️</div>
                                     <h3>Failed to Load Knowledge Base</h3>
                                     <p>Unable to connect to server. Please check your connection and try again.</p>
+                                    <button onclick="app.loadKnowledgeBase()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--primary-orange); color: white; border: none; border-radius: 4px; cursor: pointer;">Retry</button>
                                 </div>
                             </td>
                         </tr>
@@ -1541,7 +1667,7 @@ class SawronApp {
     handleDownloadClick(id) {
         const buttonId = `download-btn-${id}`;
         const state = this.downloadStateManager.getDownloadState(buttonId);
-        
+
         if (state.state === 'loading' || state.state === 'cancellable') {
             // Cancel the download
             this.downloadStateManager.cancelDownload(buttonId);
@@ -1555,7 +1681,7 @@ class SawronApp {
 
     async downloadDistillation(id) {
         const buttonId = `download-btn-${id}`;
-        
+
         try {
             // Set loading state
             const abortController = new AbortController();
@@ -1613,9 +1739,9 @@ class SawronApp {
                 // Download was cancelled, state already reset by cancelDownload
                 return;
             }
-            
+
             console.error('Error downloading distillation:', error);
-            
+
             // Set error state
             this.downloadStateManager.setDownloadState(buttonId, 'error', {
                 errorMessage: error.message || 'Download failed'
@@ -1665,9 +1791,7 @@ class SawronApp {
             }
 
             // Retry initiated successfully
-
-            // Refresh the knowledge base to show updated status
-            this.loadKnowledgeBase();
+            // Status will be updated by monitoring system
 
         } catch (error) {
             console.error('Error retrying distillation:', error);
@@ -1690,7 +1814,30 @@ class SawronApp {
                 throw new Error(error.message || 'Failed to delete distillation');
             }
 
-            this.loadKnowledgeBase();
+            // Remove the row from the table immediately
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (row) {
+                row.remove();
+            }
+
+            // Remove from local data
+            this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== id);
+
+            // Check if table is now empty
+            const tbody = document.getElementById('knowledge-base-tbody');
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state-cell">
+                            <div class="empty-state">
+                                <div class="empty-icon">🎯</div>
+                                <h3>Ready to Process Knowledge</h3>
+                                <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
 
         } catch (error) {
             console.error('Error deleting distillation:', error);
@@ -1931,7 +2078,7 @@ class SawronApp {
         if (!text || typeof text !== 'string') {
             return '';
         }
-        
+
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
     }
@@ -2019,7 +2166,7 @@ class SawronApp {
     handleBulkDownloadClick() {
         const buttonId = 'bulk-download-btn';
         const state = this.downloadStateManager.getDownloadState(buttonId);
-        
+
         if (state.state === 'loading' || state.state === 'cancellable') {
             // Cancel the download
             this.downloadStateManager.cancelDownload(buttonId);
@@ -2034,7 +2181,7 @@ class SawronApp {
     handleBulkDownloadClick() {
         const buttonId = 'bulk-download-btn';
         const state = this.downloadStateManager.getDownloadState(buttonId);
-        
+
         if (state.state === 'cancellable') {
             // Cancel the download
             this.downloadStateManager.cancelDownload(buttonId);
@@ -2132,7 +2279,7 @@ class SawronApp {
                 // Download was cancelled, state already reset by cancelDownload
                 return;
             }
-            
+
             console.error('Error downloading items:', error);
 
             // Show user-friendly error message
@@ -2206,8 +2353,32 @@ class SawronApp {
 
             // Handle any deletion errors silently
 
-            // Refresh the knowledge base
-            this.loadKnowledgeBase();
+            // Remove deleted rows from table (use selectedIds since we know which ones were requested)
+            selectedIds.forEach(id => {
+                const row = document.querySelector(`tr[data-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+            });
+
+            // Update local data
+            this.knowledgeBase = this.knowledgeBase.filter(item => !selectedIds.includes(item.id));
+
+            // Check if table is now empty
+            const tbody = document.getElementById('knowledge-base-tbody');
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state-cell">
+                            <div class="empty-state">
+                                <div class="empty-icon">🎯</div>
+                                <h3>Ready to Process Knowledge</h3>
+                                <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
 
             // Hide bulk actions bar
             document.getElementById('bulk-actions-bar').style.display = 'none';
@@ -2257,7 +2428,7 @@ class SawronApp {
             // Clear selection and refresh
             this.selectedItems.clear();
             this.handleRowSelection();
-            this.loadKnowledgeBase();
+            // Status updates will be handled by monitoring system
 
         } catch (error) {
             console.error('Error retrying selected items:', error);
@@ -2282,7 +2453,7 @@ class SawronApp {
             }
 
             this.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
-            this.loadKnowledgeBase();
+            // Status updates will be handled by monitoring system
 
         } catch (error) {
             console.error('Error retrying all items:', error);
@@ -2308,7 +2479,7 @@ class SawronApp {
             }
 
             this.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
-            this.loadKnowledgeBase();
+            // Status updates will be handled by monitoring system
 
         } catch (error) {
             console.error('Error retrying failed items:', error);
@@ -2371,6 +2542,7 @@ function closeLogsModal() {
 }
 
 function refreshKnowledgeBase() {
+    // Manual refresh - reload the entire knowledge base
     app.loadKnowledgeBase();
 }
 
