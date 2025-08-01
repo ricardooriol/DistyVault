@@ -602,7 +602,10 @@ class SawronApp {
                 setTimeout(() => this.hideStatus(), 2000);
 
                 this.removeFile();
-                // New item will be detected by status monitoring
+                // Force MULTIPLE status updates to detect new item
+                setTimeout(() => this.forceStatusUpdate(), 200);
+                setTimeout(() => this.forceStatusUpdate(), 1000);
+                setTimeout(() => this.forceStatusUpdate(), 2000);
 
             } else if (url) {
                 // Process URL
@@ -626,7 +629,10 @@ class SawronApp {
                 setTimeout(() => this.hideStatus(), 2000);
 
                 mainInput.value = '';
-                // New item will be detected by status monitoring
+                // Force MULTIPLE status updates to detect new item
+                setTimeout(() => this.forceStatusUpdate(), 200);
+                setTimeout(() => this.forceStatusUpdate(), 1000);
+                setTimeout(() => this.forceStatusUpdate(), 2000);
             }
 
             this.updateButtonStates();
@@ -644,33 +650,31 @@ class SawronApp {
     }
 
     startStatusMonitoring() {
-        // Monitor for status changes every 2 seconds (only for processing items)
+        // Monitor for status changes every 300ms for ULTRA-MAXIMUM responsiveness
         this.statusMonitorInterval = setInterval(() => {
             this.checkForStatusUpdates();
-        }, 2000);
+        }, 300);
+    }
+
+    forceStatusUpdate() {
+        // Force an immediate status update (used after retry operations)
+        this.checkForStatusUpdates();
     }
 
     async checkForStatusUpdates() {
-        // Only check processing items for status changes
-        const processingItems = this.knowledgeBase.filter(item =>
-            ['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)
-        );
-
-        if (processingItems.length === 0) {
-            return; // No processing items, nothing to check
-        }
-
         try {
-            // Fetch only the items that are currently processing
+            // Fetch latest data
             const response = await fetch('/api/summaries');
             if (!response.ok) return;
 
             const latestData = await response.json();
 
-            // Update only items that have changed status
-            processingItems.forEach(oldItem => {
+            // Check ALL items for any changes (more comprehensive monitoring)
+            // Process items in reverse order to maintain bottom-to-top visual updates
+            const itemsToCheck = [...this.knowledgeBase].reverse();
+            itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
-                if (newItem && (newItem.status !== oldItem.status || newItem.processingStep !== oldItem.processingStep)) {
+                if (newItem && this.hasItemChanged(oldItem, newItem)) {
                     this.updateSingleRow(newItem);
                     // Update our local data
                     const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
@@ -691,9 +695,44 @@ class SawronApp {
                 newItems.forEach(item => this.addSingleRow(item));
             }
 
+            // Check for deleted items
+            const deletedItems = this.knowledgeBase.filter(oldItem =>
+                !latestData.find(item => item.id === oldItem.id)
+            );
+
+            deletedItems.forEach(deletedItem => {
+                const row = document.querySelector(`tr[data-id="${deletedItem.id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== deletedItem.id);
+            });
+
         } catch (error) {
             console.error('Error checking status updates:', error);
         }
+    }
+
+    hasItemChanged(oldItem, newItem) {
+        // ULTRA-SENSITIVE change detection - checks EVERYTHING
+        return (
+            newItem.status !== oldItem.status ||
+            newItem.processingStep !== oldItem.processingStep ||
+            newItem.title !== oldItem.title ||
+            newItem.startTime !== oldItem.startTime ||
+            newItem.distillingStartTime !== oldItem.distillingStartTime ||
+            newItem.completedAt !== oldItem.completedAt ||
+            newItem.processingTime !== oldItem.processingTime ||
+            newItem.wordCount !== oldItem.wordCount ||
+            newItem.error !== oldItem.error ||
+            newItem.elapsedTime !== oldItem.elapsedTime ||
+            newItem.content !== oldItem.content ||
+            newItem.rawContent !== oldItem.rawContent ||
+            newItem.sourceUrl !== oldItem.sourceUrl ||
+            newItem.sourceType !== oldItem.sourceType ||
+            JSON.stringify(newItem.sourceFile) !== JSON.stringify(oldItem.sourceFile) ||
+            JSON.stringify(newItem.logs) !== JSON.stringify(oldItem.logs)
+        );
     }
 
     updateSingleRow(item) {
@@ -1404,8 +1443,16 @@ class SawronApp {
         const isOpen = dropdown.classList.toggle('show');
 
         if (isOpen) {
+            // FORCE MAXIMUM Z-INDEX AND POSITIONING
+            const dropdownContent = dropdown.querySelector('.action-dropdown-content');
+            if (dropdownContent) {
+                dropdownContent.style.zIndex = '2147483647';
+                dropdownContent.style.position = 'fixed';
+            }
+
             // Position dropdown intelligently
             this.positionDropdown(dropdown);
+
             // Add event listeners when dropdown opens
             this.addDropdownEventListeners();
         } else {
@@ -1418,12 +1465,9 @@ class SawronApp {
         const dropdownContent = dropdown.querySelector('.action-dropdown-content');
         if (!dropdownContent) return;
 
-        // Reset positioning to get natural dimensions
+        // FORCE MAXIMUM Z-INDEX AND FIXED POSITIONING
         dropdownContent.style.position = 'fixed';
-        dropdownContent.style.top = 'auto';
-        dropdownContent.style.left = 'auto';
-        dropdownContent.style.right = 'auto';
-        dropdownContent.style.bottom = 'auto';
+        dropdownContent.style.zIndex = '2147483647';
 
         // Get trigger button position
         const triggerRect = dropdown.getBoundingClientRect();
@@ -1433,6 +1477,7 @@ class SawronApp {
             height: window.innerHeight
         };
 
+        // Calculate position
         let top = triggerRect.bottom + 4;
         let left = triggerRect.right - dropdownRect.width;
 
@@ -1452,9 +1497,12 @@ class SawronApp {
             top = 10; // Minimum distance from top
         }
 
-        // Apply calculated position
+        // Apply calculated position with MAXIMUM Z-INDEX
         dropdownContent.style.top = `${top}px`;
         dropdownContent.style.left = `${left}px`;
+        dropdownContent.style.right = 'auto';
+        dropdownContent.style.bottom = 'auto';
+        dropdownContent.style.zIndex = '2147483647';
     }
 
     addDropdownEventListeners() {
@@ -1481,9 +1529,19 @@ class SawronApp {
             }
         };
 
+        // Add scroll listener to close dropdowns when scrolling
+        this.scrollHandler = () => {
+            const openDropdown = document.querySelector('.action-dropdown.show');
+            if (openDropdown) {
+                openDropdown.classList.remove('show');
+                this.removeDropdownEventListeners();
+            }
+        };
+
         // Add listeners immediately
         document.addEventListener('click', this.documentClickHandler);
         document.addEventListener('keydown', this.keyboardHandler);
+        document.addEventListener('scroll', this.scrollHandler, true);
     }
 
     removeDropdownEventListeners() {
@@ -1494,6 +1552,10 @@ class SawronApp {
         if (this.keyboardHandler) {
             document.removeEventListener('keydown', this.keyboardHandler);
             this.keyboardHandler = null;
+        }
+        if (this.scrollHandler) {
+            document.removeEventListener('scroll', this.scrollHandler, true);
+            this.scrollHandler = null;
         }
     }
 
@@ -1790,8 +1852,10 @@ class SawronApp {
                 throw new Error(errorMessage);
             }
 
-            // Retry initiated successfully
-            // Status will be updated by monitoring system
+            // Retry initiated successfully - force MULTIPLE immediate status updates
+            setTimeout(() => this.forceStatusUpdate(), 200);
+            setTimeout(() => this.forceStatusUpdate(), 1000);
+            setTimeout(() => this.forceStatusUpdate(), 2000);
 
         } catch (error) {
             console.error('Error retrying distillation:', error);
@@ -2419,16 +2483,27 @@ class SawronApp {
         }
 
         try {
-            for (const id of selectedIds) {
+            // Process selected items from bottom to top (reverse order) with delay to ensure proper sequencing
+            const idsToRetry = [...selectedIds].reverse();
+            for (let i = 0; i < idsToRetry.length; i++) {
+                const id = idsToRetry[i];
+                // Add small delay between retries to ensure bottom-to-top processing order
+                if (i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
                 await this.retryDistillation(id);
             }
 
             this.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
 
-            // Clear selection and refresh
+            // Clear selection and force immediate status update
             this.selectedItems.clear();
             this.handleRowSelection();
-            // Status updates will be handled by monitoring system
+
+            // Force MULTIPLE immediate status updates after retry
+            setTimeout(() => this.forceStatusUpdate(), 200);
+            setTimeout(() => this.forceStatusUpdate(), 1000);
+            setTimeout(() => this.forceStatusUpdate(), 2000);
 
         } catch (error) {
             console.error('Error retrying selected items:', error);
@@ -2448,12 +2523,23 @@ class SawronApp {
                 return;
             }
 
-            for (const item of allItems) {
+            // Process items from bottom to top (reverse order) with delay to ensure proper sequencing
+            const itemsToRetry = [...allItems].reverse();
+            for (let i = 0; i < itemsToRetry.length; i++) {
+                const item = itemsToRetry[i];
+                // Add small delay between retries to ensure bottom-to-top processing order
+                if (i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
                 await this.retryDistillation(item.id);
             }
 
             this.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
-            // Status updates will be handled by monitoring system
+
+            // Force MULTIPLE immediate status updates after retry all
+            setTimeout(() => this.forceStatusUpdate(), 200);
+            setTimeout(() => this.forceStatusUpdate(), 1000);
+            setTimeout(() => this.forceStatusUpdate(), 2000);
 
         } catch (error) {
             console.error('Error retrying all items:', error);
@@ -2474,12 +2560,23 @@ class SawronApp {
                 return;
             }
 
-            for (const item of failedItems) {
+            // Process failed items from bottom to top (reverse order) with delay to ensure proper sequencing
+            const itemsToRetry = [...failedItems].reverse();
+            for (let i = 0; i < itemsToRetry.length; i++) {
+                const item = itemsToRetry[i];
+                // Add small delay between retries to ensure bottom-to-top processing order
+                if (i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
                 await this.retryDistillation(item.id);
             }
 
             this.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
-            // Status updates will be handled by monitoring system
+
+            // Force MULTIPLE immediate status updates after retry failed
+            setTimeout(() => this.forceStatusUpdate(), 200);
+            setTimeout(() => this.forceStatusUpdate(), 1000);
+            setTimeout(() => this.forceStatusUpdate(), 2000);
 
         } catch (error) {
             console.error('Error retrying failed items:', error);

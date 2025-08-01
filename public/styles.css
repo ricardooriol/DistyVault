@@ -257,6 +257,13 @@ body {
     font-size: 1.2rem;
 }
 
+.upload-btn .btn-text,
+.distill-btn .btn-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
 .refresh-btn .btn-icon {
     font-size: 1rem;
 }
@@ -430,6 +437,11 @@ body {
     box-sizing: border-box;
 }
 
+.filter-select {
+    text-align: center;
+    text-align-last: center;
+}
+
 .search-input {
     width: 250px;
 }
@@ -469,9 +481,12 @@ body {
     border-radius: 12px;
     border: 1px solid var(--border-color);
     overflow-x: auto;
+    overflow-y: visible;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    position: relative;
+    z-index: 1;
 }
 
 .knowledge-base-table {
@@ -908,6 +923,7 @@ body {
 .action-dropdown {
     position: relative;
     display: inline-block;
+    z-index: 2147483647;
 }
 
 .action-dropdown-btn {
@@ -942,19 +958,21 @@ body {
 
 .action-dropdown-content {
     display: none;
-    position: fixed;
+    position: fixed !important;
     background: var(--bg-primary);
     border: 2px solid var(--primary-orange);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    z-index: 10000;
+    z-index: 2147483647 !important;
     min-width: 200px;
     max-width: 280px;
     overflow: hidden;
 }
 
 .action-dropdown.show .action-dropdown-content {
-    display: block;
+    display: block !important;
+    z-index: 2147483647 !important;
+    position: fixed !important;
 }
 
 .action-dropdown-item {
@@ -1010,6 +1028,8 @@ body {
     border-radius: 8px;
     margin-bottom: 16px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
 }
 
 .bulk-actions-left {
