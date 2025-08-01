@@ -416,6 +416,7 @@ class SawronApp {
         this.startAutoRefresh();
         this.startChronometer();
         this.initializeTooltips();
+        this.updateBulkActionsBar(); // Initialize bulk actions bar
     }
 
     setupEventListeners() {
@@ -656,6 +657,72 @@ class SawronApp {
         }, 300);
     }
 
+    startChronometer() {
+        // Update processing times every second for live chronometer
+        this.chronometerInterval = setInterval(() => {
+            this.updateProcessingTimes();
+        }, 1000);
+    }
+
+    updateProcessingTimes() {
+        // Update processing times for items that are currently processing
+        const processingItems = this.knowledgeBase.filter(item =>
+            ['initializing', 'extracting', 'distilling'].includes(item.status) && item.startTime
+        );
+
+        processingItems.forEach(item => {
+            const row = document.querySelector(`tr[data-id="${item.id}"]`);
+            if (row) {
+                const timeCell = row.querySelector('.time-cell');
+                if (timeCell) {
+                    const startTime = new Date(item.startTime);
+                    const currentTime = new Date();
+                    const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+
+                    let timeDisplay;
+                    if (elapsedSeconds < 60) {
+                        timeDisplay = `${elapsedSeconds}s`;
+                    } else {
+                        const minutes = Math.floor(elapsedSeconds / 60);
+                        const seconds = elapsedSeconds % 60;
+                        timeDisplay = `${minutes}m ${seconds}s`;
+                    }
+
+                    timeCell.textContent = timeDisplay;
+                }
+            }
+        });
+    }
+
+    initializeTooltips() {
+        // Set up tooltip event listeners for truncated text elements
+        document.addEventListener('mouseover', (e) => {
+            const element = e.target.closest('[data-tooltip]');
+            if (element) {
+                const tooltipText = element.getAttribute('data-tooltip');
+                if (tooltipText && tooltipText.trim()) {
+                    this.tooltipManager.showTooltip(element, tooltipText);
+                }
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const element = e.target.closest('[data-tooltip]');
+            if (element) {
+                this.tooltipManager.hideTooltip();
+            }
+        });
+
+        // Clean up stuck tooltips on scroll or window events
+        document.addEventListener('scroll', () => {
+            this.tooltipManager.cleanupStuckTooltips();
+        }, true);
+
+        window.addEventListener('resize', () => {
+            this.tooltipManager.cleanupStuckTooltips();
+        });
+    }
+
     forceStatusUpdate() {
         // Force an immediate status update (used after retry operations)
         this.checkForStatusUpdates();
@@ -713,6 +780,84 @@ class SawronApp {
         }
     }
 
+    handleRowSelection() {
+        // Update selected items set based on checkbox states
+        this.selectedItems.clear();
+        const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+        checkboxes.forEach(checkbox => {
+            this.selectedItems.add(checkbox.dataset.id);
+        });
+
+        // Update bulk actions bar visibility and content
+        this.updateBulkActionsBar();
+    }
+
+    updateBulkActionsBar() {
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+        const selectedCount = document.getElementById('selected-count');
+        const bulkRetryBtn = document.getElementById('bulk-retry-btn');
+        const bulkDownloadBtn = document.getElementById('bulk-download-btn');
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        const selectAllBtn = document.getElementById('select-all-btn');
+
+        if (this.selectedItems.size > 0) {
+            bulkActionsBar.style.display = 'flex';
+            selectedCount.textContent = `${this.selectedItems.size} item${this.selectedItems.size > 1 ? 's' : ''} selected`;
+
+            // Enable bulk action buttons
+            bulkRetryBtn.disabled = false;
+            bulkDeleteBtn.disabled = false;
+
+            // Check if any selected items are completed for download
+            const selectedItemsData = Array.from(this.selectedItems).map(id =>
+                this.knowledgeBase.find(item => item.id === id)
+            ).filter(Boolean);
+
+            const hasCompletedItems = selectedItemsData.some(item => item.status === 'completed');
+            bulkDownloadBtn.disabled = !hasCompletedItems;
+
+            // Update select all button text
+            const allCheckboxes = document.querySelectorAll('.row-checkbox');
+            if (this.selectedItems.size === allCheckboxes.length) {
+                selectAllBtn.innerHTML = '<span class="btn-text">☐ Deselect All</span>';
+            } else {
+                selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
+            }
+        } else {
+            bulkActionsBar.style.display = 'flex'; // Keep visible but disable buttons
+            selectedCount.textContent = '0 items selected';
+
+            // Disable bulk action buttons
+            bulkRetryBtn.disabled = true;
+            bulkDownloadBtn.disabled = true;
+            bulkDeleteBtn.disabled = true;
+
+            // Reset select all button
+            selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
+        }
+    }
+
+    toggleSelectAll() {
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+
+        if (this.selectedItems.size === allCheckboxes.length) {
+            // Deselect all
+            this.selectedItems.clear();
+            allCheckboxes.forEach(checkbox => checkbox.checked = false);
+            selectAllBtn.textContent = '☑️ Select All';
+        } else {
+            // Select all
+            allCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                this.selectedItems.add(checkbox.dataset.id);
+            });
+            selectAllBtn.textContent = '☐ Deselect All';
+        }
+
+        this.updateBulkActionsBar();
+    }
+
     hasItemChanged(oldItem, newItem) {
         // ULTRA-SENSITIVE change detection - checks EVERYTHING
         return (
@@ -739,36 +884,9 @@ class SawronApp {
         const row = document.querySelector(`tr[data-id="${item.id}"]`);
         if (!row) return;
 
-        // Update status cell
-        const statusCell = row.querySelector('.status-cell');
-        if (statusCell) {
-            const statusConfig = this.getStatusConfig(item.status);
-            const statusDisplay = `
-                <span class="status-icon">${statusConfig.icon}</span>
-                <span class="status-text">${statusConfig.text}</span>
-                ${item.processingStep && item.processingStep !== statusConfig.text ? `<div class="processing-step">${item.processingStep}</div>` : ''}
-            `;
-            statusCell.innerHTML = statusDisplay;
-            statusCell.className = `status-cell ${statusConfig.class} truncate-text`;
-            statusCell.setAttribute('data-tooltip', `${statusConfig.text}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}`);
-        }
-
-        // Update actions cell if status changed to completed or error
-        if (item.status === 'completed' || item.status === 'error') {
-            const actionsCell = row.querySelector('.actions-cell');
-            if (actionsCell) {
-                actionsCell.innerHTML = this.createActionsDropdown(item);
-            }
-        }
-
-        // Update name if it changed
-        const nameCell = row.querySelector('.name-cell');
-        if (nameCell && item.title && !item.title.includes('Processing')) {
-            const fullName = this.extractItemName(item);
-            const name = fullName.length > 100 ? fullName.substring(0, 97) + '...' : fullName;
-            nameCell.textContent = name;
-            nameCell.setAttribute('data-tooltip', fullName);
-        }
+        // Replace the entire row to ensure all data is forcefully updated
+        const newRowHtml = this.createTableRow(item);
+        row.outerHTML = newRowHtml;
     }
 
     addSingleRow(item) {
@@ -1231,7 +1349,15 @@ class SawronApp {
         return name;
     }
 
+    truncateText(text, maxLength) {
+        if (!text || text.length <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength - 3) + '...';
+    }
+
     createTableRow(item) {
+        const isSelected = this.selectedItems.has(item.id);
         const status = item.status;
         const isCompleted = status === 'completed';
         const isPending = status === 'pending';
@@ -1246,7 +1372,7 @@ class SawronApp {
         // Enhanced status mapping with more granular stages
         const STATUS_CONFIG = {
             'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
-            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
+            'initializing': { icon: '�', ttext: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
             'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
@@ -1360,7 +1486,7 @@ class SawronApp {
         return `
             <tr data-id="${item.id}">
                 <td class="checkbox-column">
-                    <input type="checkbox" class="row-checkbox" data-id="${item.id}" onchange="app.handleRowSelection()">
+                    <input type="checkbox" class="row-checkbox" data-id="${item.id}" onchange="app.handleRowSelection()" ${isSelected ? 'checked' : ''}>
                 </td>
                 <td class="name-cell truncate-text" data-tooltip="${fullName}">${name}</td>
                 <td class="source-cell truncate-text" data-tooltip="${item.sourceUrl || (item.sourceFile ? item.sourceFile.name : '')}">${sourceDisplay}</td>
@@ -2581,6 +2707,120 @@ class SawronApp {
         } catch (error) {
             console.error('Error retrying failed items:', error);
             alert('Error retrying failed items: ' + error.message);
+        }
+    }
+
+    handleBulkDownloadClick() {
+        const selectedItems = Array.from(this.selectedItems);
+        const completedItems = selectedItems.filter(id => {
+            const item = this.knowledgeBase.find(item => item.id === id);
+            return item && item.status === 'completed';
+        });
+
+        if (completedItems.length === 0) {
+            alert('No completed items selected for download');
+            return;
+        }
+
+        // Download each completed item
+        completedItems.forEach(id => {
+            this.downloadDistillation(id);
+        });
+
+        this.showTemporaryMessage(`Downloading ${completedItems.length} items...`, 'info');
+    }
+
+    async bulkDelete() {
+        const selectedItems = Array.from(this.selectedItems);
+
+        if (selectedItems.length === 0) {
+            alert('No items selected for deletion');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${selectedItems.length} selected item(s)?`)) {
+            return;
+        }
+
+        try {
+            // Delete items one by one
+            for (const id of selectedItems) {
+                const response = await fetch(`/api/summaries/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Remove the row from the table immediately
+                    const row = document.querySelector(`tr[data-id="${id}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+
+                    // Remove from local data
+                    this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== id);
+                    this.selectedItems.delete(id);
+                }
+            }
+
+            this.showTemporaryMessage(`Deleted ${selectedItems.length} items`, 'success');
+            this.updateBulkActionsBar();
+
+            // Check if table is now empty
+            const tbody = document.getElementById('knowledge-base-tbody');
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state-cell">
+                            <div class="empty-state">
+                                <div class="empty-icon">🎯</div>
+                                <h3>Ready to Process Knowledge</h3>
+                                <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Error deleting items:', error);
+            alert('Error deleting items: ' + error.message);
+        }
+    }
+
+    async bulkRetry() {
+        const selectedItems = Array.from(this.selectedItems);
+
+        if (selectedItems.length === 0) {
+            alert('No items selected for retry');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to retry ${selectedItems.length} selected item(s)?`)) {
+            return;
+        }
+
+        try {
+            // Process selected items from bottom to top (reverse order) with delay to ensure proper sequencing
+            const itemsToRetry = [...selectedItems].reverse();
+            for (let i = 0; i < itemsToRetry.length; i++) {
+                const id = itemsToRetry[i];
+                // Add small delay between retries to ensure bottom-to-top processing order
+                if (i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                await this.retryDistillation(id);
+            }
+
+            this.showTemporaryMessage(`Retrying ${selectedItems.length} selected items...`, 'info');
+
+            // Force MULTIPLE immediate status updates after bulk retry
+            setTimeout(() => this.forceStatusUpdate(), 200);
+            setTimeout(() => this.forceStatusUpdate(), 1000);
+            setTimeout(() => this.forceStatusUpdate(), 2000);
+
+        } catch (error) {
+            console.error('Error retrying selected items:', error);
+            alert('Error retrying selected items: ' + error.message);
         }
     }
 }
