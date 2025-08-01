@@ -259,44 +259,79 @@ class ViewportUtils {
     }
 }
 
-// Enhanced Tooltip Manager
+// Enhanced Tooltip Manager - Fixed positioning and stuck tooltip issues
 class TooltipManager {
     constructor() {
         this.activeTooltip = null;
-        this.timeoutId = null;
+        this.showTimeoutId = null;
+        this.hideTimeoutId = null;
         this.targetElement = null;
+        this.isMouseOverTooltip = false;
     }
 
     showTooltip(element, text) {
         try {
-            this.cleanup();
+            // Clear any pending hide timeout
+            if (this.hideTimeoutId) {
+                clearTimeout(this.hideTimeoutId);
+                this.hideTimeoutId = null;
+            }
 
-            if (!element || !text || typeof text !== 'string') {
+            // If tooltip is already showing for this element, don't recreate
+            if (this.activeTooltip && this.targetElement === element) {
                 return;
             }
 
+            this.cleanup();
+
+            if (!element || !text || typeof text !== 'string' || text.trim() === '') {
+                return;
+            }
+
+            // Only show tooltip if text is actually truncated
+            if (!this.isTextTruncated(element, text)) {
+                return;
+            }
+
+            // Delay showing tooltip to prevent flickering
+            this.showTimeoutId = setTimeout(() => {
+                this.createTooltip(element, text);
+            }, 300);
+
+        } catch (error) {
+            console.warn('Error showing tooltip:', error);
+            this.cleanup();
+        }
+    }
+
+    createTooltip(element, text) {
+        try {
             // Create tooltip
             this.activeTooltip = document.createElement('div');
             this.activeTooltip.className = 'tooltip';
             this.activeTooltip.textContent = text;
             document.body.appendChild(this.activeTooltip);
 
-            // Position tooltip directly below the element
+            // Position tooltip above the element with proper centering
             const elementRect = element.getBoundingClientRect();
             const tooltipRect = this.activeTooltip.getBoundingClientRect();
             
-            let left = elementRect.left;
-            let top = elementRect.bottom + 5;
+            let left = elementRect.left + (elementRect.width / 2) - (tooltipRect.width / 2);
+            let top = elementRect.top;
 
-            // Adjust if tooltip goes off screen
-            if (left + tooltipRect.width > window.innerWidth - 10) {
-                left = window.innerWidth - tooltipRect.width - 10;
+            // Keep tooltip within viewport bounds
+            const padding = 10;
+            if (left < padding) {
+                left = padding;
+            } else if (left + tooltipRect.width > window.innerWidth - padding) {
+                left = window.innerWidth - tooltipRect.width - padding;
             }
-            if (left < 10) {
-                left = 10;
-            }
-            if (top + tooltipRect.height > window.innerHeight - 10) {
-                top = elementRect.top - tooltipRect.height - 5;
+
+            // Ensure tooltip doesn't go above viewport
+            if (top < padding + tooltipRect.height) {
+                top = elementRect.bottom + 8;
+                // Flip arrow direction if showing below
+                this.activeTooltip.classList.add('tooltip-below');
             }
 
             this.activeTooltip.style.left = left + 'px';
@@ -306,19 +341,43 @@ class TooltipManager {
             this.targetElement = element;
 
         } catch (error) {
-            console.warn('Error showing tooltip:', error);
+            console.warn('Error creating tooltip:', error);
             this.cleanup();
         }
     }
 
     hideTooltip() {
-        this.cleanup();
+        // Delay hiding to prevent flickering when moving between elements
+        this.hideTimeoutId = setTimeout(() => {
+            this.cleanup();
+        }, 100);
+    }
+
+    isTextTruncated(element, text) {
+        // Check if the element's content is actually truncated
+        const tempSpan = document.createElement('span');
+        tempSpan.style.visibility = 'hidden';
+        tempSpan.style.position = 'absolute';
+        tempSpan.style.whiteSpace = 'nowrap';
+        tempSpan.style.font = window.getComputedStyle(element).font;
+        tempSpan.textContent = text;
+        document.body.appendChild(tempSpan);
+        
+        const isOverflowing = tempSpan.offsetWidth > element.offsetWidth;
+        document.body.removeChild(tempSpan);
+        
+        return isOverflowing;
     }
 
     cleanup() {
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = null;
+        if (this.showTimeoutId) {
+            clearTimeout(this.showTimeoutId);
+            this.showTimeoutId = null;
+        }
+
+        if (this.hideTimeoutId) {
+            clearTimeout(this.hideTimeoutId);
+            this.hideTimeoutId = null;
         }
 
         if (this.activeTooltip) {
@@ -327,6 +386,7 @@ class TooltipManager {
         }
 
         this.targetElement = null;
+        this.isMouseOverTooltip = false;
     }
 
     cleanupStuckTooltips() {
@@ -579,10 +639,23 @@ class SawronApp {
     }
 
     startAutoRefresh() {
-        // Refresh knowledge base every 500ms to catch rapid status changes
+        // Optimized refresh interval - faster for processing items, slower when idle
         this.refreshInterval = setInterval(() => {
+            this.smartRefresh();
+        }, 1000);
+    }
+
+    smartRefresh() {
+        // Check if there are any processing items
+        const hasProcessingItems = this.knowledgeBase.some(item => 
+            ['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)
+        );
+
+        // Only refresh if there are processing items or it's been a while since last refresh
+        if (hasProcessingItems || !this.lastRefresh || (Date.now() - this.lastRefresh) > 5000) {
             this.loadKnowledgeBase();
-        }, 500);
+            this.lastRefresh = Date.now();
+        }
     }
 
     startChronometer() {
@@ -685,7 +758,7 @@ class SawronApp {
 
     initializeTooltips() {
         // Add event delegation for tooltips on truncated text elements
-        document.addEventListener('mouseover', (e) => {
+        document.addEventListener('mouseenter', (e) => {
             const element = e.target;
             
             // Check if element is a truncated cell that should show tooltip
@@ -695,24 +768,31 @@ class SawronApp {
                     this.tooltipManager.showTooltip(element, text);
                 }
             }
-        });
+        }, true);
         
-        document.addEventListener('mouseout', (e) => {
+        document.addEventListener('mouseleave', (e) => {
             const element = e.target;
             
             // Hide tooltip when leaving truncated elements
             if (this.shouldShowTooltip(element)) {
                 this.tooltipManager.hideTooltip();
             }
-        });
+        }, true);
 
-        // Emergency cleanup on window resize or scroll
+        // Emergency cleanup on window events
         window.addEventListener('resize', () => {
             this.tooltipManager.cleanupStuckTooltips();
         });
 
         window.addEventListener('scroll', () => {
             this.tooltipManager.cleanupStuckTooltips();
+        }, true);
+
+        // Cleanup on page visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.tooltipManager.cleanupStuckTooltips();
+            }
         });
     }
 
@@ -760,7 +840,7 @@ class SawronApp {
                 data.forEach(item => {
                     const oldStatus = oldStatuses.get(item.id);
                     if (oldStatus && oldStatus !== item.status) {
-                        console.log(`[STATUS CHANGE] Item ${item.id}: ${oldStatus} → ${item.status}`);
+                        // Status change tracking for debugging
                     }
                 });
             }
@@ -772,7 +852,7 @@ class SawronApp {
             if (window.DEBUG_STATUS) {
                 this.knowledgeBase.forEach(item => {
                     if (['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)) {
-                        console.log(`[DEBUG] Processing item ${item.id}: status="${item.status}", step="${item.processingStep}"`);
+                        // Processing item debug info
                     }
                 });
             }
@@ -995,15 +1075,15 @@ class SawronApp {
 
         // Debug logging for status issues
         if (window.DEBUG_STATUS) {
-            console.log(`[DEBUG] Item ${item.id}: status="${status}", processingStep="${item.processingStep}"`);
+            // Debug item status info
         }
 
-        // Enhanced status mapping
+        // Enhanced status mapping with more granular stages
         const STATUS_CONFIG = {
-            'pending': { icon: '⏸️', text: 'QUEUED', class: 'status-queued' },
-            'initializing': { icon: '🔄', text: 'INITIALIZING', class: 'status-processing' },
+            'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
+            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
-            'distilling': { icon: '🤖', text: 'DISTILLING', class: 'status-processing' },
+            'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
             'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
         };
@@ -1198,12 +1278,57 @@ class SawronApp {
         const isOpen = dropdown.classList.toggle('show');
 
         if (isOpen) {
+            // Position dropdown intelligently
+            this.positionDropdown(dropdown);
             // Add event listeners when dropdown opens
             this.addDropdownEventListeners();
         } else {
             // Remove event listeners when dropdown closes
             this.removeDropdownEventListeners();
         }
+    }
+
+    positionDropdown(dropdown) {
+        const dropdownContent = dropdown.querySelector('.action-dropdown-content');
+        if (!dropdownContent) return;
+
+        // Reset positioning to get natural dimensions
+        dropdownContent.style.position = 'fixed';
+        dropdownContent.style.top = 'auto';
+        dropdownContent.style.left = 'auto';
+        dropdownContent.style.right = 'auto';
+        dropdownContent.style.bottom = 'auto';
+
+        // Get trigger button position
+        const triggerRect = dropdown.getBoundingClientRect();
+        const dropdownRect = dropdownContent.getBoundingClientRect();
+        const viewport = {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+
+        let top = triggerRect.bottom + 4;
+        let left = triggerRect.right - dropdownRect.width;
+
+        // Adjust horizontal position if dropdown extends beyond viewport
+        if (left < 10) {
+            left = triggerRect.left; // Align to left edge of trigger
+        }
+        if (left + dropdownRect.width > viewport.width - 10) {
+            left = viewport.width - dropdownRect.width - 10;
+        }
+
+        // Adjust vertical position if dropdown extends beyond viewport
+        if (top + dropdownRect.height > viewport.height - 10) {
+            top = triggerRect.top - dropdownRect.height - 4; // Position above
+        }
+        if (top < 10) {
+            top = 10; // Minimum distance from top
+        }
+
+        // Apply calculated position
+        dropdownContent.style.top = `${top}px`;
+        dropdownContent.style.left = `${left}px`;
     }
 
     addDropdownEventListeners() {
@@ -1519,15 +1644,13 @@ class SawronApp {
 
     async retryDistillation(id) {
         try {
-            console.log(`Retrying distillation ${id}`);
             const url = `/api/summaries/${id}/retry`;
-            console.log(`Making POST request to: ${url}`);
 
             const response = await fetch(url, {
                 method: 'POST'
             });
 
-            console.log(`Response status: ${response.status} ${response.statusText}`);
+            // Response received
 
             if (!response.ok) {
                 let errorMessage = 'Failed to retry distillation';
@@ -1541,7 +1664,7 @@ class SawronApp {
                 throw new Error(errorMessage);
             }
 
-            console.log(`Distillation ${id} retry initiated successfully`);
+            // Retry initiated successfully
 
             // Refresh the knowledge base to show updated status
             this.loadKnowledgeBase();
@@ -2172,7 +2295,7 @@ class SawronApp {
             const failedItems = this.knowledgeBase.filter(item => item.status === 'error');
 
             if (failedItems.length === 0) {
-                alert('No failed items to retry.');
+                alert('No failed items to retry');
                 return;
             }
 
@@ -2208,12 +2331,12 @@ async function pasteFromClipboard(event) {
         mainInput.value = text;
         mainInput.focus();
         app.handleInputChange(text);
-        console.log('Text pasted from clipboard successfully');
+        // Text pasted successfully
     } catch (err) {
         console.error('Failed to read clipboard:', err);
 
         // Fallback: show alert and focus input for manual paste
-        alert('Unable to access clipboard automatically. Please paste manually using Ctrl+V (or Cmd+V on Mac).');
+        alert('Unable to access clipboard automatically, please paste manually');
         const mainInput = document.getElementById('main-input');
         mainInput.focus();
         mainInput.select();
@@ -2254,12 +2377,6 @@ function refreshKnowledgeBase() {
 function toggleSelectAll() {
     app.toggleSelectAll();
 }
-
-function bulkDownload() {
-    app.handleBulkDownloadClick();
-}
-
-
 
 function handleBulkDownloadClick() {
     app.handleBulkDownloadClick();
@@ -2674,7 +2791,7 @@ async function saveAIConfiguration() {
 
     // Save settings
     const saveSuccess = await aiSettingsManager.saveSettings(settings);
-    console.log('Save result:', saveSuccess);
+    // Settings saved
 
     if (saveSuccess) {
         saveBtn.disabled = true;
@@ -2856,10 +2973,7 @@ async function saveAIConfiguration() {
             }
         };
 
-        console.log('Saving AI settings:', settings);
-
         const success = await aiSettingsManager.saveSettings(settings);
-        console.log('Save result:', success);
 
         // Update processing queue settings
         if (success && settings.concurrentProcessing) {
@@ -2875,7 +2989,7 @@ async function saveAIConfiguration() {
                 });
 
                 if (queueResponse.ok) {
-                    console.log('Processing queue settings updated successfully');
+                    // Processing queue settings updated
                 } else {
                     console.warn('Failed to update processing queue settings');
                 }

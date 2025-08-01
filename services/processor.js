@@ -88,13 +88,11 @@ class Processor {
                 const distillationObj = await database.getDistillation(distillation.id);
 
                 // Update status to initializing and set actual start time when background processing begins
-                console.log(`[${distillation.id}] Setting status to initializing`);
                 await database.updateDistillationStatus(
                     distillation.id,
                     'initializing',
                     'Starting processing'
                 );
-                console.log(`[${distillation.id}] Status set to initializing`);
 
                 // Set the actual start time when processing begins (not when queued)
                 distillationObj.startTime = new Date(startTime);
@@ -107,20 +105,18 @@ class Processor {
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // Update status to extracting
-                console.log(`[${distillation.id}] Setting status to extracting`);
                 await database.updateDistillationStatus(
                     distillation.id,
                     'extracting',
                     'Extracting content from URL'
                 );
-                console.log(`[${distillation.id}] Status set to extracting`);
 
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`🌐 Target URL: ${url}`);
                 distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
                 await database.saveDistillation(distillationObj);
 
-                console.log(`[${distillation.id}] Extracting content from URL: ${url}`);
+                // Extracting content from URL
 
                 // Extract content with timeout
                 const extractionPromise = contentExtractor.extractFromUrl(url);
@@ -150,8 +146,7 @@ class Processor {
 
                 await database.saveDistillation(updatedDistillation);
 
-                console.log(`[${distillation.id}] Content extracted successfully. Title: ${title}, Content length: ${text.length} chars`);
-                console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+                // Content extracted successfully
 
                 // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -184,10 +179,7 @@ class Processor {
                 };
                 await database.saveDistillation(distillationObj);
 
-                console.log(`[${distillation.id}] Starting distillation with AI provider`);
                 const distillationContent = await aiProvider.generateSummary(text);
-
-                console.log(`[${distillation.id}] Distillation generated successfully. Length: ${distillationContent.length} chars`);
 
                 // Calculate processing time and word count
                 const processingTime = (Date.now() - startTime) / 1000;
