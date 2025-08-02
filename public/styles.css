@@ -152,6 +152,7 @@ body {
     font-size: 1rem;
     transition: all 0.2s ease;
     box-sizing: border-box;
+    text-align: center;
 }
 
 .main-input-field:focus {
@@ -161,7 +162,8 @@ body {
 }
 
 .main-input-field::placeholder {
-    color: var(--text-muted);
+    color: white;
+    opacity: 1;
 }
 
 .paste-btn-inside {
@@ -3066,4 +3068,55 @@ ol.manual-numbered *,
 .distillation-content .nested-numbered {
     font-weight: bold !important;
     font-weight: 700 !important;
+}
+
+.input-actions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.dropzone {
+    background: var(--bg-primary);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.dropzone:hover {
+    border-color: var(--primary-orange);
+    background-color: var(--bg-tertiary);
+}
+
+.dropzone-text {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+    color: white;
+    opacity: 1;
+}
+
+.action-buttons-layout {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.settings-left {
+    flex: 0 0 auto;
+}
+
+.distill-center {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
 }

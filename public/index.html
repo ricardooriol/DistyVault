@@ -25,53 +25,56 @@
 
         <!-- Main Content -->
         <main class=" main-content">
-                        <!-- Input Section -->
-                        <section class="input-section">
-                            <div class="main-input-group">
-                                <div class="url-input-container">
-                                    <input type="text" id="main-input"
-                                        placeholder="Insert a URL and let the magic happen" class="main-input-field">
-                                    <button class="paste-btn-inside" id="paste-btn" onclick="pasteFromClipboard(event)" type="button">
-                                        <span class="btn-icon">📋</span>
-                                    </button>
-                                </div>
-
-                                <div class="action-buttons">
-                                    <button class="settings-btn" onclick="openAISettingsModal()">
-                                        <span class="btn-icon">⚙️</span>
-                                    </button>
-
-                                    <button class="upload-btn" id="upload-btn" onclick="triggerFileUpload()">
-                                        <span class="btn-icon">📄</span>
-                                        <span class="btn-text">UPLOAD</span>
-                                    </button>
-
-                                    <button class="distill-btn disabled" id="distill-btn"
-                                        onclick="startDistillation()">
-                                        <span class="btn-icon">💠</span>
-                                        <span class="btn-text">DISTILL</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Hidden file input -->
-                            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt" hidden>
-
-                            <!-- File display area -->
-                            <div class="file-display" id="file-display" style="display: none;">
-                                <div class="file-info">
-                                    <span class="file-icon">📄</span>
-                                    <span class="file-name" id="file-name"></span>
-                                    <button class="remove-file-btn" onclick="removeFile()">×</button>
-                                </div>
-                            </div>
-
-                            <!-- URL type indicator -->
-                            <div class="url-type-indicator" id="url-type-indicator" style="display: none;">
-                                <span class="type-icon" id="type-icon"></span>
-                                <span class="type-text" id="type-text"></span>
-                            </div>
-                        </section>
+            <section class="input-section">
+                <div class="main-input-group">
+                  <!-- Text Input -->
+                  <div class="url-input-container">
+                    <input type="text" id="main-input" placeholder="Paste a URL here..." class="main-input-field">
+                    <button class="paste-btn-inside" id="paste-btn" onclick="pasteFromClipboard(event)" type="button">
+                      <span class="btn-icon">📋</span>
+                    </button>
+                  </div>
+              
+                  <!-- File Upload & Action Buttons -->
+                  <div class="input-actions-container">
+                    <div class="dropzone" onclick="triggerFileUpload()">
+                      <span class="dropzone-text">...or click or drop a document here</span>
+                    </div>
+                    <div class="action-buttons-layout">
+                        <div class="settings-left">
+                          <button class="settings-btn" onclick="openAISettingsModal()">
+                            <span class="btn-icon">⚙️</span>
+                          </button>
+                        </div>
+                        <div class="distill-center">
+                          <button class="distill-btn disabled" id="distill-btn" onclick="startDistillation()">
+                            <span class="btn-icon">💠</span>
+                            <span class="btn-text">DISTILL</span>
+                          </button>
+                        </div>
+                      </div>
+                  
+              
+                  <!-- Hidden File Input -->
+                  <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt" hidden>
+              
+                  <!-- File Info -->
+                  <div class="file-display" id="file-display" style="display: none;">
+                    <div class="file-info">
+                      <span class="file-icon">📄</span>
+                      <span class="file-name" id="file-name"></span>
+                      <button class="remove-file-btn" onclick="removeFile()">×</button>
+                    </div>
+                  </div>
+              
+                  <!-- URL Type Indicator -->
+                  <div class="url-type-indicator" id="url-type-indicator" style="display: none;">
+                    <span class="type-icon" id="type-icon"></span>
+                    <span class="type-text" id="type-text"></span>
+                  </div>
+                </div>
+              </section>
+              
 
                         <!-- Processing Status -->
                         <section class="status-section" id="status-section" style="display: none;">
