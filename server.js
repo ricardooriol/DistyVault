@@ -311,8 +311,6 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
             });
         }
         
-        // Process bulk download request for multiple items
-        
         // If only one item, redirect to single PDF download
         if (ids.length === 1) {
             const distillation = await database.getDistillation(ids[0]);
@@ -345,7 +343,7 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         const archive = archiver('zip', { zlib: { level: 9 } });
         
         // Set headers for ZIP download
-        const zipFilename = `distillations-${new Date().toISOString().split('T')[0]}.zip`;
+        const zipFilename = `sawron-download.zip`;
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
         res.setHeader('Cache-Control', 'no-cache');
@@ -364,63 +362,39 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
         // Pipe archive to response
         archive.pipe(res);
         
-        let successCount = 0;
-        let errorCount = 0;
-        const usedFilenames = new Set(); // Track used filenames to avoid duplicates
+        const usedFilenames = new Set();
         
-        // Process each ID sequentially to avoid overwhelming the system
+        // Process each ID sequentially
         for (const id of ids) {
             try {
-                // Process individual distillation for bulk download
-                
                 const distillation = await database.getDistillation(id);
-                if (!distillation) {
-                    console.warn(`Distillation ${id} not found`);
-                    errorCount++;
-                    continue;
-                }
-                
-                if (distillation.status !== 'completed') {
-                    console.warn(`Distillation ${id} not completed (status: ${distillation.status})`);
-                    errorCount++;
+                if (!distillation || distillation.status !== 'completed') {
+                    console.log(`Skipping distillation ${id} - not found or not completed`);
                     continue;
                 }
                 
                 // Generate PDF
                 const pdfResult = await processor.generatePdf(id);
-                
-                if (!pdfResult || typeof pdfResult !== 'object') {
-                    console.error(`Invalid PDF result for distillation ${id}`);
-                    errorCount++;
-                    continue;
-                }
-                
                 const { buffer, filename } = pdfResult;
                 
-                // Convert buffer to Node.js Buffer if needed (Puppeteer returns Uint8Array)
+                // Convert buffer to Node.js Buffer if needed
                 let finalBuffer;
                 if (Buffer.isBuffer(buffer)) {
                     finalBuffer = buffer;
                 } else if (buffer instanceof Uint8Array) {
                     finalBuffer = Buffer.from(buffer);
-                } else if (buffer && typeof buffer === 'object' && buffer.length !== undefined) {
-                    // Handle other array-like objects
-                    finalBuffer = Buffer.from(buffer);
                 } else {
-                    console.error(`Invalid buffer type for distillation ${id}: ${typeof buffer}, isBuffer: ${Buffer.isBuffer(buffer)}`);
-                    errorCount++;
-                    continue;
+                    finalBuffer = Buffer.from(buffer);
                 }
                 
                 if (finalBuffer.length === 0) {
-                    console.error(`Empty buffer for distillation ${id}`);
-                    errorCount++;
+                    console.log(`Empty buffer for distillation ${id}, skipping`);
                     continue;
                 }
                 
                 let finalFilename = filename || `distillation-${id}.pdf`;
                 
-                // Handle duplicate filenames by adding (1), (2), etc.
+                // Handle duplicate filenames
                 let counter = 1;
                 let uniqueFilename = finalFilename;
                 while (usedFilenames.has(uniqueFilename)) {
@@ -432,17 +406,13 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 
                 // Add PDF to ZIP archive
                 archive.append(finalBuffer, { name: uniqueFilename });
-                successCount++;
                 
             } catch (error) {
                 console.error(`Error processing distillation ${id}:`, error);
-                errorCount++;
             }
         }
         
-        // Bulk download processing completed
-        
-        // Finalize the archive (this will trigger the download)
+        // Finalize the archive
         archive.finalize();
         
     } catch (error) {

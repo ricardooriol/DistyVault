@@ -91,6 +91,10 @@ class DownloadStateManager {
             state.originalContent = button.innerHTML;
         }
 
+        // Remove existing listeners to prevent duplicates
+        button.onmouseenter = null;
+        button.onmouseleave = null;
+
         switch (state.state) {
             case 'idle':
                 button.disabled = false;
@@ -114,6 +118,11 @@ class DownloadStateManager {
                     button.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
                 }
                 button.title = 'Hover to cancel';
+
+                // Add mouse enter listener to switch to cancellable state
+                button.onmouseenter = () => {
+                    this.setDownloadState(buttonId, 'cancellable');
+                };
                 break;
 
             case 'cancellable':
@@ -128,6 +137,11 @@ class DownloadStateManager {
                     button.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">Cancel</span>';
                 }
                 button.title = 'Click to cancel download';
+
+                // Add mouse leave listener to revert to loading state
+                button.onmouseleave = () => {
+                    this.setDownloadState(buttonId, 'loading');
+                };
                 break;
 
             case 'error':
@@ -651,7 +665,7 @@ class SawronApp {
     }
 
     startStatusMonitoring() {
-        // Monitor for status changes every 300ms for ULTRA-MAXIMUM responsiveness
+        // Monitor for status changes every 300ms for real-time responsiveness
         this.statusMonitorInterval = setInterval(() => {
             this.checkForStatusUpdates();
         }, 300);
@@ -859,7 +873,7 @@ class SawronApp {
     }
 
     hasItemChanged(oldItem, newItem) {
-        // ULTRA-SENSITIVE change detection - checks EVERYTHING
+        // Comprehensive change detection - checks all relevant fields
         return (
             newItem.status !== oldItem.status ||
             newItem.processingStep !== oldItem.processingStep ||
@@ -1557,18 +1571,29 @@ class SawronApp {
     toggleActionDropdown(event, id) {
         event.stopPropagation();
 
-        // Close all other dropdowns
+        // Close all other dropdowns and remove row classes
         document.querySelectorAll('.action-dropdown').forEach(dropdown => {
             if (dropdown !== event.currentTarget) {
                 dropdown.classList.remove('show');
+                // Remove dropdown-open class from parent row
+                const parentRow = dropdown.closest('tr');
+                if (parentRow) {
+                    parentRow.classList.remove('dropdown-open');
+                }
             }
         });
 
         // Toggle current dropdown
         const dropdown = event.currentTarget;
         const isOpen = dropdown.classList.toggle('show');
+        const parentRow = dropdown.closest('tr');
 
         if (isOpen) {
+            // Add dropdown-open class to parent row for z-index elevation
+            if (parentRow) {
+                parentRow.classList.add('dropdown-open');
+            }
+
             // FORCE MAXIMUM Z-INDEX AND POSITIONING
             const dropdownContent = dropdown.querySelector('.action-dropdown-content');
             if (dropdownContent) {
@@ -1582,6 +1607,10 @@ class SawronApp {
             // Add event listeners when dropdown opens
             this.addDropdownEventListeners();
         } else {
+            // Remove dropdown-open class from parent row
+            if (parentRow) {
+                parentRow.classList.remove('dropdown-open');
+            }
             // Remove event listeners when dropdown closes
             this.removeDropdownEventListeners();
         }
@@ -1640,6 +1669,11 @@ class SawronApp {
             const openDropdown = document.querySelector('.action-dropdown.show');
             if (openDropdown && !openDropdown.contains(event.target)) {
                 openDropdown.classList.remove('show');
+                // Remove dropdown-open class from parent row
+                const parentRow = openDropdown.closest('tr');
+                if (parentRow) {
+                    parentRow.classList.remove('dropdown-open');
+                }
                 this.removeDropdownEventListeners();
             }
         };
@@ -1650,6 +1684,11 @@ class SawronApp {
                 const openDropdown = document.querySelector('.action-dropdown.show');
                 if (openDropdown) {
                     openDropdown.classList.remove('show');
+                    // Remove dropdown-open class from parent row
+                    const parentRow = openDropdown.closest('tr');
+                    if (parentRow) {
+                        parentRow.classList.remove('dropdown-open');
+                    }
                     this.removeDropdownEventListeners();
                 }
             }
@@ -1660,6 +1699,11 @@ class SawronApp {
             const openDropdown = document.querySelector('.action-dropdown.show');
             if (openDropdown) {
                 openDropdown.classList.remove('show');
+                // Remove dropdown-open class from parent row
+                const parentRow = openDropdown.closest('tr');
+                if (parentRow) {
+                    parentRow.classList.remove('dropdown-open');
+                }
                 this.removeDropdownEventListeners();
             }
         };
@@ -1688,6 +1732,11 @@ class SawronApp {
     closeAllDropdowns() {
         document.querySelectorAll('.action-dropdown.show').forEach(dropdown => {
             dropdown.classList.remove('show');
+            // Remove dropdown-open class from parent row
+            const parentRow = dropdown.closest('tr');
+            if (parentRow) {
+                parentRow.classList.remove('dropdown-open');
+            }
         });
         this.removeDropdownEventListeners();
     }
@@ -2357,21 +2406,6 @@ class SawronApp {
         const buttonId = 'bulk-download-btn';
         const state = this.downloadStateManager.getDownloadState(buttonId);
 
-        if (state.state === 'loading' || state.state === 'cancellable') {
-            // Cancel the download
-            this.downloadStateManager.cancelDownload(buttonId);
-        } else {
-            // Start the download
-            this.bulkDownload();
-        }
-    }
-
-
-
-    handleBulkDownloadClick() {
-        const buttonId = 'bulk-download-btn';
-        const state = this.downloadStateManager.getDownloadState(buttonId);
-
         if (state.state === 'cancellable') {
             // Cancel the download
             this.downloadStateManager.cancelDownload(buttonId);
@@ -2388,10 +2422,16 @@ class SawronApp {
             return;
         }
 
+        // If only one item is selected, use single download logic
+        if (selectedIds.length === 1) {
+            this.downloadDistillation(selectedIds[0]);
+            return;
+        }
+
         const buttonId = 'bulk-download-btn';
 
         try {
-            // Set loading state
+            // Set loading state for bulk download
             const abortController = new AbortController();
             this.downloadStateManager.setDownloadState(buttonId, 'loading', {
                 downloadId: 'bulk',
@@ -2399,17 +2439,16 @@ class SawronApp {
                 startTime: Date.now()
             });
 
+            // Request a ZIP file from the backend endpoint
             const response = await fetch('/api/summaries/bulk-download', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: selectedIds }),
                 signal: abortController.signal
             });
 
             if (!response.ok) {
-                let errorMessage = 'Failed to download items';
+                let errorMessage = 'Failed to download ZIP archive';
                 try {
                     const error = await response.json();
                     errorMessage = error.message || errorMessage;
@@ -2419,28 +2458,15 @@ class SawronApp {
                 throw new Error(errorMessage);
             }
 
-            // Handle download
+            // Handle the ZIP file download
             const blob = await response.blob();
-
-            if (blob.size === 0) {
-                throw new Error('Downloaded file is empty. Please try again.');
-            }
-
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = `download-${new Date().toISOString().split('T')[0]}`;
+            let filename = `sawron-download.zip`; // Default filename
 
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                if (filenameMatch) {
+                if (filenameMatch && filenameMatch[1]) {
                     filename = filenameMatch[1];
-                }
-            } else {
-                // Determine file extension based on content type
-                const contentType = response.headers.get('Content-Type');
-                if (contentType === 'application/pdf') {
-                    filename += '.pdf';
-                } else if (contentType === 'application/zip') {
-                    filename += '.zip';
                 }
             }
 
@@ -2451,40 +2477,16 @@ class SawronApp {
             a.download = filename;
             document.body.appendChild(a);
             a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
 
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-
-            // Show success feedback
-            const itemText = selectedIds.length === 1 ? 'item' : 'items';
-            this.showTemporaryMessage(`Successfully downloaded ${selectedIds.length} ${itemText}`, 'success');
-
-            // Reset to idle state on success
             this.downloadStateManager.setDownloadState(buttonId, 'idle');
 
         } catch (error) {
-            if (error.name === 'AbortError') {
-                // Download was cancelled, state already reset by cancelDownload
-                return;
-            }
-
-            console.error('Error downloading items:', error);
-
-            // Show user-friendly error message
-            let userMessage = 'Failed to download items. ';
-            if (error.message.includes('network') || error.message.includes('fetch')) {
-                userMessage += 'Please check your internet connection and try again.';
-            } else if (error.message.includes('Server error: 5')) {
-                userMessage += 'Server error occurred. Please try again later.';
-            } else {
-                userMessage += error.message;
-            }
-
-            // Set error state
+            if (error.name === 'AbortError') return;
+            console.error('Error during bulk download:', error);
             this.downloadStateManager.setDownloadState(buttonId, 'error', {
-                errorMessage: userMessage
+                errorMessage: 'Bulk download failed'
             });
         }
     }
@@ -2710,25 +2712,7 @@ class SawronApp {
         }
     }
 
-    handleBulkDownloadClick() {
-        const selectedItems = Array.from(this.selectedItems);
-        const completedItems = selectedItems.filter(id => {
-            const item = this.knowledgeBase.find(item => item.id === id);
-            return item && item.status === 'completed';
-        });
 
-        if (completedItems.length === 0) {
-            alert('No completed items selected for download');
-            return;
-        }
-
-        // Download each completed item
-        completedItems.forEach(id => {
-            this.downloadDistillation(id);
-        });
-
-        this.showTemporaryMessage(`Downloading ${completedItems.length} items...`, 'info');
-    }
 
     async bulkDelete() {
         const selectedItems = Array.from(this.selectedItems);

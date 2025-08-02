@@ -116,6 +116,8 @@ body {
     margin: 0 auto;
     padding: 2rem;
     width: 100%;
+    position: relative;
+    z-index: auto;
 }
 
 /* Input Section */
@@ -125,6 +127,8 @@ body {
     padding: 2rem;
     margin-bottom: 3rem;
     border: 1px solid var(--border-color);
+    position: relative;
+    z-index: 1;
 }
 
 .main-input-group {
@@ -403,6 +407,7 @@ body {
     margin-top: 3rem;
     position: relative;
     overflow: visible;
+    z-index: auto;
 }
 
 .knowledge-base-header {
@@ -922,7 +927,44 @@ body {
 .action-dropdown {
     position: relative;
     display: inline-block;
+    z-index: 1;
+}
+
+/* When dropdown is open, elevate the entire row and dropdown */
+.action-dropdown.show {
     z-index: 2147483647;
+    position: relative;
+}
+
+/* Ensure the parent row gets elevated when dropdown is open */
+.knowledge-base-table tbody tr:has(.action-dropdown.show) {
+    position: relative;
+    z-index: 2147483646;
+}
+
+/* Fallback for browsers that don't support :has() */
+.knowledge-base-table tbody tr.dropdown-open {
+    position: relative;
+    z-index: 2147483646;
+}
+
+/* Ensure action buttons don't interfere with dropdown stacking */
+.action-buttons {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure upload and distill buttons don't interfere with dropdowns */
+.upload-btn,
+.distill-btn {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure table cells don't create stacking contexts that interfere with dropdowns */
+.actions-cell {
+    position: relative;
+    z-index: auto;
 }
 
 .action-dropdown-btn {
@@ -966,6 +1008,11 @@ body {
     min-width: 200px;
     max-width: 280px;
     overflow: hidden;
+    /* Ensure dropdown is always on top */
+    isolation: isolate;
+    /* Force hardware acceleration for better rendering */
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 .action-dropdown.show .action-dropdown-content {
@@ -2764,8 +2811,6 @@ html body .list-number {
 }
 
 /* Duplicate rules removed */
-
-
 
 .action-dropdown-item {
     display: block;
