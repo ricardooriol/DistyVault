@@ -21,11 +21,6 @@
                 </h1>
                 <p class="tagline">Connect the Dots & Fill the Gaps</p>
             </div>
-            <div class="header-actions">
-                <button class="settings-btn" onclick="openAISettingsModal()">
-                    <span class="btn-icon">⚙️</span>
-                </button>
-            </div>
         </header>
 
         <!-- Main Content -->
@@ -42,6 +37,10 @@
                                 </div>
 
                                 <div class="action-buttons">
+                                    <button class="settings-btn" onclick="openAISettingsModal()">
+                                        <span class="btn-icon">⚙️</span>
+                                    </button>
+
                                     <button class="upload-btn" id="upload-btn" onclick="triggerFileUpload()">
                                         <span class="btn-icon">📄</span>
                                         <span class="btn-text">UPLOAD</span>
@@ -56,7 +55,7 @@
                             </div>
 
                             <!-- Hidden file input -->
-                            <input type="file" id="file-input" accept=".pdf,.docx,.txt" hidden>
+                            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt" hidden>
 
                             <!-- File display area -->
                             <div class="file-display" id="file-display" style="display: none;">
@@ -319,8 +318,7 @@
                                             onclick="adjustConcurrentProcessing(1)">+</button>
                                     </div>
                                     <small class="form-help">Maximum number of items that can be processed
-                                        simultaneously, lower
-                                        values reduce API rate limit issues</small>
+                                        simultaneously, lower values reduce API rate limit issues</small>
                                 </div>
                             </div>
 
