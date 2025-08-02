@@ -618,7 +618,9 @@ class SawronApp {
 
                 this.removeFile();
                 // Force MULTIPLE status updates to detect new item
-                setTimeout(() => this.forceStatusUpdate(), 200);
+                this.forceStatusUpdate();
+                setTimeout(() => this.forceStatusUpdate(), 100);
+                setTimeout(() => this.forceStatusUpdate(), 500);
                 setTimeout(() => this.forceStatusUpdate(), 1000);
                 setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -645,7 +647,9 @@ class SawronApp {
 
                 mainInput.value = '';
                 // Force MULTIPLE status updates to detect new item
-                setTimeout(() => this.forceStatusUpdate(), 200);
+                this.forceStatusUpdate();
+                setTimeout(() => this.forceStatusUpdate(), 100);
+                setTimeout(() => this.forceStatusUpdate(), 500);
                 setTimeout(() => this.forceStatusUpdate(), 1000);
                 setTimeout(() => this.forceStatusUpdate(), 2000);
             }
@@ -665,17 +669,59 @@ class SawronApp {
     }
 
     startStatusMonitoring() {
-        // Monitor for status changes every 300ms for real-time responsiveness
+        // Monitor for status changes every 200ms for real-time responsiveness
         this.statusMonitorInterval = setInterval(() => {
             this.checkForStatusUpdates();
-        }, 300);
+        }, 200);
+
+        // Additional aggressive monitoring for processing items every 100ms
+        this.aggressiveMonitorInterval = setInterval(() => {
+            this.checkProcessingItemsStatus();
+        }, 100);
     }
 
     startChronometer() {
-        // Update processing times every second for live chronometer
+        // Update processing times every 500ms for smooth live chronometer
         this.chronometerInterval = setInterval(() => {
             this.updateProcessingTimes();
-        }, 1000);
+        }, 500);
+    }
+
+    calculateProcessingTimeDisplay(item) {
+        // Centralized time calculation to ensure consistency
+        if (item.processingTime && item.status === 'completed') {
+            return `${item.processingTime.toFixed(1)}s`;
+        } else if (item.status === 'pending') {
+            return 'Waiting...';
+        } else if (['initializing', 'extracting', 'distilling'].includes(item.status) && item.startTime) {
+            try {
+                const startTime = new Date(item.startTime);
+                const currentTime = new Date();
+
+                if (!isNaN(startTime.getTime()) && !isNaN(currentTime.getTime())) {
+                    const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+
+                    if (elapsedSeconds >= 0) {
+                        if (elapsedSeconds < 60) {
+                            return `${elapsedSeconds}s`;
+                        } else {
+                            const minutes = Math.floor(elapsedSeconds / 60);
+                            const seconds = elapsedSeconds % 60;
+                            return `${minutes}m ${seconds}s`;
+                        }
+                    } else {
+                        return '0s';
+                    }
+                }
+            } catch (error) {
+                console.warn('Error calculating processing time:', error);
+            }
+        } else if (item.elapsedTime && item.elapsedTime > 0) {
+            const minutes = Math.floor(item.elapsedTime / 60);
+            const seconds = Math.floor(item.elapsedTime % 60);
+            return `${minutes}m ${seconds}s`;
+        }
+        return '';
     }
 
     updateProcessingTimes() {
@@ -689,20 +735,12 @@ class SawronApp {
             if (row) {
                 const timeCell = row.querySelector('.time-cell');
                 if (timeCell) {
-                    const startTime = new Date(item.startTime);
-                    const currentTime = new Date();
-                    const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                    const timeDisplay = this.calculateProcessingTimeDisplay(item);
 
-                    let timeDisplay;
-                    if (elapsedSeconds < 60) {
-                        timeDisplay = `${elapsedSeconds}s`;
-                    } else {
-                        const minutes = Math.floor(elapsedSeconds / 60);
-                        const seconds = elapsedSeconds % 60;
-                        timeDisplay = `${minutes}m ${seconds}s`;
+                    // Only update if the time display actually changed to prevent flickering
+                    if (timeDisplay && timeCell.textContent !== timeDisplay) {
+                        timeCell.textContent = timeDisplay;
                     }
-
-                    timeCell.textContent = timeDisplay;
                 }
             }
         });
@@ -756,6 +794,10 @@ class SawronApp {
             itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
+                    // Debug logging for status changes
+                    if (newItem.status !== oldItem.status) {
+                        console.log(`Status change detected for ${oldItem.id}: ${oldItem.status} → ${newItem.status}`);
+                    }
                     this.updateSingleRow(newItem);
                     // Update our local data
                     const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
@@ -791,6 +833,43 @@ class SawronApp {
 
         } catch (error) {
             console.error('Error checking status updates:', error);
+        }
+    }
+
+    async checkProcessingItemsStatus() {
+        try {
+            // Only check items that are currently processing
+            const processingItems = this.knowledgeBase.filter(item =>
+                ['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)
+            );
+
+            if (processingItems.length === 0) return;
+
+            // Fetch latest data
+            const response = await fetch('/api/summaries');
+            if (!response.ok) return;
+
+            const latestData = await response.json();
+
+            // Check only processing items for changes
+            processingItems.forEach(oldItem => {
+                const newItem = latestData.find(item => item.id === oldItem.id);
+                if (newItem && this.hasItemChanged(oldItem, newItem)) {
+                    // Debug logging for status changes
+                    if (newItem.status !== oldItem.status) {
+                        console.log(`[AGGRESSIVE] Status change detected for ${oldItem.id}: ${oldItem.status} → ${newItem.status}`);
+                    }
+                    this.updateSingleRow(newItem);
+                    // Update our local data
+                    const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
+                    if (index !== -1) {
+                        this.knowledgeBase[index] = newItem;
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('Error checking processing items status:', error);
         }
     }
 
@@ -898,9 +977,51 @@ class SawronApp {
         const row = document.querySelector(`tr[data-id="${item.id}"]`);
         if (!row) return;
 
-        // Replace the entire row to ensure all data is forcefully updated
-        const newRowHtml = this.createTableRow(item);
-        row.outerHTML = newRowHtml;
+        // Check if this is a processing item with live chronometer
+        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(item.status);
+        const hasStartTime = item.startTime;
+        const shouldPreserveTime = isProcessing && hasStartTime;
+
+        if (shouldPreserveTime) {
+            // Update individual cells to preserve the live chronometer
+            this.updateRowCellsSelectively(row, item);
+        } else {
+            // Replace the entire row for non-processing items
+            const newRowHtml = this.createTableRow(item);
+            row.outerHTML = newRowHtml;
+        }
+    }
+
+    updateRowCellsSelectively(row, item) {
+        // Update only specific cells, preserving the time cell for live chronometer
+        const statusConfig = this.getStatusConfig(item.status);
+        const statusClass = statusConfig.class;
+        const statusText = statusConfig.text;
+        const statusDisplay = `<span class="status-icon">${statusConfig.icon}</span>${statusText}`;
+
+        // Update status cell
+        const statusCell = row.querySelector('.status-cell');
+        if (statusCell) {
+            statusCell.className = `status-cell ${statusClass} truncate-text`;
+            statusCell.innerHTML = statusDisplay;
+            statusCell.setAttribute('data-tooltip', `${statusText}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}`);
+        }
+
+        // Update title cell if it changed
+        const titleCell = row.querySelector('.title-cell');
+        if (titleCell && item.title) {
+            const truncatedTitle = item.title.length > 50 ? item.title.substring(0, 50) + '...' : item.title;
+            titleCell.textContent = truncatedTitle;
+            titleCell.setAttribute('data-tooltip', item.title);
+        }
+
+        // Update actions cell
+        const actionsCell = row.querySelector('.actions-cell');
+        if (actionsCell) {
+            actionsCell.innerHTML = this.createActionsDropdown(item);
+        }
+
+        // Note: We intentionally don't update the time cell to preserve the live chronometer
     }
 
     addSingleRow(item) {
@@ -920,13 +1041,13 @@ class SawronApp {
     getStatusConfig(status) {
         const STATUS_CONFIG = {
             'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
-            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
+           // 'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
             'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
             'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
         };
-        return STATUS_CONFIG[status] || { icon: '❓', text: 'UNKNOWN', class: 'status-unknown' };
+        return STATUS_CONFIG[status] || { icon: '⏳', text: 'QUEUED', class: 'status-queued' };
     }
 
     createActionsDropdown(item) {
@@ -974,97 +1095,16 @@ class SawronApp {
         `;
     }
 
-    startChronometer() {
-        // Update chronometer every second for processing items
-        this.chronometerInterval = setInterval(() => {
-            this.updateProcessingTimes();
-        }, 1000);
-    }
 
-    updateProcessingTimes() {
-        try {
-            // Update processing times for items that are currently processing
-            const rows = document.querySelectorAll('#knowledge-base-tbody tr[data-id]');
-
-            rows.forEach((row) => {
-                try {
-                    const statusCell = row.querySelector('.status-cell');
-                    const timeCell = row.querySelector('.time-cell');
-
-                    if (statusCell && timeCell) {
-                        const statusText = statusCell.querySelector('.status-text')?.textContent.trim();
-                        const isProcessing = ['INITIALIZING', 'EXTRACTING', 'DISTILLING'].includes(statusText);
-                        const isQueued = statusText === 'QUEUED';
-
-                        if (isQueued || isProcessing) {
-                            // Find the corresponding item data
-                            const itemId = row.dataset.id;
-                            if (itemId && this.knowledgeBaseData) {
-                                const item = this.knowledgeBaseData.find(i => i.id === itemId);
-
-                                if (!item) {
-                                    // Item not found, show fallback
-                                    timeCell.textContent = 'Unknown';
-                                    return;
-                                }
-
-                                // Show "Waiting..." for queued items
-                                if (item.status === 'pending') {
-                                    timeCell.textContent = 'Waiting...';
-                                } else if (item.startTime && isProcessing) {
-                                    // Only show live timer for actively processing items
-                                    try {
-                                        const startTime = new Date(item.startTime);
-                                        const currentTime = new Date();
-
-                                        // Validate dates
-                                        if (isNaN(startTime.getTime()) || isNaN(currentTime.getTime())) {
-                                            timeCell.textContent = 'Unknown';
-                                            return;
-                                        }
-
-                                        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-
-                                        // Ensure elapsed time is not negative
-                                        if (elapsedSeconds < 0) {
-                                            timeCell.textContent = '0s';
-                                            return;
-                                        }
-
-                                        let timeDisplay;
-                                        if (elapsedSeconds < 60) {
-                                            timeDisplay = `${elapsedSeconds}s`;
-                                        } else {
-                                            const minutes = Math.floor(elapsedSeconds / 60);
-                                            const seconds = elapsedSeconds % 60;
-                                            timeDisplay = `${minutes}m ${seconds}s`;
-                                        }
-
-                                        timeCell.textContent = timeDisplay;
-                                    } catch (timeError) {
-                                        console.warn('Error calculating processing time:', timeError);
-                                        timeCell.textContent = 'Unknown';
-                                    }
-                                } else if (isProcessing) {
-                                    // Processing but no start time available
-                                    timeCell.textContent = 'Processing...';
-                                }
-                            }
-                        }
-                    }
-                } catch (rowError) {
-                    console.warn('Error updating processing time for row:', rowError);
-                }
-            });
-        } catch (error) {
-            console.warn('Error in updateProcessingTimes:', error);
-        }
-    }
 
     stopAutoRefresh() {
         if (this.statusMonitorInterval) {
             clearInterval(this.statusMonitorInterval);
             this.statusMonitorInterval = null;
+        }
+        if (this.aggressiveMonitorInterval) {
+            clearInterval(this.aggressiveMonitorInterval);
+            this.aggressiveMonitorInterval = null;
         }
         if (this.chronometerInterval) {
             clearInterval(this.chronometerInterval);
@@ -1339,7 +1379,7 @@ class SawronApp {
 
     extractItemName(item) {
         // Extract name from title, URL, or file
-        let name = 'Unknown';
+        let name = '';
 
         if (item.title && item.title !== 'Processing...' && !item.title.includes('Processing')) {
             name = item.title;
@@ -1386,7 +1426,7 @@ class SawronApp {
         // Enhanced status mapping with more granular stages
         const STATUS_CONFIG = {
             'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
-            'initializing': { icon: '�', ttext: 'INITIALIZING', class: 'status-processing' },
+            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
             'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
@@ -1394,7 +1434,7 @@ class SawronApp {
         };
 
         const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['pending'] || {
-            icon: '❓', text: 'UNKNOWN', class: 'status-unknown'
+            icon: '⏳', text: 'QUEUED', class: 'status-queued'
         };
         const statusClass = statusConfig.class;
         const statusIcon = statusConfig.icon;
@@ -1424,33 +1464,8 @@ class SawronApp {
             ${item.processingStep && item.processingStep !== statusText ? `<div class="processing-step">${item.processingStep}</div>` : ''}
         `;
 
-        // Format processing time with live chronometer
-        let processingTimeDisplay = '-';
-        if (item.processingTime) {
-            // Completed items show final processing time
-            processingTimeDisplay = `${item.processingTime.toFixed(1)}s`;
-        } else if (status === 'pending') {
-            // Show "Waiting..." for items that are pending (in queue)
-            processingTimeDisplay = 'Waiting...';
-        } else if (isProcessing && item.startTime) {
-            // Live chronometer for processing items (initializing, extracting, distilling)
-            const startTime = new Date(item.startTime);
-            const currentTime = new Date();
-            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-
-            if (elapsedSeconds < 60) {
-                processingTimeDisplay = `${elapsedSeconds}s`;
-            } else {
-                const minutes = Math.floor(elapsedSeconds / 60);
-                const seconds = elapsedSeconds % 60;
-                processingTimeDisplay = `${minutes}m ${seconds}s`;
-            }
-        } else if (item.elapsedTime) {
-            // Fallback to stored elapsed time
-            const minutes = Math.floor(item.elapsedTime / 60);
-            const seconds = Math.floor(item.elapsedTime % 60);
-            processingTimeDisplay = `${minutes}m ${seconds}s`;
-        }
+        // Format processing time with live chronometer using centralized calculation
+        const processingTimeDisplay = this.calculateProcessingTimeDisplay(item);
 
         // Format created date
         const createdAt = new Date(item.createdAt);
@@ -1788,10 +1803,10 @@ class SawronApp {
                         <span class="log-message"><strong>ID:</strong> ${distillation.id}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Source:</strong> ${distillation.sourceUrl || distillation.sourceFile || 'Unknown'}</span>
+                        <span class="log-message"><strong>Source:</strong> ${distillation.sourceUrl || distillation.sourceFile || ''}</span>
                     </div>
                     <div class="log-entry log-info">
-                        <span class="log-message"><strong>Type:</strong> ${distillation.sourceType || 'Unknown'}</span>
+                        <span class="log-message"><strong>Type:</strong> ${distillation.sourceType || ''}</span>
                     </div>
                     <div class="log-entry log-info">
                         <span class="log-message"><strong>Status:</strong> ${distillation.status}</span>
@@ -1868,10 +1883,10 @@ class SawronApp {
                     <div class="log-section">
                         <h4 class="log-section-title">🔍 Extraction Details</h4>
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Content Type:</strong> ${distillation.extractionMetadata.contentType || 'Unknown'}</span>
+                            <span class="log-message"><strong>Content Type:</strong> ${distillation.extractionMetadata.contentType || ''}</span>
                         </div>
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Extraction Method:</strong> ${distillation.extractionMetadata.extractionMethod || 'Unknown'}</span>
+                            <span class="log-message"><strong>Extraction Method:</strong> ${distillation.extractionMetadata.extractionMethod || ''}</span>
                         </div>
                         <div class="log-entry log-info">
                             <span class="log-message"><strong>Fallback Used:</strong> ${distillation.extractionMetadata.fallbackUsed ? 'Yes' : 'No'}</span>
@@ -2028,7 +2043,9 @@ class SawronApp {
             }
 
             // Retry initiated successfully - force MULTIPLE immediate status updates
-            setTimeout(() => this.forceStatusUpdate(), 200);
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -2629,7 +2646,9 @@ class SawronApp {
             this.handleRowSelection();
 
             // Force MULTIPLE immediate status updates after retry
-            setTimeout(() => this.forceStatusUpdate(), 200);
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -2665,7 +2684,9 @@ class SawronApp {
             this.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
 
             // Force MULTIPLE immediate status updates after retry all
-            setTimeout(() => this.forceStatusUpdate(), 200);
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -2702,7 +2723,9 @@ class SawronApp {
             this.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
 
             // Force MULTIPLE immediate status updates after retry failed
-            setTimeout(() => this.forceStatusUpdate(), 200);
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -2798,7 +2821,9 @@ class SawronApp {
             this.showTemporaryMessage(`Retrying ${selectedItems.length} selected items...`, 'info');
 
             // Force MULTIPLE immediate status updates after bulk retry
-            setTimeout(() => this.forceStatusUpdate(), 200);
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
 
@@ -3372,7 +3397,7 @@ function validateApiKeyFormat(provider, apiKey) {
 
     const format = formats[provider];
     if (!format) {
-        return { valid: true }; // Unknown provider, skip validation
+        return { valid: true }; // Provider not found, skip validation
     }
 
     if (format.prefix && !apiKey.startsWith(format.prefix)) {

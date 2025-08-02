@@ -101,8 +101,8 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
-                // Small delay to ensure frontend can see the initializing status
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Delay to ensure frontend can see the initializing status
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Update status to extracting
                 await database.updateDistillationStatus(
@@ -114,6 +114,8 @@ class Processor {
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`🌐 Target URL: ${url}`);
                 distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
+                distillationObj.status = 'extracting';
+                distillationObj.processingStep = 'Extracting content from URL';
                 await database.saveDistillation(distillationObj);
 
                 // Extracting content from URL
@@ -149,7 +151,7 @@ class Processor {
                 // Content extracted successfully
 
                 // Delay to ensure frontend can see the extracting status
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Update status to distilling
                 await database.updateDistillationStatus(
@@ -157,6 +159,9 @@ class Processor {
                     'distilling',
                     'Generating distillation with AI provider'
                 );
+
+                // Delay to ensure frontend can see the distilling status
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Store raw content and enhanced extraction metadata
                 distillationObj.rawContent = text;
@@ -177,6 +182,8 @@ class Processor {
                     fallbackUsed,
                     ...metadata
                 };
+                distillationObj.status = 'distilling';
+                distillationObj.processingStep = 'Generating distillation with AI provider';
                 await database.saveDistillation(distillationObj);
 
                 const distillationContent = await aiProvider.generateSummary(text);
@@ -499,8 +506,8 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
-                // Small delay to ensure frontend can see the initializing status
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Delay to ensure frontend can see the initializing status
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Update status to extracting
                 await database.updateDistillationStatus(
@@ -512,6 +519,8 @@ class Processor {
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`📁 Processing file: ${file.originalname}`);
                 distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
+                distillationObj.status = 'extracting';
+                distillationObj.processingStep = `Extracting content from ${file.originalname}`;
                 await database.saveDistillation(distillationObj);
 
                 console.log(`[${distillation.id}] Extracting content from file: ${file.originalname}`);
@@ -528,8 +537,8 @@ class Processor {
                 console.log(`[${distillation.id}] File content extracted successfully. Content length: ${text.length} chars`);
                 console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
 
-                // Small delay to ensure frontend can see the extracting status
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Delay to ensure frontend can see the extracting status
+                await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Update status to distilling
                 await database.updateDistillationStatus(
@@ -537,6 +546,9 @@ class Processor {
                     'distilling',
                     'Generating distillation with AI provider'
                 );
+
+                // Delay to ensure frontend can see the distilling status
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Store raw content and enhanced extraction metadata
                 distillationObj.rawContent = text;
@@ -549,6 +561,8 @@ class Processor {
                     fallbackUsed,
                     ...metadata
                 };
+                distillationObj.status = 'distilling';
+                distillationObj.processingStep = 'Generating distillation with AI provider';
                 await database.saveDistillation(distillationObj);
 
                 console.log(`[${distillation.id}] Starting distillation with AI provider`);
@@ -709,6 +723,8 @@ class Processor {
                 distillationObj.addLog(`🎯 Model: ${aiProvider.model}`);
                 distillationObj.addLog(`🔗 Endpoint: ${aiProvider.endpoint || 'Default'}`);
 
+                distillationObj.status = 'distilling';
+                distillationObj.processingStep = 'Generating distillation with AI provider';
                 await database.saveDistillation(distillationObj);
 
                 console.log(`[${distillation.id}] Starting distillation with AI provider (retry)`);

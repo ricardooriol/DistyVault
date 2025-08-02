@@ -73,6 +73,7 @@ class Database {
 
     async saveDistillation(distillation) {
         return new Promise((resolve, reject) => {
+            console.log(`[DB] Saving distillation ${distillation.id} with status: ${distillation.status}`);
             const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO summaries 
                 (id, title, content, sourceUrl, sourceType, sourceFile, status, processingStep, rawContent,
@@ -154,6 +155,7 @@ class Database {
     async updateDistillationStatus(id, status, processingStep = null, error = null) {
         return new Promise(async (resolve, reject) => {
             try {
+                console.log(`[DB] Updating status for ${id}: ${status}`);
                 const updates = { status };
 
                 if (status === 'completed') {
