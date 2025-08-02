@@ -90,8 +90,8 @@ class Processor {
                 // Update status to initializing and set actual start time when background processing begins
                 await database.updateDistillationStatus(
                     distillation.id,
-                    'initializing',
-                    'Starting processing'
+                    'extracting',
+                    'Extracting content from URL'
                 );
 
                 // Set the actual start time when processing begins (not when queued)
@@ -101,15 +101,8 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
-                // Delay to ensure frontend can see the initializing status
+                // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Update status to extracting
-                await database.updateDistillationStatus(
-                    distillation.id,
-                    'extracting',
-                    'Extracting content from URL'
-                );
 
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`🌐 Target URL: ${url}`);
@@ -282,8 +275,8 @@ class Processor {
                 // Update status to initializing when background processing starts
                 await database.updateDistillationStatus(
                     trackingDistillation.id,
-                    'initializing',
-                    'Starting playlist processing'
+                    'extracting',
+                    'Extracting video URLs from playlist'
                 );
 
                 // Update status to extracting
@@ -495,8 +488,8 @@ class Processor {
                 // Update status to initializing when background processing starts
                 await database.updateDistillationStatus(
                     distillation.id,
-                    'initializing',
-                    'Starting file processing'
+                    'extracting',
+                    `Extracting content from ${file.originalname}`
                 );
 
                 // Set the actual start time when processing begins (not when queued)
@@ -506,15 +499,8 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
-                // Delay to ensure frontend can see the initializing status
+                // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Update status to extracting
-                await database.updateDistillationStatus(
-                    distillation.id,
-                    'extracting',
-                    `Extracting content from ${file.originalname}`
-                );
 
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`📁 Processing file: ${file.originalname}`);
@@ -694,8 +680,8 @@ class Processor {
                 // Update status to initializing when background processing starts
                 await database.updateDistillationStatus(
                     distillation.id,
-                    'initializing',
-                    'Starting retry processing'
+                    'distilling',
+                    'Generating distillation with AI provider'
                 );
 
                 const distillationObj = await database.getDistillation(distillation.id);

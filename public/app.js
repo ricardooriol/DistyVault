@@ -693,7 +693,7 @@ class SawronApp {
             return `${item.processingTime.toFixed(1)}s`;
         } else if (item.status === 'pending') {
             return 'Waiting...';
-        } else if (['initializing', 'extracting', 'distilling'].includes(item.status) && item.startTime) {
+        } else if (['extracting', 'distilling'].includes(item.status) && item.startTime) {
             try {
                 const startTime = new Date(item.startTime);
                 const currentTime = new Date();
@@ -727,7 +727,7 @@ class SawronApp {
     updateProcessingTimes() {
         // Update processing times for items that are currently processing
         const processingItems = this.knowledgeBase.filter(item =>
-            ['initializing', 'extracting', 'distilling'].includes(item.status) && item.startTime
+            ['extracting', 'distilling'].includes(item.status) && item.startTime
         );
 
         processingItems.forEach(item => {
@@ -840,7 +840,7 @@ class SawronApp {
         try {
             // Only check items that are currently processing
             const processingItems = this.knowledgeBase.filter(item =>
-                ['pending', 'initializing', 'extracting', 'distilling'].includes(item.status)
+                ['pending', 'extracting', 'distilling'].includes(item.status)
             );
 
             if (processingItems.length === 0) return;
@@ -873,6 +873,84 @@ class SawronApp {
         }
     }
 
+    clearAllSelections() {
+        console.log('[DEBUG] clearAllSelections called');
+
+        // Set a flag to indicate we're clearing selections
+        this.clearingSelections = true;
+
+        // Clear the selectedItems set
+        this.selectedItems.clear();
+        // Uncheck all checkboxes in the DOM
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+        console.log(`[DEBUG] clearAllSelections: Found ${allCheckboxes.length} checkboxes`);
+        allCheckboxes.forEach(checkbox => checkbox.checked = false);
+        // Update the UI
+        this.handleRowSelection();
+
+        console.log(`[DEBUG] clearAllSelections: selectedItems.size=${this.selectedItems.size}`);
+
+        // Clear the flag after a delay to ensure all updates are complete
+        setTimeout(() => {
+            this.clearingSelections = false;
+            console.log('[DEBUG] clearingSelections flag cleared');
+        }, 3000);
+    }
+
+    forceBulkActionsRefresh() {
+        console.log('[DEBUG] forceBulkActionsRefresh called');
+
+        // Force clear selections and refresh bulk actions bar
+        this.selectedItems.clear();
+
+        // Uncheck all checkboxes in the DOM
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+        console.log(`[DEBUG] Found ${allCheckboxes.length} checkboxes`);
+        allCheckboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                console.log(`[DEBUG] Unchecking checkbox for ${checkbox.dataset.id}`);
+                checkbox.checked = false;
+            }
+        });
+
+        // Force update the bulk actions bar
+        this.updateBulkActionsBar();
+
+        // Also call handleRowSelection to ensure consistency
+        this.handleRowSelection();
+
+        console.log(`[DEBUG] After refresh: selectedItems.size=${this.selectedItems.size}`);
+    }
+
+    nuclearSelectionReset() {
+        console.log('[DEBUG] nuclearSelectionReset called - complete reset');
+
+        // Nuclear option: completely reset everything
+        this.selectedItems = new Set();
+        this.clearingSelections = false;
+
+        // Uncheck ALL checkboxes
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+        allCheckboxes.forEach(checkbox => checkbox.checked = false);
+
+        // Force update bulk actions bar to show 0 selected
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+        const selectedCount = document.getElementById('selected-count');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const bulkRetryBtn = document.getElementById('bulk-retry-btn');
+        const bulkDownloadBtn = document.getElementById('bulk-download-btn');
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+
+        if (bulkActionsBar) bulkActionsBar.style.display = 'flex';
+        if (selectedCount) selectedCount.textContent = '0 items selected';
+        if (selectAllBtn) selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
+        if (bulkRetryBtn) bulkRetryBtn.disabled = true;
+        if (bulkDownloadBtn) bulkDownloadBtn.disabled = true;
+        if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
+
+        console.log('[DEBUG] Nuclear reset complete');
+    }
+
     handleRowSelection() {
         // Update selected items set based on checkbox states
         this.selectedItems.clear();
@@ -892,6 +970,10 @@ class SawronApp {
         const bulkDownloadBtn = document.getElementById('bulk-download-btn');
         const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
         const selectAllBtn = document.getElementById('select-all-btn');
+
+        // Debug logging
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        console.log(`[DEBUG] updateBulkActionsBar: selectedItems.size=${this.selectedItems.size}, checkedBoxes.length=${checkedBoxes.length}`);
 
         if (this.selectedItems.size > 0) {
             bulkActionsBar.style.display = 'flex';
@@ -978,7 +1060,7 @@ class SawronApp {
         if (!row) return;
 
         // Check if this is a processing item with live chronometer
-        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(item.status);
+        const isProcessing = ['extracting', 'distilling'].includes(item.status);
         const hasStartTime = item.startTime;
         const shouldPreserveTime = isProcessing && hasStartTime;
 
@@ -1004,7 +1086,7 @@ class SawronApp {
         if (statusCell) {
             statusCell.className = `status-cell ${statusClass} truncate-text`;
             statusCell.innerHTML = statusDisplay;
-            statusCell.setAttribute('data-tooltip', `${statusText}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}`);
+            // No tooltip for status cell
         }
 
         // Update title cell if it changed
@@ -1041,9 +1123,8 @@ class SawronApp {
     getStatusConfig(status) {
         const STATUS_CONFIG = {
             'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
-           // 'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
-            'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
+            'distilling': { icon: '💠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
             'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
         };
@@ -1052,7 +1133,7 @@ class SawronApp {
 
     createActionsDropdown(item) {
         const isCompleted = item.status === 'completed';
-        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(item.status);
+        const isProcessing = ['extracting', 'distilling'].includes(item.status);
         const isError = item.status === 'error';
 
         return `
@@ -1073,7 +1154,7 @@ class SawronApp {
                     ` : ''}
                     ${isProcessing ? `
                         <button class="action-dropdown-item" onclick="event.stopPropagation(); app.stopProcessing('${item.id}'); app.closeAllDropdowns();">
-                            ⏹️ Stop Processing
+                            ⏹️ Stop
                         </button>
                     ` : ''}
                     <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
@@ -1411,11 +1492,11 @@ class SawronApp {
     }
 
     createTableRow(item) {
-        const isSelected = this.selectedItems.has(item.id);
+        const isSelected = this.clearingSelections ? false : this.selectedItems.has(item.id);
         const status = item.status;
         const isCompleted = status === 'completed';
         const isPending = status === 'pending';
-        const isProcessing = ['initializing', 'extracting', 'distilling'].includes(status);
+        const isProcessing = ['extracting', 'distilling'].includes(status);
         const isError = status === 'error';
 
         // Debug logging for status issues
@@ -1426,9 +1507,8 @@ class SawronApp {
         // Enhanced status mapping with more granular stages
         const STATUS_CONFIG = {
             'pending': { icon: '⏳', text: 'QUEUED', class: 'status-queued' },
-            'initializing': { icon: '🚀', text: 'INITIALIZING', class: 'status-processing' },
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
-            'distilling': { icon: '🧠', text: 'DISTILLING', class: 'status-processing' },
+            'distilling': { icon: '💠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
             'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
         };
@@ -1458,11 +1538,7 @@ class SawronApp {
         }
 
         // Format status display with step
-        const statusDisplay = `
-            <span class="status-icon">${statusIcon}</span>
-            <span class="status-text">${statusText}</span>
-            ${item.processingStep && item.processingStep !== statusText ? `<div class="processing-step">${item.processingStep}</div>` : ''}
-        `;
+        const statusDisplay = `<span class="status-icon">${statusIcon}</span><span class="status-text">${statusText}</span>`;
 
         // Format processing time with live chronometer using centralized calculation
         const processingTimeDisplay = this.calculateProcessingTimeDisplay(item);
@@ -1520,7 +1596,7 @@ class SawronApp {
                 <td class="name-cell truncate-text" data-tooltip="${fullName}">${name}</td>
                 <td class="source-cell truncate-text" data-tooltip="${item.sourceUrl || (item.sourceFile ? item.sourceFile.name : '')}">${sourceDisplay}</td>
                 <td class="type-cell">${this.getTypeLabel(item.sourceType)}</td>
-                <td class="status-cell ${statusClass} truncate-text" data-tooltip="${statusText}${item.error ? ': ' + item.error : ''}${item.processingStep ? ' - ' + item.processingStep : ''}">${statusDisplay}</td>
+                <td class="status-cell ${statusClass}">${statusDisplay}</td>
                 <td class="time-cell">${processingTimeDisplay}</td>
                 <td class="date-cell">${formattedDate}</td>
                 <td class="actions-cell">${actions}</td>
@@ -2593,7 +2669,11 @@ class SawronApp {
             document.getElementById('bulk-actions-bar').style.display = 'none';
 
             // Clear selection
-            this.selectedItems.clear();
+            this.clearAllSelections();
+
+            // Force refresh bulk actions bar to ensure consistency
+            setTimeout(() => this.nuclearSelectionReset(), 100);
+            setTimeout(() => this.nuclearSelectionReset(), 500);
 
         } catch (error) {
             console.error('Error deleting items:', error);
@@ -2641,9 +2721,8 @@ class SawronApp {
 
             this.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
 
-            // Clear selection and force immediate status update
-            this.selectedItems.clear();
-            this.handleRowSelection();
+            // Clear selection immediately with the new flag-based approach
+            this.clearAllSelections();
 
             // Force MULTIPLE immediate status updates after retry
             this.forceStatusUpdate();
@@ -2651,6 +2730,12 @@ class SawronApp {
             setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
             setTimeout(() => this.forceStatusUpdate(), 2000);
+
+            // Force refresh bulk actions bar multiple times to ensure consistency
+            setTimeout(() => this.nuclearSelectionReset(), 600);
+            setTimeout(() => this.nuclearSelectionReset(), 1200);
+            setTimeout(() => this.nuclearSelectionReset(), 2500);
+            setTimeout(() => this.nuclearSelectionReset(), 4000);
 
         } catch (error) {
             console.error('Error retrying selected items:', error);
