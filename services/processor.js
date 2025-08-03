@@ -1422,13 +1422,32 @@ class Processor {
      * @returns {Promise<boolean>} - True if the process was stopped
      */
     async stopProcess(distillationId) {
-        // Since we're using setTimeout for background processing,
-        // we can't actually stop a running process.
-        // In a real implementation with a job queue, you would cancel the job.
-
-        // For now, just mark it as error/cancelled
         try {
-            await database.updateDistillationStatus(distillationId, 'error', 'Process cancelled by user');
+            // Check if the distillation exists and is in a stoppable state
+            const distillation = await database.getDistillation(distillationId);
+            if (!distillation) {
+                return false;
+            }
+
+            // Only allow stopping if the process is currently running
+            if (!['pending', 'extracting', 'distilling'].includes(distillation.status)) {
+                return false;
+            }
+
+            // Mark as stopped with appropriate status and message
+            await database.updateDistillationStatus(
+                distillationId, 
+                'stopped', 
+                'Process stopped by user'
+            );
+
+            // Add log entry for the stop action
+            if (distillation.addLog) {
+                distillation.addLog('⏹️ Process stopped by user request', 'info');
+                await database.saveDistillation(distillation);
+            }
+
+            console.log(`[${distillationId}] Process stopped by user`);
             return true;
         } catch (error) {
             console.error(`Error stopping process ${distillationId}:`, error);

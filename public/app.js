@@ -478,7 +478,7 @@ class SawronApp {
         // Drag and drop on the entire input section
         const inputSection = document.querySelector('.input-section');
         const dropzone = document.getElementById('dropzone');
-        
+
         inputSection.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropzone.style.borderColor = 'var(--primary-orange)';
@@ -876,27 +876,15 @@ class SawronApp {
     }
 
     clearAllSelections() {
-        console.log('[DEBUG] clearAllSelections called');
-
-        // Set a flag to indicate we're clearing selections
-        this.clearingSelections = true;
-
         // Clear the selectedItems set
         this.selectedItems.clear();
+
         // Uncheck all checkboxes in the DOM
         const allCheckboxes = document.querySelectorAll('.row-checkbox');
-        console.log(`[DEBUG] clearAllSelections: Found ${allCheckboxes.length} checkboxes`);
         allCheckboxes.forEach(checkbox => checkbox.checked = false);
-        // Update the UI
-        this.handleRowSelection();
 
-        console.log(`[DEBUG] clearAllSelections: selectedItems.size=${this.selectedItems.size}`);
-
-        // Clear the flag after a delay to ensure all updates are complete
-        setTimeout(() => {
-            this.clearingSelections = false;
-            console.log('[DEBUG] clearingSelections flag cleared');
-        }, 3000);
+        // Update the bulk actions bar
+        this.updateBulkActionsBar();
     }
 
     forceBulkActionsRefresh() {
@@ -925,29 +913,15 @@ class SawronApp {
     }
 
     nuclearSelectionReset() {
-        console.log('[DEBUG] nuclearSelectionReset called - complete reset');
-
-        // Nuclear option: completely reset everything
+        // Complete reset of selection state
         this.selectedItems = new Set();
-        this.clearingSelections = false;
 
         // Uncheck ALL checkboxes
         const allCheckboxes = document.querySelectorAll('.row-checkbox');
         allCheckboxes.forEach(checkbox => checkbox.checked = false);
 
-        // Force update bulk actions bar to show 0 selected
-        const bulkActionsBar = document.getElementById('bulk-actions-bar');
-        const selectedCount = document.getElementById('selected-count');
-        const selectAllBtn = document.getElementById('select-all-btn');
-        const bulkRetryBtn = document.getElementById('bulk-retry-btn');
-        const bulkDownloadBtn = document.getElementById('bulk-download-btn');
-        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
-
-        if (bulkActionsBar) bulkActionsBar.style.display = 'flex';
-        if (selectedCount) selectedCount.textContent = '0 items selected';
-        if (selectAllBtn) selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
-        if (bulkRetryBtn) bulkRetryBtn.disabled = true;
-        if (bulkDownloadBtn) bulkDownloadBtn.disabled = true;
+        // Update the bulk actions bar
+        this.updateBulkActionsBar();
         if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
 
         console.log('[DEBUG] Nuclear reset complete');
@@ -973,13 +947,20 @@ class SawronApp {
         const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
         const selectAllBtn = document.getElementById('select-all-btn');
 
-        // Debug logging
+        // Sync selectedItems with actual checked checkboxes to ensure consistency
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
-        console.log(`[DEBUG] updateBulkActionsBar: selectedItems.size=${this.selectedItems.size}, checkedBoxes.length=${checkedBoxes.length}`);
+        const actualSelectedIds = new Set(Array.from(checkedBoxes).map(cb => cb.dataset.id));
 
-        if (this.selectedItems.size > 0) {
+        // Update selectedItems to match actual DOM state
+        this.selectedItems = actualSelectedIds;
+
+        const selectedCount_value = this.selectedItems.size;
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+        const totalCount = allCheckboxes.length;
+
+        if (selectedCount_value > 0) {
             bulkActionsBar.style.display = 'flex';
-            selectedCount.textContent = `${this.selectedItems.size} item${this.selectedItems.size > 1 ? 's' : ''} selected`;
+            selectedCount.textContent = `${selectedCount_value} selected`;
 
             // Enable bulk action buttons
             bulkRetryBtn.disabled = false;
@@ -993,16 +974,15 @@ class SawronApp {
             const hasCompletedItems = selectedItemsData.some(item => item.status === 'completed');
             bulkDownloadBtn.disabled = !hasCompletedItems;
 
-            // Update select all button text
-            const allCheckboxes = document.querySelectorAll('.row-checkbox');
-            if (this.selectedItems.size === allCheckboxes.length) {
-                selectAllBtn.innerHTML = '<span class="btn-text">☐ Deselect All</span>';
+            // Update select all button text based on actual selection state
+            if (selectedCount_value === totalCount && totalCount > 0) {
+                selectAllBtn.innerHTML = '<span class="btn-text">Unselect All</span>';
             } else {
-                selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
+                selectAllBtn.innerHTML = '<span class="btn-text">Select All</span>';
             }
         } else {
             bulkActionsBar.style.display = 'flex'; // Keep visible but disable buttons
-            selectedCount.textContent = '0 items selected';
+            selectedCount.textContent = '0 selected';
 
             // Disable bulk action buttons
             bulkRetryBtn.disabled = true;
@@ -1010,26 +990,27 @@ class SawronApp {
             bulkDeleteBtn.disabled = true;
 
             // Reset select all button
-            selectAllBtn.innerHTML = '<span class="btn-text">☑️ Select All</span>';
+            selectAllBtn.innerHTML = '<span class="btn-text">Select All</span>';
         }
     }
 
     toggleSelectAll() {
-        const selectAllBtn = document.getElementById('select-all-btn');
         const allCheckboxes = document.querySelectorAll('.row-checkbox');
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        const shouldSelectAll = checkedBoxes.length !== allCheckboxes.length;
 
-        if (this.selectedItems.size === allCheckboxes.length) {
-            // Deselect all
-            this.selectedItems.clear();
-            allCheckboxes.forEach(checkbox => checkbox.checked = false);
-            selectAllBtn.textContent = '☑️ Select All';
-        } else {
+        if (shouldSelectAll) {
             // Select all
             allCheckboxes.forEach(checkbox => {
                 checkbox.checked = true;
                 this.selectedItems.add(checkbox.dataset.id);
             });
-            selectAllBtn.textContent = '☐ Deselect All';
+        } else {
+            // Deselect all
+            allCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            this.selectedItems.clear();
         }
 
         this.updateBulkActionsBar();
@@ -1128,7 +1109,8 @@ class SawronApp {
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
             'distilling': { icon: '💠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
-            'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
+            'error': { icon: '❌', text: 'ERROR', class: 'status-error' },
+            'stopped': { icon: '⏹️', text: 'STOPPED', class: 'status-stopped' }
         };
         return STATUS_CONFIG[status] || { icon: '⏳', text: 'QUEUED', class: 'status-queued' };
     }
@@ -1512,7 +1494,8 @@ class SawronApp {
             'extracting': { icon: '🔍', text: 'EXTRACTING', class: 'status-processing' },
             'distilling': { icon: '💠', text: 'DISTILLING', class: 'status-processing' },
             'completed': { icon: '✅', text: 'COMPLETED', class: 'status-completed' },
-            'error': { icon: '❌', text: 'ERROR', class: 'status-error' }
+            'error': { icon: '❌', text: 'ERROR', class: 'status-error' },
+            'stopped': { icon: '⏹️', text: 'STOPPED', class: 'status-stopped' }
         };
 
         const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['pending'] || {
@@ -2419,78 +2402,11 @@ class SawronApp {
 
     // Bulk Actions Methods
     handleRowSelection() {
-        try {
-            const checkboxes = document.querySelectorAll('.row-checkbox');
-            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
-            const bulkActionsBar = document.getElementById('bulk-actions-bar');
-            const selectedCount = document.getElementById('selected-count');
-            const selectAllBtn = document.getElementById('select-all-btn');
-
-            // Get all action buttons
-            const bulkRetryBtn = document.getElementById('bulk-retry-btn');
-            const bulkDownloadBtn = document.getElementById('bulk-download-btn');
-            const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
-
-            // Ensure all elements exist
-            if (!bulkActionsBar || !selectedCount || !selectAllBtn) {
-                return;
-            }
-
-            const selectedCount_num = checkedBoxes.length;
-            const totalCount = checkboxes.length;
-
-            // Update selected items set
-            this.selectedItems.clear();
-            checkedBoxes.forEach(checkbox => {
-                if (checkbox.dataset.id) {
-                    this.selectedItems.add(checkbox.dataset.id);
-                }
-            });
-
-            // Update selected count
-            selectedCount.textContent = `${selectedCount_num} selected`;
-
-            // Bulk actions bar is always visible now
-            // Update button states based on selection
-            const hasSelection = selectedCount_num > 0;
-
-            if (bulkRetryBtn) bulkRetryBtn.disabled = !hasSelection;
-            if (bulkDownloadBtn) bulkDownloadBtn.disabled = !hasSelection;
-            if (bulkDeleteBtn) bulkDeleteBtn.disabled = !hasSelection;
-
-            // Update Select All button text and state
-            if (selectedCount_num === 0) {
-                selectAllBtn.querySelector('.btn-text').textContent = 'Select All';
-                selectAllBtn.disabled = false;
-            } else if (selectedCount_num === totalCount && totalCount > 0) {
-                selectAllBtn.querySelector('.btn-text').textContent = 'Unselect All';
-                selectAllBtn.disabled = false;
-            } else {
-                selectAllBtn.querySelector('.btn-text').textContent = 'Select All';
-                selectAllBtn.disabled = false;
-            }
-        } catch (error) {
-            // Handle selection errors silently
-        }
+        // Simply delegate to the improved updateBulkActionsBar method
+        this.updateBulkActionsBar();
     }
 
-    toggleSelectAll() {
-        try {
-            const checkboxes = document.querySelectorAll('.row-checkbox');
-            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
-            const shouldSelectAll = checkedBoxes.length !== checkboxes.length;
-
-            checkboxes.forEach(checkbox => {
-                if (checkbox) {
-                    checkbox.checked = shouldSelectAll;
-                }
-            });
-
-            this.handleRowSelection();
-        } catch (error) {
-            // Handle toggle errors silently
-        }
-    }
+    // This method is a duplicate and should be removed - the main one is above
 
     getSelectedIds() {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
@@ -2723,21 +2639,13 @@ class SawronApp {
 
             this.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
 
-            // Clear selection immediately with the new flag-based approach
+            // Clear selection after retry
             this.clearAllSelections();
 
-            // Force MULTIPLE immediate status updates after retry
+            // Force status updates to detect new items
             this.forceStatusUpdate();
-            setTimeout(() => this.forceStatusUpdate(), 100);
             setTimeout(() => this.forceStatusUpdate(), 500);
             setTimeout(() => this.forceStatusUpdate(), 1000);
-            setTimeout(() => this.forceStatusUpdate(), 2000);
-
-            // Force refresh bulk actions bar multiple times to ensure consistency
-            setTimeout(() => this.nuclearSelectionReset(), 600);
-            setTimeout(() => this.nuclearSelectionReset(), 1200);
-            setTimeout(() => this.nuclearSelectionReset(), 2500);
-            setTimeout(() => this.nuclearSelectionReset(), 4000);
 
         } catch (error) {
             console.error('Error retrying selected items:', error);

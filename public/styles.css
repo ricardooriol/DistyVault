@@ -27,6 +27,7 @@
     --status-processing: #2196f3;
     --status-error: #f44336;
     --status-pending: #ff9800;
+    --status-stopped: #9e9e9e;
 }
 
 body {
@@ -877,6 +878,10 @@ body {
     color: var(--text-muted);
 }
 
+.status-cell.status-stopped .status-text {
+    color: var(--status-stopped);
+}
+
 .time-cell {
     white-space: nowrap;
     text-align: center;
@@ -1025,8 +1030,8 @@ body {
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     z-index: 2147483647 !important;
-    min-width: 200px;
-    max-width: 280px;
+    min-width: max-content;
+    width: auto;
     overflow: hidden;
     /* Ensure dropdown is always on top */
     isolation: isolate;
@@ -1053,8 +1058,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     border-bottom: 1px solid var(--border-color);
-    white-space: normal;
-    word-wrap: break-word;
+    white-space: nowrap;
     line-height: 1.3;
 }
 
