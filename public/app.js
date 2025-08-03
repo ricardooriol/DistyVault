@@ -477,21 +477,31 @@ class SawronApp {
 
         // Drag and drop on the entire input section
         const inputSection = document.querySelector('.input-section');
+        const dropzone = document.getElementById('dropzone');
+        
         inputSection.addEventListener('dragover', (e) => {
             e.preventDefault();
-            inputSection.style.background = 'var(--shadow-light)';
+            dropzone.style.borderColor = 'var(--primary-orange)';
+            dropzone.style.color = 'var(--text-secondary)';
         });
 
         inputSection.addEventListener('dragleave', (e) => {
             if (!inputSection.contains(e.relatedTarget)) {
-                inputSection.style.background = 'var(--bg-secondary)';
+                dropzone.style.borderColor = 'var(--border-color)';
+                dropzone.style.color = 'var(--text-muted)';
             }
         });
 
         inputSection.addEventListener('drop', (e) => {
             e.preventDefault();
-            inputSection.style.background = 'var(--bg-secondary)';
+            dropzone.style.borderColor = 'var(--border-color)';
+            dropzone.style.color = 'var(--text-muted)';
             this.handleFileSelection(e.dataTransfer.files);
+        });
+
+        // Click handler for dropzone
+        dropzone.addEventListener('click', () => {
+            document.getElementById('file-input').click();
         });
     }
 
@@ -540,18 +550,10 @@ class SawronApp {
 
     updateButtonStates() {
         const mainInput = document.getElementById('main-input');
-        const uploadBtn = document.getElementById('upload-btn');
         const distillBtn = document.getElementById('distill-btn');
 
         const hasText = mainInput.value.trim().length > 0;
         const hasFile = this.selectedFile !== null;
-
-        // Upload button: disabled if there's text in input
-        if (hasText) {
-            uploadBtn.classList.add('disabled');
-        } else {
-            uploadBtn.classList.remove('disabled');
-        }
 
         // Distill button: enabled if there's text or file selected
         if (hasText || hasFile) {
@@ -2945,12 +2947,7 @@ async function pasteFromClipboard(event) {
     }
 }
 
-function triggerFileUpload() {
-    const uploadBtn = document.getElementById('upload-btn');
-    if (!uploadBtn.classList.contains('disabled')) {
-        document.getElementById('file-input').click();
-    }
-}
+// Removed triggerFileUpload function - now handled by dropzone click event
 
 function startDistillation() {
     app.startDistillation();
