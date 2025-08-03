@@ -16,6 +16,8 @@ class Processor {
     constructor() {
         this.aiSettingsManager = AISettingsManager.getInstance();
         this.initializeProcessingQueue();
+        // Track active processes for cancellation
+        this.activeProcesses = new Map(); // distillationId -> { cancelled: boolean, abortController: AbortController }
     }
 
     /**
@@ -51,17 +53,45 @@ class Processor {
     }
 
     /**
-     * Check if a distillation process has been stopped
+     * Check if a distillation process has been stopped or cancelled
      * @param {string} distillationId - The ID to check
      * @returns {Promise<boolean>} - True if the process has been stopped
      */
     async isProcessStopped(distillationId) {
         try {
+            // First check our active processes tracking (fastest)
+            const processInfo = this.activeProcesses.get(distillationId);
+            if (processInfo && processInfo.cancelled) {
+                console.log(`[${distillationId}] PROCESS CANCELLED - STOPPING IMMEDIATELY`);
+                return true;
+            }
+
+            // Then check database status
             const distillation = await database.getDistillation(distillationId);
-            return distillation && distillation.status === 'stopped';
+            const isStopped = distillation && distillation.status === 'stopped';
+
+            if (isStopped) {
+                console.log(`[${distillationId}] PROCESS STOPPED IN DATABASE - STOPPING IMMEDIATELY`);
+                // Also mark as cancelled in our tracking
+                if (processInfo) {
+                    processInfo.cancelled = true;
+                }
+            }
+
+            return isStopped;
         } catch (error) {
             console.error(`Error checking if process ${distillationId} is stopped:`, error);
             return false;
+        }
+    }
+
+    /**
+     * Throw an error if the process has been cancelled
+     * @param {string} distillationId - The ID to check
+     */
+    async throwIfCancelled(distillationId) {
+        if (await this.isProcessStopped(distillationId)) {
+            throw new Error(`Process ${distillationId} was cancelled by user`);
         }
     }
 
@@ -134,13 +164,29 @@ class Processor {
 
                 // Extracting content from URL
 
-                // Extract content with timeout
+                // Extract content with timeout AND cancellation checking
                 const extractionPromise = contentExtractor.extractFromUrl(url);
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Content extraction timed out after 5 minutes')), 5 * 60 * 1000)
                 );
 
-                const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+                // Add periodic cancellation checking during extraction
+                const cancellationChecker = setInterval(async () => {
+                    if (await this.isProcessStopped(distillation.id)) {
+                        console.log(`[${distillation.id}] CANCELLATION DETECTED DURING EXTRACTION - THROWING ERROR`);
+                        clearInterval(cancellationChecker);
+                        throw new Error(`Process ${distillation.id} was cancelled by user`);
+                    }
+                }, 500); // Check every 500ms
+
+                let extractionResult;
+                try {
+                    extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+                    clearInterval(cancellationChecker);
+                } catch (error) {
+                    clearInterval(cancellationChecker);
+                    throw error;
+                }
 
                 // Check if process has been stopped immediately after extraction
                 if (await this.isProcessStopped(distillation.id)) {
@@ -213,18 +259,28 @@ class Processor {
                 await database.saveDistillation(distillationObj);
 
                 // Check if process has been stopped before AI distillation
-                if (await this.isProcessStopped(distillation.id)) {
-                    console.log(`[${distillation.id}] Process stopped before AI distillation`);
-                    return { success: false, stopped: true };
-                }
+                await this.throwIfCancelled(distillation.id);
 
-                const distillationContent = await aiProvider.generateSummary(text);
+                // Add periodic cancellation checking during AI distillation
+                const aiCancellationChecker = setInterval(async () => {
+                    if (await this.isProcessStopped(distillation.id)) {
+                        console.log(`[${distillation.id}] CANCELLATION DETECTED DURING AI DISTILLATION - THROWING ERROR`);
+                        clearInterval(aiCancellationChecker);
+                        throw new Error(`Process ${distillation.id} was cancelled by user`);
+                    }
+                }, 500); // Check every 500ms
+
+                let distillationContent;
+                try {
+                    distillationContent = await aiProvider.generateSummary(text);
+                    clearInterval(aiCancellationChecker);
+                } catch (error) {
+                    clearInterval(aiCancellationChecker);
+                    throw error;
+                }
 
                 // Check if process has been stopped after AI distillation
-                if (await this.isProcessStopped(distillation.id)) {
-                    console.log(`[${distillation.id}] Process stopped after AI distillation`);
-                    return { success: false, stopped: true };
-                }
+                await this.throwIfCancelled(distillation.id);
 
                 // Calculate processing time and word count
                 const processingTime = (Date.now() - startTime) / 1000;
@@ -562,13 +618,29 @@ class Processor {
 
                 console.log(`[${distillation.id}] Extracting content from file: ${file.originalname}`);
 
-                // Extract content with timeout
+                // Extract content with timeout AND cancellation checking
                 const extractionPromise = contentExtractor.extractFromFile(file);
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('File extraction timed out after 5 minutes')), 5 * 60 * 1000)
                 );
 
-                const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+                // Add periodic cancellation checking during file extraction
+                const fileCancellationChecker = setInterval(async () => {
+                    if (await this.isProcessStopped(distillation.id)) {
+                        console.log(`[${distillation.id}] CANCELLATION DETECTED DURING FILE EXTRACTION - THROWING ERROR`);
+                        clearInterval(fileCancellationChecker);
+                        throw new Error(`Process ${distillation.id} was cancelled by user`);
+                    }
+                }, 500); // Check every 500ms
+
+                let extractionResult;
+                try {
+                    extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+                    clearInterval(fileCancellationChecker);
+                } catch (error) {
+                    clearInterval(fileCancellationChecker);
+                    throw error;
+                }
 
                 // Check if process has been stopped immediately after file extraction
                 if (await this.isProcessStopped(distillation.id)) {
@@ -618,20 +690,31 @@ class Processor {
                 console.log(`[${distillation.id}] Starting distillation with AI provider`);
 
                 // Check if process has been stopped before AI distillation
-                if (await this.isProcessStopped(distillation.id)) {
-                    console.log(`[${distillation.id}] Process stopped before AI distillation`);
-                    return { success: false, stopped: true };
-                }
+                await this.throwIfCancelled(distillation.id);
 
                 // Get current AI provider and generate distillation
                 const aiProvider = await this.getCurrentAIProvider();
-                const distillationContent = await aiProvider.generateSummary(text);
+
+                // Add periodic cancellation checking during AI distillation
+                const fileAiCancellationChecker = setInterval(async () => {
+                    if (await this.isProcessStopped(distillation.id)) {
+                        console.log(`[${distillation.id}] CANCELLATION DETECTED DURING FILE AI DISTILLATION - THROWING ERROR`);
+                        clearInterval(fileAiCancellationChecker);
+                        throw new Error(`Process ${distillation.id} was cancelled by user`);
+                    }
+                }, 500); // Check every 500ms
+
+                let distillationContent;
+                try {
+                    distillationContent = await aiProvider.generateSummary(text);
+                    clearInterval(fileAiCancellationChecker);
+                } catch (error) {
+                    clearInterval(fileAiCancellationChecker);
+                    throw error;
+                }
 
                 // Check if process has been stopped after AI distillation
-                if (await this.isProcessStopped(distillation.id)) {
-                    console.log(`[${distillation.id}] Process stopped after AI distillation`);
-                    return { success: false, stopped: true };
-                }
+                await this.throwIfCancelled(distillation.id);
 
                 console.log(`[${distillation.id}] Distillation generated successfully. Length: ${distillationContent.length} chars`);
 
@@ -870,22 +953,63 @@ class Processor {
         try {
             await processingQueue.addToQueue(distillationId, async () => {
                 try {
+                    console.log(`[${distillationId}] REGISTERING PROCESS FOR CANCELLATION TRACKING`);
+
+                    // Register this process for cancellation tracking
+                    const abortController = new AbortController();
+                    this.activeProcesses.set(distillationId, {
+                        cancelled: false,
+                        abortController: abortController
+                    });
+
                     // Check if the process has been stopped before starting
                     const currentDistillation = await database.getDistillation(distillationId);
                     if (currentDistillation && currentDistillation.status === 'stopped') {
                         console.log(`[${distillationId}] Process was stopped before execution, skipping`);
+                        this.activeProcesses.delete(distillationId);
                         return;
                     }
 
+                    // Check if cancelled during registration
+                    const processInfo = this.activeProcesses.get(distillationId);
+                    if (processInfo && processInfo.cancelled) {
+                        console.log(`[${distillationId}] PROCESS CANCELLED DURING REGISTRATION`);
+                        this.activeProcesses.delete(distillationId);
+                        return;
+                    }
+
+                    console.log(`[${distillationId}] STARTING BACKGROUND PROCESSING`);
                     await processFn();
+
+                    console.log(`[${distillationId}] BACKGROUND PROCESSING COMPLETED`);
+                    // Clean up tracking
+                    this.activeProcesses.delete(distillationId);
+
                 } catch (error) {
-                    console.error(`Background processing error for distillation ${distillationId}:`, error);
-                    await database.updateDistillationStatus(distillationId, 'error', error.message);
-                    throw error; // Re-throw to be handled by queue
+                    console.log(`[${distillationId}] PROCESSING ERROR OR CANCELLATION:`, error.message);
+
+                    // Check if this was a cancellation
+                    const processInfo = this.activeProcesses.get(distillationId);
+                    const wasCancelled = processInfo && processInfo.cancelled;
+
+                    // Clean up tracking on error
+                    this.activeProcesses.delete(distillationId);
+
+                    if (wasCancelled || error.message.includes('cancelled')) {
+                        console.log(`[${distillationId}] PROCESS WAS CANCELLED - NOT UPDATING TO ERROR`);
+                        // Don't update status to error if it was cancelled - it should stay as 'stopped'
+                        return;
+                    } else {
+                        console.error(`[${distillationId}] ACTUAL ERROR OCCURRED:`, error);
+                        await database.updateDistillationStatus(distillationId, 'error', error.message);
+                        throw error; // Re-throw to be handled by queue
+                    }
                 }
             });
         } catch (error) {
             console.error(`Failed to add distillation ${distillationId} to processing queue:`, error);
+            // Clean up tracking on queue error
+            this.activeProcesses.delete(distillationId);
         }
     }
 
@@ -1506,15 +1630,36 @@ class Processor {
      */
     async stopProcess(distillationId) {
         try {
+            console.log(`[${distillationId}] STOP REQUEST RECEIVED - CANCELLING PROCESS`);
+
             // Check if the distillation exists and is in a stoppable state
             const distillation = await database.getDistillation(distillationId);
             if (!distillation) {
+                console.log(`[${distillationId}] Process not found`);
                 return false;
             }
 
             // Only allow stopping if the process is currently running
             if (!['pending', 'extracting', 'distilling'].includes(distillation.status)) {
+                console.log(`[${distillationId}] Process not in stoppable state: ${distillation.status}`);
                 return false;
+            }
+
+            // IMMEDIATELY mark the process as cancelled in our tracking
+            if (this.activeProcesses.has(distillationId)) {
+                const processInfo = this.activeProcesses.get(distillationId);
+                processInfo.cancelled = true;
+                console.log(`[${distillationId}] MARKED AS CANCELLED IN ACTIVE PROCESSES`);
+
+                // Abort any ongoing HTTP requests
+                if (processInfo.abortController) {
+                    processInfo.abortController.abort();
+                    console.log(`[${distillationId}] ABORTED HTTP REQUESTS`);
+                }
+            } else {
+                // Create a cancelled entry even if not found
+                this.activeProcesses.set(distillationId, { cancelled: true, abortController: null });
+                console.log(`[${distillationId}] CREATED CANCELLED ENTRY`);
             }
 
             // Mark as stopped with appropriate status and message
@@ -1524,13 +1669,15 @@ class Processor {
                 'Process stopped by user'
             );
 
+            console.log(`[${distillationId}] DATABASE STATUS UPDATED TO STOPPED`);
+
             // Add log entry for the stop action
             if (distillation.addLog) {
                 distillation.addLog('⏹️ Process stopped by user request', 'info');
                 await database.saveDistillation(distillation);
             }
 
-            console.log(`[${distillationId}] Process stopped by user`);
+            console.log(`[${distillationId}] PROCESS SUCCESSFULLY STOPPED`);
             return true;
         } catch (error) {
             console.error(`Error stopping process ${distillationId}:`, error);
