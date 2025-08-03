@@ -403,7 +403,7 @@ class Processor {
                     `Processing ${videoUrls.length} videos from playlist`
                 );
 
-                // Process each video individually
+                // Process each video individually with proper ordering
                 const processedVideos = [];
                 for (let i = 0; i < videoUrls.length; i++) {
                     const videoUrl = videoUrls[i];
@@ -420,6 +420,12 @@ class Processor {
                             'distilling',
                             `Processed ${i + 1}/${videoUrls.length} videos from playlist`
                         );
+
+                        // Add a small delay to ensure proper timestamp ordering
+                        // This ensures that videos are processed in the correct order
+                        if (i < videoUrls.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
                     } catch (error) {
                         console.error(`[${trackingDistillation.id}] Error processing video ${videoUrl}:`, error);
                         // Continue with other videos even if one fails
@@ -1370,7 +1376,7 @@ class Processor {
             </div>
             
             <div class="footer">
-                Distilled by SAWRON
+                Distilled by SAWRON 💠
             </div>
         </body>
         </html>

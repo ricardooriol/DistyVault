@@ -54,8 +54,9 @@ class ProcessingQueue {
         
         this.isProcessing = true;
 
+        // Process items in FIFO order (first in, first out) to maintain top-to-bottom processing
         while (this.queue.length > 0 && this.activeProcessing.size < this.maxConcurrent) {
-            const task = this.queue.shift();
+            const task = this.queue.shift(); // Always take from the front of the queue
             
             this.activeProcessing.add(task.id);
             

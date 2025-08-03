@@ -130,6 +130,8 @@ class Database {
 
     async getAllSummaries() {
         return new Promise((resolve, reject) => {
+            // Always order by createdAt DESC to ensure consistent top-to-bottom processing order
+            // This ensures that newer items appear at the top and playlist videos maintain their order
             this.db.all('SELECT * FROM summaries ORDER BY createdAt DESC', (err, rows) => {
                 if (err) {
                     reject(err);

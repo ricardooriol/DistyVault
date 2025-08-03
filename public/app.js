@@ -87,7 +87,7 @@ class DownloadStateManager {
         if (!button) return;
 
         // Store original content if not already stored
-        if (!state.originalContent && state.state === 'idle') {
+        if (!state.originalContent) {
             state.originalContent = button.innerHTML;
         }
 
@@ -426,11 +426,15 @@ class SawronApp {
 
     init() {
         this.setupEventListeners();
+        // Hide bulk actions bar initially to prevent flash
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+        if (bulkActionsBar) {
+            bulkActionsBar.style.display = 'none';
+        }
         this.loadKnowledgeBase();
         this.startAutoRefresh();
         this.startChronometer();
         this.initializeTooltips();
-        this.updateBulkActionsBar(); // Initialize bulk actions bar
     }
 
     setupEventListeners() {
@@ -815,9 +819,12 @@ class SawronApp {
             );
 
             if (newItems.length > 0) {
-                // Only add new items to the beginning of the list
-                this.knowledgeBase = [...newItems, ...this.knowledgeBase];
-                newItems.forEach(item => this.addSingleRow(item));
+                // Add new items and re-sort to maintain proper chronological order (newest first)
+                this.knowledgeBase = [...this.knowledgeBase, ...newItems]
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                // Re-render the entire table to maintain proper order
+                this.renderKnowledgeBase();
             }
 
             // Check for deleted items
@@ -1153,7 +1160,8 @@ class SawronApp {
                         </button>
                         <button class="action-dropdown-item" id="download-btn-${item.id}" 
                                 onclick="event.stopPropagation(); app.handleDownloadClick('${item.id}'); app.closeAllDropdowns();">
-                            📥 Download
+                            <span class="btn-icon">📥</span>
+                            <span class="btn-text">Download</span>
                         </button>
                     ` : ''}
                     ${isProcessing ? `
@@ -1238,20 +1246,27 @@ class SawronApp {
     }
 
     shouldShowTooltip(element) {
-        // Check if element is in columns 1, 2, or 4 (name, source, status)
+        // Only show tooltips for name and source columns, NOT status column
+        // Also check that we're not in a status cell
+        const isInStatusCell = element.classList.contains('status-cell') || element.closest('.status-cell');
+        if (isInStatusCell) {
+            return false;
+        }
+        
         return element.classList.contains('name-cell') ||
             element.classList.contains('source-cell') ||
-            element.classList.contains('status-cell') ||
             element.closest('.name-cell') ||
-            element.closest('.source-cell') ||
-            element.closest('.status-cell');
+            element.closest('.source-cell');
     }
 
     getTooltipText(element) {
         // Get the appropriate text content for tooltip
-        const cell = element.closest('.name-cell, .source-cell, .status-cell') || element;
+        const cell = element.closest('.name-cell, .source-cell') || element;
 
-        if (cell.classList.contains('source-cell')) {
+        if (cell.classList.contains('name-cell')) {
+            // For name cells, get the data-tooltip attribute which contains the full name
+            return cell.getAttribute('data-tooltip') || cell.textContent.trim();
+        } else if (cell.classList.contains('source-cell')) {
             const link = cell.querySelector('a');
             return link ? link.href : cell.textContent.trim();
         }
@@ -1279,6 +1294,9 @@ class SawronApp {
             this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
 
             this.renderKnowledgeBase();
+            
+            // Ensure bulk actions bar visibility is correct after initial load
+            this.updateBulkActionsBar();
         } catch (error) {
             console.error('Error loading knowledge base:', error);
 
@@ -1299,6 +1317,11 @@ class SawronApp {
                             </td>
                         </tr>
                     `;
+                }
+                // Hide bulk actions bar when there's an error and no data
+                const bulkActionsBar = document.getElementById('bulk-actions-bar');
+                if (bulkActionsBar) {
+                    bulkActionsBar.style.display = 'none';
                 }
             }
         }
@@ -1329,6 +1352,7 @@ class SawronApp {
 
     renderFilteredKnowledgeBase(items) {
         const tbody = document.getElementById('knowledge-base-tbody');
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
 
         // Preserve dropdown state before re-rendering
         const openDropdown = document.querySelector('.action-dropdown.show');
@@ -1346,13 +1370,20 @@ class SawronApp {
                     </td>
                 </tr>
             `;
-            // Hide bulk actions bar when empty
-            const bulkActionsBar = document.getElementById('bulk-actions-bar');
-            if (bulkActionsBar) bulkActionsBar.style.display = 'none';
+            // Hide bulk actions bar when empty and clear selections
+            if (bulkActionsBar) {
+                bulkActionsBar.style.display = 'none';
+                this.selectedItems.clear();
+            }
             return;
         }
 
         tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
+
+        // Show bulk actions bar when there are items (only after initial load)
+        if (bulkActionsBar && this.knowledgeBase && this.knowledgeBase.length > 0) {
+            bulkActionsBar.style.display = 'flex';
+        }
 
         // Fix any text overflow issues after rendering
         this.fixTextOverflow();
@@ -2058,14 +2089,14 @@ class SawronApp {
             document.body.appendChild(a);
             a.click();
 
+            // Reset to idle state on success BEFORE cleanup
+            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+
             // Clean up after a delay
             setTimeout(() => {
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
             }, 100);
-
-            // Reset to idle state on success
-            this.downloadStateManager.setDownloadState(buttonId, 'idle');
 
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -2451,9 +2482,9 @@ class SawronApp {
             return;
         }
 
-        // If only one item is selected, use single download logic
+        // If only one item is selected, use single download logic but with bulk button state management
         if (selectedIds.length === 1) {
-            this.downloadDistillation(selectedIds[0]);
+            this.downloadSingleFromBulk(selectedIds[0]);
             return;
         }
 
@@ -2506,16 +2537,87 @@ class SawronApp {
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
-            a.remove();
-
+            
+            // Reset to idle state immediately after triggering download
             this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            
+            // Clean up after a delay
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
 
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Error during bulk download:', error);
             this.downloadStateManager.setDownloadState(buttonId, 'error', {
                 errorMessage: 'Bulk download failed'
+            });
+        }
+    }
+
+    async downloadSingleFromBulk(id) {
+        const buttonId = 'bulk-download-btn';
+
+        try {
+            // Set loading state for bulk download button
+            const abortController = new AbortController();
+            this.downloadStateManager.setDownloadState(buttonId, 'loading', {
+                downloadId: id,
+                abortController: abortController,
+                startTime: Date.now()
+            });
+
+            // Use the same logic as individual download but with bulk button state
+            const response = await fetch(`/api/summaries/${id}/pdf`, {
+                signal: abortController.signal
+            });
+
+            if (!response.ok) {
+                let errorMessage = 'Failed to download PDF';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            // Handle the PDF download
+            const blob = await response.blob();
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `distillation-${id}.pdf`; // Default filename
+
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            // Reset to idle state immediately after triggering download
+            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+
+            // Clean up after a delay
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            console.error('Error during single download from bulk:', error);
+            this.downloadStateManager.setDownloadState(buttonId, 'error', {
+                errorMessage: error.message || 'Download failed'
             });
         }
     }
