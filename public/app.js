@@ -951,7 +951,16 @@ class SawronApp {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
         const actualSelectedIds = new Set(Array.from(checkedBoxes).map(cb => cb.dataset.id));
 
-        // Update selectedItems to match actual DOM state
+        // Also clean up selectedItems to remove any IDs that no longer exist in the DOM
+        const allCheckboxIds = new Set(Array.from(document.querySelectorAll('.row-checkbox')).map(cb => cb.dataset.id));
+        const cleanedSelectedItems = new Set();
+        this.selectedItems.forEach(id => {
+            if (allCheckboxIds.has(id)) {
+                cleanedSelectedItems.add(id);
+            }
+        });
+
+        // Update selectedItems to match actual DOM state (both checked and existing)
         this.selectedItems = actualSelectedIds;
 
         const selectedCount_value = this.selectedItems.size;
@@ -972,7 +981,13 @@ class SawronApp {
             ).filter(Boolean);
 
             const hasCompletedItems = selectedItemsData.some(item => item.status === 'completed');
-            bulkDownloadBtn.disabled = !hasCompletedItems;
+            
+            // Only disable download button if no completed items AND not currently downloading
+            const downloadState = this.downloadStateManager.getDownloadState('bulk-download-btn');
+            if (downloadState.state === 'idle') {
+                bulkDownloadBtn.disabled = !hasCompletedItems;
+            }
+            // If downloading, let the downloadStateManager handle the button state
 
             // Update select all button text based on actual selection state
             if (selectedCount_value === totalCount && totalCount > 0) {
@@ -986,8 +1001,13 @@ class SawronApp {
 
             // Disable bulk action buttons
             bulkRetryBtn.disabled = true;
-            bulkDownloadBtn.disabled = true;
             bulkDeleteBtn.disabled = true;
+            
+            // Only disable download button if not currently downloading
+            const downloadState = this.downloadStateManager.getDownloadState('bulk-download-btn');
+            if (downloadState.state === 'idle') {
+                bulkDownloadBtn.disabled = true;
+            }
 
             // Reset select all button
             selectAllBtn.innerHTML = '<span class="btn-text">Select All</span>';
@@ -1043,7 +1063,7 @@ class SawronApp {
         if (!row) return;
 
         // Check if this is a processing item with live chronometer
-        const isProcessing = ['extracting', 'distilling'].includes(item.status);
+        const isProcessing = ['pending', 'extracting', 'distilling'].includes(item.status);
         const hasStartTime = item.startTime;
         const shouldPreserveTime = isProcessing && hasStartTime;
 
@@ -1117,7 +1137,7 @@ class SawronApp {
 
     createActionsDropdown(item) {
         const isCompleted = item.status === 'completed';
-        const isProcessing = ['extracting', 'distilling'].includes(item.status);
+        const isProcessing = ['pending', 'extracting', 'distilling'].includes(item.status);
         const isError = item.status === 'error';
 
         return `
@@ -1480,7 +1500,7 @@ class SawronApp {
         const status = item.status;
         const isCompleted = status === 'completed';
         const isPending = status === 'pending';
-        const isProcessing = ['extracting', 'distilling'].includes(status);
+        const isProcessing = ['pending', 'extracting', 'distilling'].includes(status);
         const isError = status === 'error';
 
         // Debug logging for status issues
@@ -2073,7 +2093,10 @@ class SawronApp {
                 throw new Error(error.message || 'Failed to stop processing');
             }
 
-            this.loadKnowledgeBase();
+            // Force immediate status updates to show the stopped status
+            this.forceStatusUpdate();
+            setTimeout(() => this.forceStatusUpdate(), 100);
+            setTimeout(() => this.forceStatusUpdate(), 500);
 
         } catch (error) {
             console.error('Error stopping processing:', error);
@@ -2401,12 +2424,7 @@ class SawronApp {
     }
 
     // Bulk Actions Methods
-    handleRowSelection() {
-        // Simply delegate to the improved updateBulkActionsBar method
-        this.updateBulkActionsBar();
-    }
 
-    // This method is a duplicate and should be removed - the main one is above
 
     getSelectedIds() {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
@@ -2789,44 +2807,7 @@ class SawronApp {
         }
     }
 
-    async bulkRetry() {
-        const selectedItems = Array.from(this.selectedItems);
 
-        if (selectedItems.length === 0) {
-            alert('No items selected for retry');
-            return;
-        }
-
-        if (!confirm(`Are you sure you want to retry ${selectedItems.length} selected item(s)?`)) {
-            return;
-        }
-
-        try {
-            // Process selected items from bottom to top (reverse order) with delay to ensure proper sequencing
-            const itemsToRetry = [...selectedItems].reverse();
-            for (let i = 0; i < itemsToRetry.length; i++) {
-                const id = itemsToRetry[i];
-                // Add small delay between retries to ensure bottom-to-top processing order
-                if (i > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-                await this.retryDistillation(id);
-            }
-
-            this.showTemporaryMessage(`Retrying ${selectedItems.length} selected items...`, 'info');
-
-            // Force MULTIPLE immediate status updates after bulk retry
-            this.forceStatusUpdate();
-            setTimeout(() => this.forceStatusUpdate(), 100);
-            setTimeout(() => this.forceStatusUpdate(), 500);
-            setTimeout(() => this.forceStatusUpdate(), 1000);
-            setTimeout(() => this.forceStatusUpdate(), 2000);
-
-        } catch (error) {
-            console.error('Error retrying selected items:', error);
-            alert('Error retrying selected items: ' + error.message);
-        }
-    }
 }
 
 // Global functions for HTML onclick handlers

@@ -51,6 +51,21 @@ class Processor {
     }
 
     /**
+     * Check if a distillation process has been stopped
+     * @param {string} distillationId - The ID to check
+     * @returns {Promise<boolean>} - True if the process has been stopped
+     */
+    async isProcessStopped(distillationId) {
+        try {
+            const distillation = await database.getDistillation(distillationId);
+            return distillation && distillation.status === 'stopped';
+        } catch (error) {
+            console.error(`Error checking if process ${distillationId} is stopped:`, error);
+            return false;
+        }
+    }
+
+    /**
      * Process a URL for distillation
      * @param {string} url - The URL to process
      * @returns {Promise<Distillation>} - The created distillation object
@@ -101,6 +116,12 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
+                // Check if process has been stopped
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped during initialization`);
+                    return { success: false, stopped: true };
+                }
+
                 // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -120,6 +141,13 @@ class Processor {
                 );
 
                 const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+
+                // Check if process has been stopped immediately after extraction
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped during content extraction`);
+                    return { success: false, stopped: true };
+                }
+
                 const { text, title, contentType, extractionMethod, fallbackUsed, metadata } = extractionResult;
 
                 const extractionTime = Date.now() - startTime;
@@ -143,16 +171,21 @@ class Processor {
 
                 // Content extracted successfully
 
+                // Check if process has been stopped after extraction
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped after extraction`);
+                    return { success: false, stopped: true };
+                }
+
                 // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Update status to distilling
                 await database.updateDistillationStatus(
                     distillation.id,
-                    'distilling',
+
                     'Generating distillation with AI provider'
                 );
-
                 // Delay to ensure frontend can see the distilling status
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -179,7 +212,19 @@ class Processor {
                 distillationObj.processingStep = 'Generating distillation with AI provider';
                 await database.saveDistillation(distillationObj);
 
+                // Check if process has been stopped before AI distillation
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped before AI distillation`);
+                    return { success: false, stopped: true };
+                }
+
                 const distillationContent = await aiProvider.generateSummary(text);
+
+                // Check if process has been stopped after AI distillation
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped after AI distillation`);
+                    return { success: false, stopped: true };
+                }
 
                 // Calculate processing time and word count
                 const processingTime = (Date.now() - startTime) / 1000;
@@ -499,6 +544,12 @@ class Processor {
                 distillationObj.addLog(`🔄 Background processing started`);
                 distillationObj.addLog(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 
+                // Check if process has been stopped
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped during initialization`);
+                    return { success: false, stopped: true };
+                }
+
                 // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -518,10 +569,23 @@ class Processor {
                 );
 
                 const extractionResult = await Promise.race([extractionPromise, timeoutPromise]);
+
+                // Check if process has been stopped immediately after file extraction
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped during file extraction`);
+                    return { success: false, stopped: true };
+                }
+
                 const { text, title, contentType, extractionMethod, fallbackUsed, metadata } = extractionResult;
 
                 console.log(`[${distillation.id}] File content extracted successfully. Content length: ${text.length} chars`);
                 console.log(`[${distillation.id}] Extraction details - Method: ${extractionMethod}, Type: ${contentType}, Fallback used: ${fallbackUsed}`);
+
+                // Check if process has been stopped after extraction
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped after extraction`);
+                    return { success: false, stopped: true };
+                }
 
                 // Delay to ensure frontend can see the extracting status
                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -553,9 +617,21 @@ class Processor {
 
                 console.log(`[${distillation.id}] Starting distillation with AI provider`);
 
+                // Check if process has been stopped before AI distillation
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped before AI distillation`);
+                    return { success: false, stopped: true };
+                }
+
                 // Get current AI provider and generate distillation
                 const aiProvider = await this.getCurrentAIProvider();
                 const distillationContent = await aiProvider.generateSummary(text);
+
+                // Check if process has been stopped after AI distillation
+                if (await this.isProcessStopped(distillation.id)) {
+                    console.log(`[${distillation.id}] Process stopped after AI distillation`);
+                    return { success: false, stopped: true };
+                }
 
                 console.log(`[${distillation.id}] Distillation generated successfully. Length: ${distillationContent.length} chars`);
 
@@ -794,6 +870,13 @@ class Processor {
         try {
             await processingQueue.addToQueue(distillationId, async () => {
                 try {
+                    // Check if the process has been stopped before starting
+                    const currentDistillation = await database.getDistillation(distillationId);
+                    if (currentDistillation && currentDistillation.status === 'stopped') {
+                        console.log(`[${distillationId}] Process was stopped before execution, skipping`);
+                        return;
+                    }
+
                     await processFn();
                 } catch (error) {
                     console.error(`Background processing error for distillation ${distillationId}:`, error);
@@ -1163,7 +1246,7 @@ class Processor {
             </div>
             
             <div class="footer">
-                Generated by SAWRON Knowledge Processing System
+                Distilled by SAWRON
             </div>
         </body>
         </html>
@@ -1436,8 +1519,8 @@ class Processor {
 
             // Mark as stopped with appropriate status and message
             await database.updateDistillationStatus(
-                distillationId, 
-                'stopped', 
+                distillationId,
+                'stopped',
                 'Process stopped by user'
             );
 
