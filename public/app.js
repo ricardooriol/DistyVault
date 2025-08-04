@@ -2089,8 +2089,10 @@ class SawronApp {
             document.body.appendChild(a);
             a.click();
 
-            // Reset to idle state on success BEFORE cleanup
-            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            // Wait a moment to ensure download has started before resetting state
+            setTimeout(() => {
+                this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            }, 1000);
 
             // Clean up after a delay
             setTimeout(() => {
@@ -2538,8 +2540,10 @@ class SawronApp {
             document.body.appendChild(a);
             a.click();
             
-            // Reset to idle state immediately after triggering download
-            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            // Wait a moment to ensure download has started before resetting state
+            setTimeout(() => {
+                this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            }, 1000);
             
             // Clean up after a delay
             setTimeout(() => {
@@ -2604,8 +2608,10 @@ class SawronApp {
             document.body.appendChild(a);
             a.click();
 
-            // Reset to idle state immediately after triggering download
-            this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            // Wait a moment to ensure download has started before resetting state
+            setTimeout(() => {
+                this.downloadStateManager.setDownloadState(buttonId, 'idle');
+            }, 1000);
 
             // Clean up after a delay
             setTimeout(() => {

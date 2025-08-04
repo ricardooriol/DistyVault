@@ -130,9 +130,9 @@ class Database {
 
     async getAllSummaries() {
         return new Promise((resolve, reject) => {
-            // Always order by createdAt DESC to ensure consistent top-to-bottom processing order
-            // This ensures that newer items appear at the top and playlist videos maintain their order
-            this.db.all('SELECT * FROM summaries ORDER BY createdAt DESC', (err, rows) => {
+            // Always order by createdAt ASC to ensure consistent top-to-bottom processing order
+            // This ensures that playlist videos process in the correct order (first video first)
+            this.db.all('SELECT * FROM summaries ORDER BY createdAt ASC', (err, rows) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -209,8 +209,8 @@ class Database {
                 const distillation = await this.getDistillation(id);
                 const now = new Date();
                 // Use distilling start time if available, otherwise fall back to start time
-                const elapsedTime = distillation && distillation.distillingStartTime ? 
-                    (now - distillation.distillingStartTime) / 1000 : 
+                const elapsedTime = distillation && distillation.distillingStartTime ?
+                    (now - distillation.distillingStartTime) / 1000 :
                     (distillation && distillation.startTime ? (now - distillation.startTime) / 1000 : 0);
 
                 this.db.run(
@@ -234,7 +234,7 @@ class Database {
         return new Promise((resolve, reject) => {
             const searchTerm = `%${query}%`;
             this.db.all(
-                'SELECT * FROM summaries WHERE title LIKE ? OR content LIKE ? ORDER BY createdAt DESC',
+                'SELECT * FROM summaries WHERE title LIKE ? OR content LIKE ? ORDER BY createdAt ASC',
                 [searchTerm, searchTerm],
                 (err, rows) => {
                     if (err) {

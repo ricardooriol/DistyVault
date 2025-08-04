@@ -1376,7 +1376,7 @@ class Processor {
             </div>
             
             <div class="footer">
-                Distilled by SAWRON 💠
+                💠 Distilled by SAWRON 💠
             </div>
         </body>
         </html>
