@@ -1,4 +1,4 @@
-# SAWRON - Connect the Dots & Fill the Gaps
+# 💠 SAWRON - Connect the Dots & Fill the Gaps 💠
 
 **The Ultimate Knowledge Distillation & AI Processing Platform**
 
