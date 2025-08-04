@@ -1,10 +1,6 @@
 # 💠 SAWRON - Connect the Dots & Fill the Gaps 💠
 
-**The Ultimate Knowledge Distillation & AI Processing Platform**
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-v14+-green.svg)](https://nodejs.org/)
-[![AI Powered](https://img.shields.io/badge/AI-Powered-blue.svg)](https://github.com/your-repo)
+**The Ultimate Knowledge Distillation AI Processing Platform**
 
 ---
 
