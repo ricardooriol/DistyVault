@@ -390,7 +390,7 @@ class NumberingProcessor {
             const sentenceMatch = firstLine.match(/^([^.!?]*[.!?])/);
 
             if (sentenceMatch) {
-                // First line has a sentence ending, use that as the bold part
+                // First line has a sentence ending, use that as the main sentence
                 const firstSentence = sentenceMatch[1].trim();
                 const remainingFirstLine = firstLine.substring(sentenceMatch[0].length).trim();
                 const restOfLines = lines.slice(1).join('\n').trim();
@@ -404,22 +404,22 @@ class NumberingProcessor {
                 }
 
                 if (restOfContent.length > 0) {
-                    return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
+                    return `${number}. ${firstSentence}\n${restOfContent}`;
                 } else {
-                    return `<strong>${number}. ${firstSentence}</strong>`;
+                    return `${number}. ${firstSentence}`;
                 }
             } else {
-                // No sentence ending in first line, use entire first line as bold
+                // No sentence ending in first line, use entire first line as main sentence
                 if (lines.length > 1) {
                     const restOfLines = lines.slice(1).join('\n').trim();
                     if (restOfLines.length > 0) {
-                        return `<strong>${number}. ${firstLine}</strong>\n${restOfLines}`;
+                        return `${number}. ${firstLine}\n${restOfLines}`;
                     } else {
-                        return `<strong>${number}. ${firstLine}</strong>`;
+                        return `${number}. ${firstLine}`;
                     }
                 } else {
-                    // Single line, make it all bold
-                    return `<strong>${number}. ${content}</strong>`;
+                    // Single line
+                    return `${number}. ${content}`;
                 }
             }
         });
@@ -574,12 +574,12 @@ class NumberingProcessor {
             const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 10);
 
             if (paragraphs.length === 0) {
-                return `<strong>1. ${text.trim()}</strong>`;
+                return `1. ${text.trim()}`;
             }
 
             return paragraphs.map((paragraph, index) => {
                 const cleaned = paragraph.trim().replace(/^\s*\d+[\.\)\:\-]\s*/, '');
-                return `<strong>${index + 1}. ${cleaned}</strong>`;
+                return `${index + 1}. ${cleaned}`;
             }).join('\n\n');
         }
 
@@ -595,7 +595,7 @@ class NumberingProcessor {
             const sentenceMatch = firstLine.match(/^([^.!?]*[.!?])/);
 
             if (sentenceMatch) {
-                // First line has a sentence ending, use that as the bold part
+                // First line has a sentence ending, use that as the main sentence
                 const firstSentence = sentenceMatch[1].trim();
                 const remainingFirstLine = firstLine.substring(sentenceMatch[0].length).trim();
                 const restOfLines = lines.slice(1).join('\n').trim();
@@ -609,22 +609,22 @@ class NumberingProcessor {
                 }
 
                 if (restOfContent.length > 0) {
-                    return `<strong>${number}. ${firstSentence}</strong>\n${restOfContent}`;
+                    return `${number}. ${firstSentence}\n${restOfContent}`;
                 } else {
-                    return `<strong>${number}. ${firstSentence}</strong>`;
+                    return `${number}. ${firstSentence}`;
                 }
             } else {
-                // No sentence ending in first line, use entire first line as bold
+                // No sentence ending in first line, use entire first line as main sentence
                 if (lines.length > 1) {
                     const restOfLines = lines.slice(1).join('\n').trim();
                     if (restOfLines.length > 0) {
-                        return `<strong>${number}. ${firstLine}</strong>\n${restOfLines}`;
+                        return `${number}. ${firstLine}\n${restOfLines}`;
                     } else {
-                        return `<strong>${number}. ${firstLine}</strong>`;
+                        return `${number}. ${firstLine}`;
                     }
                 } else {
-                    // Single line, make it all bold
-                    return `<strong>${number}. ${section}</strong>`;
+                    // Single line
+                    return `${number}. ${section}`;
                 }
             }
         }).join('\n\n');

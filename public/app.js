@@ -693,10 +693,22 @@ class SawronApp {
         }, 500);
     }
 
+    formatTimeDisplay(timeInSeconds) {
+        // Helper function for consistent time formatting
+        const totalSeconds = Math.floor(timeInSeconds);
+        if (totalSeconds < 60) {
+            return `${totalSeconds}s`;
+        } else {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}m ${seconds}s`;
+        }
+    }
+
     calculateProcessingTimeDisplay(item) {
         // Centralized time calculation to ensure consistency
         if (item.processingTime && item.status === 'completed') {
-            return `${item.processingTime.toFixed(1)}s`;
+            return this.formatTimeDisplay(item.processingTime);
         } else if (item.status === 'pending') {
             return 'Waiting...';
         } else if (['extracting', 'distilling'].includes(item.status) && item.startTime) {
@@ -800,10 +812,7 @@ class SawronApp {
             itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
-                    // Debug logging for status changes
-                    if (newItem.status !== oldItem.status) {
-                        console.log(`Status change detected for ${oldItem.id}: ${oldItem.status} → ${newItem.status}`);
-                    }
+                    // Status change detected - update silently
                     this.updateSingleRow(newItem);
                     // Update our local data
                     const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
@@ -822,7 +831,7 @@ class SawronApp {
                 // Add new items and re-sort to maintain proper chronological order (newest first)
                 this.knowledgeBase = [...this.knowledgeBase, ...newItems]
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                
+
                 // Re-render the entire table to maintain proper order
                 this.renderKnowledgeBase();
             }
@@ -841,7 +850,11 @@ class SawronApp {
             });
 
         } catch (error) {
-            console.error('Error checking status updates:', error);
+            // Silently handle errors to prevent console spam
+            // Only log if it's not a network error
+            if (error.name !== 'TypeError' && !error.message.includes('Load failed')) {
+                console.warn('Status update error:', error.message);
+            }
         }
     }
 
@@ -864,10 +877,7 @@ class SawronApp {
             processingItems.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
-                    // Debug logging for status changes
-                    if (newItem.status !== oldItem.status) {
-                        console.log(`[AGGRESSIVE] Status change detected for ${oldItem.id}: ${oldItem.status} → ${newItem.status}`);
-                    }
+                    // Processing status change detected - update silently
                     this.updateSingleRow(newItem);
                     // Update our local data
                     const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
@@ -878,7 +888,11 @@ class SawronApp {
             });
 
         } catch (error) {
-            console.error('Error checking processing items status:', error);
+            // Silently handle errors to prevent console spam
+            // Only log if it's not a network error
+            if (error.name !== 'TypeError' && !error.message.includes('Load failed')) {
+                console.warn('Processing items status error:', error.message);
+            }
         }
     }
 
@@ -895,17 +909,13 @@ class SawronApp {
     }
 
     forceBulkActionsRefresh() {
-        console.log('[DEBUG] forceBulkActionsRefresh called');
-
         // Force clear selections and refresh bulk actions bar
         this.selectedItems.clear();
 
         // Uncheck all checkboxes in the DOM
         const allCheckboxes = document.querySelectorAll('.row-checkbox');
-        console.log(`[DEBUG] Found ${allCheckboxes.length} checkboxes`);
         allCheckboxes.forEach(checkbox => {
             if (checkbox.checked) {
-                console.log(`[DEBUG] Unchecking checkbox for ${checkbox.dataset.id}`);
                 checkbox.checked = false;
             }
         });
@@ -915,8 +925,6 @@ class SawronApp {
 
         // Also call handleRowSelection to ensure consistency
         this.handleRowSelection();
-
-        console.log(`[DEBUG] After refresh: selectedItems.size=${this.selectedItems.size}`);
     }
 
     nuclearSelectionReset() {
@@ -931,7 +939,7 @@ class SawronApp {
         this.updateBulkActionsBar();
         if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
 
-        console.log('[DEBUG] Nuclear reset complete');
+
     }
 
     handleRowSelection() {
@@ -988,7 +996,7 @@ class SawronApp {
             ).filter(Boolean);
 
             const hasCompletedItems = selectedItemsData.some(item => item.status === 'completed');
-            
+
             // Only disable download button if no completed items AND not currently downloading
             const downloadState = this.downloadStateManager.getDownloadState('bulk-download-btn');
             if (downloadState.state === 'idle') {
@@ -1009,7 +1017,7 @@ class SawronApp {
             // Disable bulk action buttons
             bulkRetryBtn.disabled = true;
             bulkDeleteBtn.disabled = true;
-            
+
             // Only disable download button if not currently downloading
             const downloadState = this.downloadStateManager.getDownloadState('bulk-download-btn');
             if (downloadState.state === 'idle') {
@@ -1252,7 +1260,7 @@ class SawronApp {
         if (isInStatusCell) {
             return false;
         }
-        
+
         return element.classList.contains('name-cell') ||
             element.classList.contains('source-cell') ||
             element.closest('.name-cell') ||
@@ -1294,7 +1302,7 @@ class SawronApp {
             this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
 
             this.renderKnowledgeBase();
-            
+
             // Ensure bulk actions bar visibility is correct after initial load
             this.updateBulkActionsBar();
         } catch (error) {
@@ -1672,7 +1680,7 @@ class SawronApp {
             }
 
             if (distillation.processingTime) {
-                metaHtml += `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>`;
+                metaHtml += `<strong>Processing Time:</strong> ${this.formatTimeDisplay(distillation.processingTime)}<br>`;
             } else if (distillation.elapsedTime) {
                 const minutes = Math.floor(distillation.elapsedTime / 60);
                 const seconds = Math.floor(distillation.elapsedTime % 60);
@@ -1936,7 +1944,7 @@ class SawronApp {
                     ` : ''}
                     ${distillation.processingTime ? `
                         <div class="log-entry log-info">
-                            <span class="log-message"><strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s</span>
+                            <span class="log-message"><strong>Processing Time:</strong> ${this.formatTimeDisplay(distillation.processingTime)}</span>
                         </div>
                     ` : distillation.elapsedTime ? `
                         <div class="log-entry log-info">
@@ -2539,12 +2547,12 @@ class SawronApp {
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            
+
             // Wait a moment to ensure download has started before resetting state
             setTimeout(() => {
                 this.downloadStateManager.setDownloadState(buttonId, 'idle');
             }, 1000);
-            
+
             // Clean up after a delay
             setTimeout(() => {
                 window.URL.revokeObjectURL(url);

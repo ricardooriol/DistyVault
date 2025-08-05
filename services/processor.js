@@ -272,10 +272,38 @@ class Processor {
 
                 let distillationContent;
                 try {
-                    distillationContent = await aiProvider.generateSummary(text);
+                    // Add timeout wrapper for AI generation
+                    const aiGenerationPromise = aiProvider.generateSummary(text);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('AI distillation timed out after 10 minutes')), 10 * 60 * 1000)
+                    );
+
+                    distillationContent = await Promise.race([aiGenerationPromise, timeoutPromise]);
                     clearInterval(aiCancellationChecker);
+
+                    // Validate that we got actual content
+                    if (!distillationContent || typeof distillationContent !== 'string' || distillationContent.trim().length < 10) {
+                        throw new Error('AI provider returned empty or invalid content');
+                    }
+
+                    distillationObj.addLog(`✅ AI distillation completed successfully`);
+                    distillationObj.addLog(`📝 Generated content length: ${distillationContent.length} characters`);
+
                 } catch (error) {
                     clearInterval(aiCancellationChecker);
+                    
+                    // Enhanced error logging for AI failures
+                    distillationObj.addLog(`❌ AI distillation failed: ${error.message}`, 'error');
+                    
+                    if (error.message.includes('timeout')) {
+                        distillationObj.addLog(`⏰ AI processing exceeded 10-minute timeout`, 'error');
+                    } else if (error.message.includes('API key')) {
+                        distillationObj.addLog(`🔑 API key issue - check AI provider configuration`, 'error');
+                    } else if (error.message.includes('rate limit')) {
+                        distillationObj.addLog(`🚦 API rate limit exceeded - try again later`, 'error');
+                    }
+                    
+                    await database.saveDistillation(distillationObj);
                     throw error;
                 }
 

@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ 
+const upload = multer({
     storage,
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
     fileFilter: (req, file, cb) => {
@@ -42,7 +42,12 @@ const upload = multer({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -105,14 +110,14 @@ app.get('/api/summaries/:id', async (req, res) => {
 app.post('/api/process/url', async (req, res) => {
     try {
         const { url } = req.body;
-        
+
         if (!url) {
             return res.status(400).json({
                 status: 'error',
                 message: 'URL is required'
             });
         }
-        
+
         const distillation = await processor.processUrl(url);
         res.status(202).json(distillation);
     } catch (error) {
@@ -132,7 +137,7 @@ app.post('/api/process/file', upload.single('file'), async (req, res) => {
                 message: 'No file uploaded'
             });
         }
-        
+
         const distillation = await processor.processFile(req.file);
         res.status(202).json(distillation);
     } catch (error) {
@@ -188,7 +193,7 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
         console.log('Attempting to get distillation from database...');
         const distillation = await database.getDistillation(req.params.id);
         console.log('Distillation retrieved:', distillation ? 'Found' : 'Not found');
-        
+
         if (!distillation) {
             console.log('Distillation not found, returning 404');
             return res.status(404).json({
@@ -196,7 +201,7 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
                 message: 'Distillation not found'
             });
         }
-        
+
         console.log(`Distillation status: ${distillation.status}`);
         console.log('Distillation sourceUrl:', distillation.sourceUrl);
         console.log('Distillation sourceFile:', distillation.sourceFile);
@@ -207,7 +212,7 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
 
         // Retry the distillation based on its source type
         let retryResult;
-        
+
         if ((distillation.sourceType === 'url' || distillation.sourceType === 'youtube' || distillation.sourceType === 'channel') && distillation.sourceUrl) {
             // Retry URL processing
             console.log('Retrying URL processing for:', distillation.sourceUrl);
@@ -220,9 +225,9 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
                     message: 'Cannot retry file processing - original file content not available'
                 });
             }
-            
+
             console.log('Retrying file processing for:', distillation.sourceFile.name);
-            
+
             // Create a mock file object from the stored data
             const mockFile = {
                 originalname: distillation.sourceFile.name,
@@ -230,7 +235,7 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
                 size: distillation.sourceFile.size,
                 path: null // We'll use rawContent instead
             };
-            
+
             retryResult = await processor.retryFileProcessing(req.params.id, mockFile, distillation.rawContent);
         } else {
             console.log('Cannot determine retry method. sourceType:', distillation.sourceType, 'sourceUrl:', !!distillation.sourceUrl, 'sourceFile:', !!distillation.sourceFile, 'rawContent:', !!distillation.rawContent);
@@ -243,7 +248,7 @@ app.post('/api/summaries/:id/retry', async (req, res) => {
         // Delete the old failed distillation
         await database.deleteDistillation(req.params.id);
 
-        res.json({ 
+        res.json({
             status: 'ok',
             message: 'Distillation retry initiated successfully',
             newId: retryResult.id
@@ -268,28 +273,28 @@ app.get('/api/summaries/:id/pdf', async (req, res) => {
                 message: 'Distillation not found'
             });
         }
-        
+
         if (distillation.status !== 'completed') {
             return res.status(400).json({
                 status: 'error',
                 message: 'Distillation is not yet completed'
             });
         }
-        
+
         // Generate PDF for the requested distillation
-        
+
         // Generate PDF
         const { buffer, filename } = await processor.generatePdf(req.params.id);
-        
+
         // Set headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Length', buffer.length);
         res.setHeader('Cache-Control', 'no-cache');
-        
+
         // Send PDF buffer
         res.end(buffer, 'binary');
-        
+
     } catch (error) {
         console.error('PDF generation error:', error);
         res.status(500).json({
@@ -303,14 +308,14 @@ app.get('/api/summaries/:id/pdf', async (req, res) => {
 app.post('/api/summaries/bulk-download', async (req, res) => {
     try {
         const { ids } = req.body;
-        
+
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({
                 status: 'error',
                 message: 'IDs array is required'
             });
         }
-        
+
         // If only one item, redirect to single PDF download
         if (ids.length === 1) {
             const distillation = await database.getDistillation(ids[0]);
@@ -320,34 +325,34 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                     message: 'Distillation not found'
                 });
             }
-            
+
             if (distillation.status !== 'completed') {
                 return res.status(400).json({
                     status: 'error',
                     message: 'Distillation is not yet completed'
                 });
             }
-            
+
             const { buffer, filename } = await processor.generatePdf(ids[0]);
-            
+
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
             res.setHeader('Content-Length', buffer.length);
             res.setHeader('Cache-Control', 'no-cache');
-            
+
             return res.end(buffer, 'binary');
         }
-        
+
         // Multiple items - create ZIP
         const archiver = require('archiver');
         const archive = archiver('zip', { zlib: { level: 9 } });
-        
+
         // Set headers for ZIP download
         const zipFilename = `sawron-download.zip`;
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
         res.setHeader('Cache-Control', 'no-cache');
-        
+
         // Handle archive errors
         archive.on('error', (err) => {
             console.error('Archive error:', err);
@@ -358,12 +363,12 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 });
             }
         });
-        
+
         // Pipe archive to response
         archive.pipe(res);
-        
+
         const usedFilenames = new Set();
-        
+
         // Process each ID sequentially
         for (const id of ids) {
             try {
@@ -372,11 +377,11 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                     console.log(`Skipping distillation ${id} - not found or not completed`);
                     continue;
                 }
-                
+
                 // Generate PDF
                 const pdfResult = await processor.generatePdf(id);
                 const { buffer, filename } = pdfResult;
-                
+
                 // Convert buffer to Node.js Buffer if needed
                 let finalBuffer;
                 if (Buffer.isBuffer(buffer)) {
@@ -386,14 +391,14 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                 } else {
                     finalBuffer = Buffer.from(buffer);
                 }
-                
+
                 if (finalBuffer.length === 0) {
                     console.log(`Empty buffer for distillation ${id}, skipping`);
                     continue;
                 }
-                
+
                 let finalFilename = filename || `distillation-${id}.pdf`;
-                
+
                 // Handle duplicate filenames
                 let counter = 1;
                 let uniqueFilename = finalFilename;
@@ -403,18 +408,18 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
                     counter++;
                 }
                 usedFilenames.add(uniqueFilename);
-                
+
                 // Add PDF to ZIP archive
                 archive.append(finalBuffer, { name: uniqueFilename });
-                
+
             } catch (error) {
                 console.error(`Error processing distillation ${id}:`, error);
             }
         }
-        
+
         // Finalize the archive
         archive.finalize();
-        
+
     } catch (error) {
         console.error('Bulk download error:', error);
         if (!res.headersSent) {
@@ -430,19 +435,19 @@ app.post('/api/summaries/bulk-download', async (req, res) => {
 app.post('/api/summaries/bulk-delete', async (req, res) => {
     try {
         const { ids } = req.body;
-        
+
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({
                 status: 'error',
                 message: 'IDs array is required'
             });
         }
-        
+
         // Process bulk delete request
-        
+
         let deletedCount = 0;
         const errors = [];
-        
+
         // Process each ID
         for (const id of ids) {
             try {
@@ -463,14 +468,14 @@ app.post('/api/summaries/bulk-delete', async (req, res) => {
                 });
             }
         }
-        
+
         // Bulk delete operation completed
-        
+
         res.json({
             deletedCount: deletedCount,
             errors: errors
         });
-        
+
     } catch (error) {
         console.error('Bulk delete error:', error);
         res.status(500).json({
@@ -485,7 +490,7 @@ app.post('/api/summaries/:id/cancel-download', async (req, res) => {
     try {
         // For now, just return success since downloads are client-side
         // In a real implementation, you might track server-side download processes
-        res.json({ 
+        res.json({
             status: 'ok',
             message: 'Download cancellation requested'
         });
@@ -502,7 +507,7 @@ app.post('/api/summaries/cancel-bulk-download', async (req, res) => {
     try {
         // For now, just return success since downloads are client-side
         // In a real implementation, you might track server-side download processes
-        res.json({ 
+        res.json({
             status: 'ok',
             message: 'Bulk download cancellation requested'
         });
@@ -524,7 +529,7 @@ app.get('/api/search', async (req, res) => {
                 message: 'Search query is required'
             });
         }
-        
+
         const results = await database.searchSummaries(query);
         res.json(results);
     } catch (error) {
