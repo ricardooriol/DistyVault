@@ -132,6 +132,10 @@ class Processor {
                 const startTime = Date.now();
                 const distillationObj = await database.getDistillation(distillation.id);
 
+                if (!distillationObj) {
+                    throw new Error(`Distillation object not found for ID: ${distillation.id}`);
+                }
+
                 // Update status to initializing and set actual start time when background processing begins
                 await database.updateDistillationStatus(
                     distillation.id,
@@ -158,9 +162,7 @@ class Processor {
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`🌐 Target URL: ${url}`);
                 distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
-                distillationObj.status = 'extracting';
-                distillationObj.processingStep = 'Extracting content from URL';
-                await database.saveDistillation(distillationObj);
+                // Status already set to 'extracting' by updateDistillationStatus above
 
                 // Extracting content from URL
 
@@ -229,7 +231,7 @@ class Processor {
                 // Update status to distilling
                 await database.updateDistillationStatus(
                     distillation.id,
-
+                    'distilling',
                     'Generating distillation with AI provider'
                 );
                 // Delay to ensure frontend can see the distilling status
@@ -254,9 +256,7 @@ class Processor {
                     fallbackUsed,
                     ...metadata
                 };
-                distillationObj.status = 'distilling';
-                distillationObj.processingStep = 'Generating distillation with AI provider';
-                await database.saveDistillation(distillationObj);
+                // Status already set to 'distilling' by updateDistillationStatus above
 
                 // Check if process has been stopped before AI distillation
                 await this.throwIfCancelled(distillation.id);
@@ -291,10 +291,10 @@ class Processor {
 
                 } catch (error) {
                     clearInterval(aiCancellationChecker);
-                    
+
                     // Enhanced error logging for AI failures
                     distillationObj.addLog(`❌ AI distillation failed: ${error.message}`, 'error');
-                    
+
                     if (error.message.includes('timeout')) {
                         distillationObj.addLog(`⏰ AI processing exceeded 10-minute timeout`, 'error');
                     } else if (error.message.includes('API key')) {
@@ -302,7 +302,7 @@ class Processor {
                     } else if (error.message.includes('rate limit')) {
                         distillationObj.addLog(`🚦 API rate limit exceeded - try again later`, 'error');
                     }
-                    
+
                     await database.saveDistillation(distillationObj);
                     throw error;
                 }
@@ -330,15 +330,18 @@ class Processor {
 
                 // Add final completion logs
                 const completedDistillation = await database.getDistillation(distillation.id);
-                completedDistillation.addLog(`✅ Processing completed successfully`);
-                completedDistillation.addLog(`📊 Final statistics:`);
-                completedDistillation.addLog(`   • Original content: ${text.length.toLocaleString()} chars`);
-                completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
-                completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
-                completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
-                completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / text.length) * 100).toFixed(1)}%`);
-                completedDistillation.addLog(`🎯 Ready for review and export`);
-                await database.saveDistillation(completedDistillation);
+
+                if (completedDistillation) {
+                    completedDistillation.addLog(`✅ Processing completed successfully`);
+                    completedDistillation.addLog(`📊 Final statistics:`);
+                    completedDistillation.addLog(`   • Original content: ${text.length.toLocaleString()} chars`);
+                    completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
+                    completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
+                    completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
+                    completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / text.length) * 100).toFixed(1)}%`);
+                    completedDistillation.addLog(`🎯 Ready for review and export`);
+                    await database.saveDistillation(completedDistillation);
+                }
 
                 return { success: true };
             } catch (error) {
@@ -620,6 +623,10 @@ class Processor {
                 const startTime = Date.now();
                 const distillationObj = await database.getDistillation(distillation.id);
 
+                if (!distillationObj) {
+                    throw new Error(`Distillation object not found for ID: ${distillation.id}`);
+                }
+
                 // Update status to initializing when background processing starts
                 await database.updateDistillationStatus(
                     distillation.id,
@@ -646,9 +653,7 @@ class Processor {
                 distillationObj.addLog(`🔍 Phase 1: Content Extraction`);
                 distillationObj.addLog(`📁 Processing file: ${file.originalname}`);
                 distillationObj.addLog(`⏱️ Extraction timeout: 5 minutes`);
-                distillationObj.status = 'extracting';
-                distillationObj.processingStep = `Extracting content from ${file.originalname}`;
-                await database.saveDistillation(distillationObj);
+                // Status already set to 'extracting' by updateDistillationStatus above
 
                 console.log(`[${distillation.id}] Extracting content from file: ${file.originalname}`);
 
@@ -717,9 +722,7 @@ class Processor {
                     fallbackUsed,
                     ...metadata
                 };
-                distillationObj.status = 'distilling';
-                distillationObj.processingStep = 'Generating distillation with AI provider';
-                await database.saveDistillation(distillationObj);
+                // Status already set to 'distilling' by updateDistillationStatus above
 
                 console.log(`[${distillation.id}] Starting distillation with AI provider`);
 
@@ -878,6 +881,11 @@ class Processor {
                 );
 
                 const distillationObj = await database.getDistillation(distillation.id);
+
+                if (!distillationObj) {
+                    throw new Error(`Distillation object not found for ID: ${distillation.id}`);
+                }
+
                 distillationObj.startTime = new Date(startTime);
                 await database.saveDistillation(distillationObj);
 
@@ -902,9 +910,7 @@ class Processor {
                 distillationObj.addLog(`🎯 Model: ${aiProvider.model}`);
                 distillationObj.addLog(`🔗 Endpoint: ${aiProvider.endpoint || 'Default'}`);
 
-                distillationObj.status = 'distilling';
-                distillationObj.processingStep = 'Generating distillation with AI provider';
-                await database.saveDistillation(distillationObj);
+                // Status already set to 'distilling' by updateDistillationStatus above
 
                 console.log(`[${distillation.id}] Starting distillation with AI provider (retry)`);
 
@@ -933,15 +939,18 @@ class Processor {
 
                 // Add completion logs
                 const completedDistillation = await database.getDistillation(distillation.id);
-                completedDistillation.addLog(`✅ Retry processing completed successfully`);
-                completedDistillation.addLog(`📊 Final statistics:`);
-                completedDistillation.addLog(`   • Original content: ${rawContent.length.toLocaleString()} chars`);
-                completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
-                completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
-                completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
-                completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / rawContent.length) * 100).toFixed(1)}%`);
-                completedDistillation.addLog(`🎯 Retry completed successfully`);
-                await database.saveDistillation(completedDistillation);
+
+                if (completedDistillation) {
+                    completedDistillation.addLog(`✅ Retry processing completed successfully`);
+                    completedDistillation.addLog(`📊 Final statistics:`);
+                    completedDistillation.addLog(`   • Original content: ${rawContent.length.toLocaleString()} chars`);
+                    completedDistillation.addLog(`   • Distilled content: ${distillationContent.length.toLocaleString()} chars`);
+                    completedDistillation.addLog(`   • Word count: ${wordCount.toLocaleString()} words`);
+                    completedDistillation.addLog(`   • Processing time: ${processingTime.toFixed(2)}s`);
+                    completedDistillation.addLog(`   • Compression: ${((1 - distillationContent.length / rawContent.length) * 100).toFixed(1)}%`);
+                    completedDistillation.addLog(`🎯 Retry completed successfully`);
+                    await database.saveDistillation(completedDistillation);
+                }
 
                 return { success: true };
             } catch (error) {

@@ -806,9 +806,15 @@ class SawronApp {
 
             // Check ALL items for any changes
             const itemsToCheck = [...this.knowledgeBase];
+            let needsReSort = false;
             itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
+                    // Check if status changed (which affects sorting)
+                    if (oldItem.status !== newItem.status) {
+                        needsReSort = true;
+                    }
+                    
                     // Status change detected - update silently
                     this.updateSingleRow(newItem);
                     // Update our local data
@@ -818,6 +824,13 @@ class SawronApp {
                     }
                 }
             });
+            
+            // Re-sort if any status changed
+            if (needsReSort) {
+                this.knowledgeBase = this.sortKnowledgeBaseItems(this.knowledgeBase);
+                this.renderKnowledgeBase();
+                return; // Skip individual updates since we're re-rendering
+            }
 
             // Check for any new items that might have been added
             const newItems = latestData.filter(item =>
@@ -825,9 +838,8 @@ class SawronApp {
             );
 
             if (newItems.length > 0) {
-                // Add new items and re-sort to maintain proper chronological order (newest first)
-                this.knowledgeBase = [...this.knowledgeBase, ...newItems]
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                // Add new items and re-sort to maintain proper order
+                this.knowledgeBase = this.sortKnowledgeBaseItems([...this.knowledgeBase, ...newItems]);
 
                 // Re-render the entire table to maintain proper order
                 this.renderKnowledgeBase();
@@ -1253,7 +1265,7 @@ class SawronApp {
                 throw new Error('Invalid data format received from server');
             }
 
-            this.knowledgeBase = data;
+            this.knowledgeBase = this.sortKnowledgeBaseItems(data);
             this.knowledgeBaseData = this.knowledgeBase; // Store for chronometer updates
 
             this.renderKnowledgeBase();
@@ -1305,7 +1317,37 @@ class SawronApp {
             );
         }
 
+        // Sort items by status priority and then by start time
+        filtered = this.sortKnowledgeBaseItems(filtered);
+
         this.renderFilteredKnowledgeBase(filtered);
+    }
+
+    sortKnowledgeBaseItems(items) {
+        return items.sort((a, b) => {
+            // Define status priority (lower number = higher priority in display)
+            const statusPriority = {
+                'completed': 1,
+                'failed': 2,
+                'stopped': 3,
+                'distilling': 4,
+                'extracting': 5,
+                'pending': 6
+            };
+
+            const aPriority = statusPriority[a.status] || 7;
+            const bPriority = statusPriority[b.status] || 7;
+
+            // First sort by status priority
+            if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+            }
+
+            // Within same status, sort by start time (most recent first)
+            const aTime = new Date(a.startTime || a.createdAt || 0);
+            const bTime = new Date(b.startTime || b.createdAt || 0);
+            return bTime - aTime;
+        });
     }
 
     renderKnowledgeBase() {
