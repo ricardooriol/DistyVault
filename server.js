@@ -41,13 +41,16 @@ const upload = multer({
     }
 });
 
-// Middleware
+// CORS middleware - simplified and working configuration
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: true, // Allow all origins for local development
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Remove the old CORS setup since we're handling it manually above
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -74,12 +77,15 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
+
+
 // Get all distillations
 app.get('/api/summaries', async (req, res) => {
     try {
         const distillations = await database.getAllSummaries();
         res.json(distillations);
     } catch (error) {
+        console.error('Error in /api/summaries:', error);
         res.status(500).json({
             status: 'error',
             message: error.message

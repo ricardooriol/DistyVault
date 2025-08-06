@@ -675,15 +675,10 @@ class SawronApp {
     }
 
     startStatusMonitoring() {
-        // Monitor for status changes every 200ms for real-time responsiveness
+        // Monitor for status changes every 2 seconds - much more reasonable
         this.statusMonitorInterval = setInterval(() => {
             this.checkForStatusUpdates();
-        }, 200);
-
-        // Additional aggressive monitoring for processing items every 100ms
-        this.aggressiveMonitorInterval = setInterval(() => {
-            this.checkProcessingItemsStatus();
-        }, 100);
+        }, 2000);
     }
 
     startChronometer() {
@@ -800,15 +795,17 @@ class SawronApp {
 
     async checkForStatusUpdates() {
         try {
-            // Fetch latest data
+            // Fetch latest data with error handling
             const response = await fetch('/api/summaries');
-            if (!response.ok) return;
+            if (!response.ok) {
+                console.warn('Failed to fetch summaries:', response.status);
+                return;
+            }
 
             const latestData = await response.json();
 
-            // Check ALL items for any changes (more comprehensive monitoring)
-            // Process items in reverse order to maintain bottom-to-top visual updates
-            const itemsToCheck = [...this.knowledgeBase].reverse();
+            // Check ALL items for any changes
+            const itemsToCheck = [...this.knowledgeBase];
             itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
@@ -842,57 +839,19 @@ class SawronApp {
             );
 
             deletedItems.forEach(deletedItem => {
-                const row = document.querySelector(`tr[data-id="${deletedItem.id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== deletedItem.id);
-            });
-
-        } catch (error) {
-            // Silently handle errors to prevent console spam
-            // Only log if it's not a network error
-            if (error.name !== 'TypeError' && !error.message.includes('Load failed')) {
-                console.warn('Status update error:', error.message);
-            }
-        }
-    }
-
-    async checkProcessingItemsStatus() {
-        try {
-            // Only check items that are currently processing
-            const processingItems = this.knowledgeBase.filter(item =>
-                ['pending', 'extracting', 'distilling'].includes(item.status)
-            );
-
-            if (processingItems.length === 0) return;
-
-            // Fetch latest data
-            const response = await fetch('/api/summaries');
-            if (!response.ok) return;
-
-            const latestData = await response.json();
-
-            // Check only processing items for changes
-            processingItems.forEach(oldItem => {
-                const newItem = latestData.find(item => item.id === oldItem.id);
-                if (newItem && this.hasItemChanged(oldItem, newItem)) {
-                    // Processing status change detected - update silently
-                    this.updateSingleRow(newItem);
-                    // Update our local data
-                    const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
-                    if (index !== -1) {
-                        this.knowledgeBase[index] = newItem;
+                const index = this.knowledgeBase.findIndex(item => item.id === deletedItem.id);
+                if (index !== -1) {
+                    this.knowledgeBase.splice(index, 1);
+                    const row = document.querySelector(`tr[data-id="${deletedItem.id}"]`);
+                    if (row) {
+                        row.remove();
                     }
                 }
             });
 
         } catch (error) {
-            // Silently handle errors to prevent console spam
-            // Only log if it's not a network error
-            if (error.name !== 'TypeError' && !error.message.includes('Load failed')) {
-                console.warn('Processing items status error:', error.message);
-            }
+            // Silently handle network errors to prevent console spam
+            console.warn('Status update error:', error.message);
         }
     }
 
@@ -1202,10 +1161,6 @@ class SawronApp {
         if (this.statusMonitorInterval) {
             clearInterval(this.statusMonitorInterval);
             this.statusMonitorInterval = null;
-        }
-        if (this.aggressiveMonitorInterval) {
-            clearInterval(this.aggressiveMonitorInterval);
-            this.aggressiveMonitorInterval = null;
         }
         if (this.chronometerInterval) {
             clearInterval(this.chronometerInterval);
@@ -3006,6 +2961,20 @@ function bulkRetryFailed() {
 // Initialize app
 const app = new SawronApp();
 
+// Make functions globally accessible for HTML onclick handlers
+window.startDistillation = startDistillation;
+window.removeFile = removeFile;
+window.closeDistillationModal = closeDistillationModal;
+window.closeRawContentModal = closeRawContentModal;
+window.closeLogsModal = closeLogsModal;
+window.refreshKnowledgeBase = refreshKnowledgeBase;
+window.toggleSelectAll = toggleSelectAll;
+window.handleBulkDownloadClick = handleBulkDownloadClick;
+window.bulkDelete = bulkDelete;
+window.bulkRetry = bulkRetry;
+window.bulkRetryAll = bulkRetryAll;
+window.bulkRetryFailed = bulkRetryFailed;
+
 // AI Settings Management
 class AISettingsManager {
     constructor() {
@@ -3148,6 +3117,16 @@ function closeAISettingsModal() {
     const modal = document.getElementById('ai-settings-modal');
     modal.style.display = 'none';
 }
+
+// Make functions globally accessible
+window.openAISettingsModal = openAISettingsModal;
+window.closeAISettingsModal = closeAISettingsModal;
+window.toggleApiKeyVisibility = toggleApiKeyVisibility;
+window.testOllamaConnection = testOllamaConnection;
+window.testProviderConnection = testProviderConnection;
+window.adjustConcurrentProcessing = adjustConcurrentProcessing;
+window.saveAIConfiguration = saveAIConfiguration;
+window.resetAIConfiguration = resetAIConfiguration;
 
 async function loadAISettingsUI() {
     const settings = await aiSettingsManager.loadSettings();
@@ -3369,51 +3348,7 @@ function showTestResult(message, type) {
     }, 5000);
 }
 
-async function saveAIConfiguration() {
-    const saveBtn = document.getElementById('save-config-btn');
-    const modeToggle = document.getElementById('mode-toggle');
 
-    const settings = {
-        mode: modeToggle.checked ? 'online' : 'offline',
-        offline: {
-            model: document.getElementById('ollama-model').value,
-            endpoint: document.getElementById('ollama-endpoint').value || 'http://localhost:11434'
-        },
-        online: {
-            provider: document.getElementById('provider-select').value,
-            apiKey: document.getElementById('api-key').value,
-            model: document.getElementById('model-select').value,
-            endpoint: ''
-        }
-    };
-
-    // Validate configuration
-    const validation = await validateAIConfiguration(settings);
-    if (!validation.valid) {
-        showTestResult(`❌ Configuration invalid: ${validation.errors.join(', ')}`, 'error');
-        return;
-    }
-
-    // Save settings
-    const saveSuccess = await aiSettingsManager.saveSettings(settings);
-    // Settings saved
-
-    if (saveSuccess) {
-        saveBtn.disabled = true;
-        saveBtn.querySelector('.btn-text').textContent = 'Saved!';
-        saveBtn.querySelector('.btn-icon').textContent = '✅';
-
-        setTimeout(() => {
-            saveBtn.disabled = false;
-            saveBtn.querySelector('.btn-text').textContent = 'Save Configuration';
-            saveBtn.querySelector('.btn-icon').textContent = '💾';
-        }, 2000);
-
-        showTestResult('✅ Configuration saved successfully!', 'success');
-    } else {
-        showTestResult('❌ Failed to save configuration', 'error');
-    }
-}
 
 async function validateAIConfiguration(settings) {
     // Client-side validation
