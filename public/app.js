@@ -1608,7 +1608,7 @@ class SawronApp {
                     ` : ''}
                     ${isProcessing ? `
                         <button class="action-dropdown-item" onclick="event.stopPropagation(); app.stopProcessing('${item.id}'); app.closeAllDropdowns();">
-                            ⏹️ Stop Processing
+                            ⏹️ Stop
                         </button>
                     ` : ''}
                     <button class="action-dropdown-item retry-item" onclick="event.stopPropagation(); app.retryDistillation('${item.id}'); app.closeAllDropdowns();">
