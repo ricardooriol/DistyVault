@@ -283,7 +283,7 @@ class ContentExtractor {
      * @returns {Promise<{text: string, method: string, fallbackUsed: boolean}>} - Extraction result
      */
     async tryMultipleTranscriptMethods(videoId) {
-        const YouTubeTranscriptExtractor = require('./transcript/YouTubeTranscriptExtractor');
+        const YouTubeTranscriptExtractor = require('./youtubeTranscriptExtractor');
         const extractor = new YouTubeTranscriptExtractor();
 
         console.log(`🎬 Starting transcript extraction for video ID: ${videoId}`);

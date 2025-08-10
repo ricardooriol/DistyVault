@@ -2,13 +2,13 @@
  * Factory class for creating AI provider instances
  * Handles the instantiation of different AI providers based on configuration
  */
-const OllamaProvider = require('./providers/OllamaProvider');
-const OpenAIProvider = require('./providers/OpenAIProvider');
-const AnthropicProvider = require('./providers/AnthropicProvider');
-const GoogleProvider = require('./providers/GoogleProvider');
+const OllamaProvider = require('./providers/ollama');
+const OpenAIProvider = require('./providers/openAI');
+const AnthropicProvider = require('./providers/anthropic');
+const GoogleProvider = require('./providers/google');
 
-const GrokProvider = require('./providers/GrokProvider');
-const DeepseekProvider = require('./providers/DeepseekProvider');
+const GrokProvider = require('./providers/grok');
+const DeepseekProvider = require('./providers/deepseek');
 
 class AIProviderFactory {
     /**

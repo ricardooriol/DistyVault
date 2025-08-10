@@ -1,25 +1,25 @@
 /**
- * Deepseek AI Provider
- * Handles communication with Deepseek's API
+ * Anthropic Claude AI Provider
+ * Handles communication with Anthropic's Claude API
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 const axios = require('axios');
 
-class DeepseekProvider extends AIProvider {
+class AnthropicProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'deepseek-chat';
-        this.endpoint = config.endpoint || 'https://api.deepseek.com/v1';
+        this.model = config.model || 'claude-3-5-haiku-latest';
+        this.endpoint = config.endpoint || 'https://api.anthropic.com/v1';
         this.timeout = config.timeout || 60000; // 1 minute default
         
         if (!this.apiKey) {
-            throw new Error('Deepseek API key is required');
+            throw new Error('Anthropic API key is required');
         }
     }
 
     /**
-     * Generate a distillation using Deepseek
+     * Generate a distillation using Anthropic Claude
      * @param {string} text - The text to distill
      * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
@@ -29,131 +29,143 @@ class DeepseekProvider extends AIProvider {
             const processedText = this.preprocessText(text);
             const prompt = this.createDistillationPrompt(processedText, options);
 
-            console.log(`Sending request to Deepseek with ${processedText.length} characters`);
+            console.log(`Sending request to Anthropic with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);
 
             const requestData = {
                 model: this.model,
+                max_tokens: options.max_tokens || 1000,
                 messages: [
                     {
                         role: 'user',
                         content: prompt
                     }
                 ],
-                max_tokens: options.max_tokens || 1000,
                 temperature: options.temperature || 0.7,
                 top_p: options.top_p || 1.0
             };
 
             const startTime = Date.now();
-            console.log(`Deepseek request started at: ${new Date().toISOString()}`);
+            console.log(`Anthropic request started at: ${new Date().toISOString()}`);
 
-            const response = await axios.post(`${this.endpoint}/chat/completions`, requestData, {
+            const response = await axios.post(`${this.endpoint}/messages`, requestData, {
                 timeout: this.timeout,
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
+                    'x-api-key': this.apiKey,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
                 }
             });
 
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
 
-            if (response.data && response.data.choices && response.data.choices[0]) {
-                const rawDistillation = response.data.choices[0].message.content.trim();
-                console.log(`Deepseek response received in ${duration.toFixed(2)}s`);
+            if (response.data && response.data.content && response.data.content[0]) {
+                const rawDistillation = response.data.content[0].text.trim();
+                console.log(`Anthropic response received in ${duration.toFixed(2)}s`);
                 console.log(`Distillation length: ${rawDistillation.length} characters`);
-                console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
+                console.log(`Input tokens: ${response.data.usage?.input_tokens || 'unknown'}`);
+                console.log(`Output tokens: ${response.data.usage?.output_tokens || 'unknown'}`);
                 
                 // Apply post-processing to fix numbering and other issues
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
             } else {
-                throw new Error('Invalid response format from Deepseek');
+                throw new Error('Invalid response format from Anthropic');
             }
 
         } catch (error) {
-            console.error('Error generating distillation with Deepseek:', error);
+            console.error('Error generating distillation with Anthropic:', error);
             
             if (error.response) {
                 const status = error.response.status;
                 const data = error.response.data;
                 
                 if (status === 401) {
-                    throw new Error('Invalid Deepseek API key. Please check your API key.');
+                    throw new Error('Invalid Anthropic API key. Please check your API key.');
                 } else if (status === 429) {
-                    throw new Error('Deepseek API rate limit exceeded. Please wait before making more requests.');
+                    throw new Error('Anthropic API rate limit exceeded. Please wait before making more requests.');
                 } else if (status === 400) {
-                    throw new Error(`Deepseek API error: ${data.error?.message || 'Bad request'}`);
+                    throw new Error(`Anthropic API error: ${data.error?.message || 'Bad request'}`);
                 } else {
-                    throw new Error(`Deepseek API error (${status}): ${data.error?.message || error.message}`);
+                    throw new Error(`Anthropic API error (${status}): ${data.error?.message || error.message}`);
                 }
             }
 
-            throw new Error(`Deepseek error: ${error.message}`);
+            throw new Error(`Anthropic error: ${error.message}`);
         }
     }
 
     /**
-     * Validate Deepseek configuration
+     * Validate Anthropic configuration
      * @returns {Promise<{valid: boolean, error?: string}>} - Validation result
      */
     async validateConfiguration() {
         try {
             // Basic API key format validation
-            if (!this.apiKey || !this.apiKey.startsWith('sk-')) {
+            if (!this.apiKey || !this.apiKey.startsWith('sk-ant-')) {
                 return {
                     valid: false,
-                    error: 'Invalid Deepseek API key format. API key should start with "sk-"'
+                    error: 'Invalid Anthropic API key format. API key should start with "sk-ant-"'
                 };
             }
 
             // Test API key with a simple request
-            const response = await axios.post(`${this.endpoint}/chat/completions`, {
+            const response = await axios.post(`${this.endpoint}/messages`, {
                 model: this.model,
+                max_tokens: 10,
                 messages: [
                     {
                         role: 'user',
                         content: 'Hello'
                     }
-                ],
-                max_tokens: 10
+                ]
             }, {
                 timeout: 10000,
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
+                    'x-api-key': this.apiKey,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
                 }
             });
 
-            if (response.data && response.data.choices) {
+            if (response.data && response.data.content) {
                 return { valid: true };
             } else {
                 return {
                     valid: false,
-                    error: 'Invalid response from Deepseek API'
+                    error: 'Invalid response from Anthropic API'
                 };
             }
 
         } catch (error) {
             if (error.response) {
                 const status = error.response.status;
+                const data = error.response.data;
+                
                 if (status === 401) {
                     return {
                         valid: false,
-                        error: 'Invalid Deepseek API key'
+                        error: 'Invalid Anthropic API key'
                     };
                 } else if (status === 429) {
                     return {
                         valid: false,
-                        error: 'Deepseek API rate limit exceeded'
+                        error: 'Anthropic API rate limit exceeded'
                     };
+                } else if (status === 400 && data.error?.type === 'invalid_request_error') {
+                    if (data.error.message.includes('model')) {
+                        return {
+                            valid: false,
+                            error: `Model "${this.model}" is not available`
+                        };
+                    }
                 }
             }
 
             return {
                 valid: false,
-                error: `Deepseek validation failed: ${error.message}`
+                error: `Anthropic validation failed: ${error.message}`
             };
         }
     }
@@ -168,25 +180,27 @@ class DeepseekProvider extends AIProvider {
                 type: 'string',
                 required: true,
                 sensitive: true,
-                description: 'Deepseek API key (starts with sk-)'
+                description: 'Anthropic API key (starts with sk-ant-)'
             },
             model: {
                 type: 'string',
                 required: false,
-                default: 'deepseek-chat',
-                description: 'Deepseek model to use'
+                default: 'claude-3-5-haiku-latest',
+                description: 'Claude model to use'
             }
         };
     }
 
     /**
-     * Get available models from Deepseek
+     * Get available models from Anthropic
      * @returns {Array<string>} - List of available model names
      */
     getAvailableModels() {
         return [
-            'deepseek-chat',
-            'deepseek-reasoner'
+            'claude-opus-4-20250514',
+            'claude-sonnet-4-20250514',
+            'claude-3-7-sonnet-latest',
+            'claude-3-5-haiku-latest'
         ];
     }
 
@@ -195,58 +209,63 @@ class DeepseekProvider extends AIProvider {
      * @returns {string} - Human-readable provider name
      */
     getDisplayName() {
-        return 'Deepseek';
+        return 'Anthropic Claude';
     }
 
     /**
-     * Get maximum input length for Deepseek
+     * Get maximum input length for Anthropic
      * @returns {number} - Maximum input length in characters
      */
     getMaxInputLength() {
-        // Deepseek has a reasonable context window
-        return 60000; // ~15k tokens, conservative estimate
+        // Claude models have different context windows
+        if (this.model.includes('claude-3')) {
+            return 150000; // ~200k tokens, leaving room for output
+        }
+        return 75000; // Conservative estimate for older models
     }
 
 
 
     /**
-     * Test connection to Deepseek with a simple request
+     * Test connection to Anthropic with a simple request
      * @returns {Promise<{success: boolean, error?: string, latency?: number}>} - Test result
      */
     async testConnection() {
         const startTime = Date.now();
         
         try {
-            const response = await axios.post(`${this.endpoint}/chat/completions`, {
+            const response = await axios.post(`${this.endpoint}/messages`, {
                 model: this.model,
+                max_tokens: 20,
                 messages: [
                     {
                         role: 'user',
-                        content: 'Please respond with "Deepseek connection test successful" to confirm the connection.'
+                        content: 'Please respond with "Claude connection test successful" to confirm the connection.'
                     }
-                ],
-                max_tokens: 20
+                ]
             }, {
                 timeout: 30000,
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
+                    'x-api-key': this.apiKey,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
                 }
             });
 
             const latency = Date.now() - startTime;
 
-            if (response.data && response.data.choices && response.data.choices[0]) {
+            if (response.data && response.data.content && response.data.content[0]) {
                 return {
                     success: true,
                     latency: latency,
-                    response: response.data.choices[0].message.content.trim(),
-                    tokensUsed: response.data.usage?.total_tokens
+                    response: response.data.content[0].text.trim(),
+                    inputTokens: response.data.usage?.input_tokens,
+                    outputTokens: response.data.usage?.output_tokens
                 };
             } else {
                 return {
                     success: false,
-                    error: 'Invalid response format from Deepseek'
+                    error: 'Invalid response format from Anthropic'
                 };
             }
 
@@ -260,4 +279,4 @@ class DeepseekProvider extends AIProvider {
     }
 }
 
-module.exports = DeepseekProvider;
+module.exports = AnthropicProvider;

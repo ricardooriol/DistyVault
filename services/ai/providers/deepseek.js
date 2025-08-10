@@ -1,25 +1,25 @@
 /**
- * OpenAI AI Provider
- * Handles communication with OpenAI's API
+ * Deepseek AI Provider
+ * Handles communication with Deepseek's API
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 const axios = require('axios');
 
-class OpenAIProvider extends AIProvider {
+class DeepseekProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'gpt-4o';
-        this.endpoint = config.endpoint || 'https://api.openai.com/v1';
+        this.model = config.model || 'deepseek-chat';
+        this.endpoint = config.endpoint || 'https://api.deepseek.com/v1';
         this.timeout = config.timeout || 60000; // 1 minute default
         
         if (!this.apiKey) {
-            throw new Error('OpenAI API key is required');
+            throw new Error('Deepseek API key is required');
         }
     }
 
     /**
-     * Generate a distillation using OpenAI
+     * Generate a distillation using Deepseek
      * @param {string} text - The text to distill
      * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
@@ -29,7 +29,7 @@ class OpenAIProvider extends AIProvider {
             const processedText = this.preprocessText(text);
             const prompt = this.createDistillationPrompt(processedText, options);
 
-            console.log(`Sending request to OpenAI with ${processedText.length} characters`);
+            console.log(`Sending request to Deepseek with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);
 
             const requestData = {
@@ -46,7 +46,7 @@ class OpenAIProvider extends AIProvider {
             };
 
             const startTime = Date.now();
-            console.log(`OpenAI request started at: ${new Date().toISOString()}`);
+            console.log(`Deepseek request started at: ${new Date().toISOString()}`);
 
             const response = await axios.post(`${this.endpoint}/chat/completions`, requestData, {
                 timeout: this.timeout,
@@ -61,7 +61,7 @@ class OpenAIProvider extends AIProvider {
 
             if (response.data && response.data.choices && response.data.choices[0]) {
                 const rawDistillation = response.data.choices[0].message.content.trim();
-                console.log(`OpenAI response received in ${duration.toFixed(2)}s`);
+                console.log(`Deepseek response received in ${duration.toFixed(2)}s`);
                 console.log(`Distillation length: ${rawDistillation.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
                 
@@ -69,33 +69,33 @@ class OpenAIProvider extends AIProvider {
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
             } else {
-                throw new Error('Invalid response format from OpenAI');
+                throw new Error('Invalid response format from Deepseek');
             }
 
         } catch (error) {
-            console.error('Error generating distillation with OpenAI:', error);
+            console.error('Error generating distillation with Deepseek:', error);
             
             if (error.response) {
                 const status = error.response.status;
                 const data = error.response.data;
                 
                 if (status === 401) {
-                    throw new Error('Invalid OpenAI API key. Please check your API key.');
+                    throw new Error('Invalid Deepseek API key. Please check your API key.');
                 } else if (status === 429) {
-                    throw new Error('OpenAI API rate limit exceeded. Please wait before making more requests.');
+                    throw new Error('Deepseek API rate limit exceeded. Please wait before making more requests.');
                 } else if (status === 400) {
-                    throw new Error(`OpenAI API error: ${data.error?.message || 'Bad request'}`);
+                    throw new Error(`Deepseek API error: ${data.error?.message || 'Bad request'}`);
                 } else {
-                    throw new Error(`OpenAI API error (${status}): ${data.error?.message || error.message}`);
+                    throw new Error(`Deepseek API error (${status}): ${data.error?.message || error.message}`);
                 }
             }
 
-            throw new Error(`OpenAI error: ${error.message}`);
+            throw new Error(`Deepseek error: ${error.message}`);
         }
     }
 
     /**
-     * Validate OpenAI configuration
+     * Validate Deepseek configuration
      * @returns {Promise<{valid: boolean, error?: string}>} - Validation result
      */
     async validateConfiguration() {
@@ -104,33 +104,34 @@ class OpenAIProvider extends AIProvider {
             if (!this.apiKey || !this.apiKey.startsWith('sk-')) {
                 return {
                     valid: false,
-                    error: 'Invalid OpenAI API key format. API key should start with "sk-"'
+                    error: 'Invalid Deepseek API key format. API key should start with "sk-"'
                 };
             }
 
             // Test API key with a simple request
-            const response = await axios.get(`${this.endpoint}/models`, {
+            const response = await axios.post(`${this.endpoint}/chat/completions`, {
+                model: this.model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: 'Hello'
+                    }
+                ],
+                max_tokens: 10
+            }, {
                 timeout: 10000,
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
-            if (response.data && response.data.data) {
-                // Check if the specified model is available
-                const availableModels = response.data.data.map(model => model.id);
-                if (!availableModels.includes(this.model)) {
-                    return {
-                        valid: false,
-                        error: `Model "${this.model}" is not available. Available models: ${availableModels.slice(0, 5).join(', ')}...`
-                    };
-                }
-
+            if (response.data && response.data.choices) {
                 return { valid: true };
             } else {
                 return {
                     valid: false,
-                    error: 'Invalid response from OpenAI API'
+                    error: 'Invalid response from Deepseek API'
                 };
             }
 
@@ -140,19 +141,19 @@ class OpenAIProvider extends AIProvider {
                 if (status === 401) {
                     return {
                         valid: false,
-                        error: 'Invalid OpenAI API key'
+                        error: 'Invalid Deepseek API key'
                     };
                 } else if (status === 429) {
                     return {
                         valid: false,
-                        error: 'OpenAI API rate limit exceeded'
+                        error: 'Deepseek API rate limit exceeded'
                     };
                 }
             }
 
             return {
                 valid: false,
-                error: `OpenAI validation failed: ${error.message}`
+                error: `Deepseek validation failed: ${error.message}`
             };
         }
     }
@@ -167,27 +168,25 @@ class OpenAIProvider extends AIProvider {
                 type: 'string',
                 required: true,
                 sensitive: true,
-                description: 'OpenAI API key (starts with sk-)'
+                description: 'Deepseek API key (starts with sk-)'
             },
             model: {
                 type: 'string',
                 required: false,
-                default: 'gpt-4o',
-                description: 'OpenAI model to use'
+                default: 'deepseek-chat',
+                description: 'Deepseek model to use'
             }
         };
     }
 
     /**
-     * Get available models from OpenAI
+     * Get available models from Deepseek
      * @returns {Array<string>} - List of available model names
      */
     getAvailableModels() {
         return [
-            'o3-mini',
-            'o4-mini',
-            'gpt-4o',
-            'gpt-4.1'
+            'deepseek-chat',
+            'deepseek-reasoner'
         ];
     }
 
@@ -196,38 +195,34 @@ class OpenAIProvider extends AIProvider {
      * @returns {string} - Human-readable provider name
      */
     getDisplayName() {
-        return 'OpenAI';
+        return 'Deepseek';
     }
 
     /**
-     * Get maximum input length for OpenAI
+     * Get maximum input length for Deepseek
      * @returns {number} - Maximum input length in characters
      */
     getMaxInputLength() {
-        // GPT-3.5-turbo: ~4k tokens, GPT-4: ~8k tokens
-        // Rough estimate: 1 token ≈ 4 characters
-        if (this.model.includes('gpt-4')) {
-            return 25000; // ~6k tokens for input, leaving room for output
-        }
-        return 12000; // ~3k tokens for input, leaving room for output
+        // Deepseek has a reasonable context window
+        return 60000; // ~15k tokens, conservative estimate
     }
 
 
+
     /**
-     * Test connection to OpenAI with a simple request
+     * Test connection to Deepseek with a simple request
      * @returns {Promise<{success: boolean, error?: string, latency?: number}>} - Test result
      */
     async testConnection() {
         const startTime = Date.now();
         
         try {
-            // Test with a simple chat completion
             const response = await axios.post(`${this.endpoint}/chat/completions`, {
                 model: this.model,
                 messages: [
                     {
                         role: 'user',
-                        content: 'Please respond with "OpenAI connection test successful" to confirm the connection.'
+                        content: 'Please respond with "Deepseek connection test successful" to confirm the connection.'
                     }
                 ],
                 max_tokens: 20
@@ -251,7 +246,7 @@ class OpenAIProvider extends AIProvider {
             } else {
                 return {
                     success: false,
-                    error: 'Invalid response format from OpenAI'
+                    error: 'Invalid response format from Deepseek'
                 };
             }
 
@@ -265,4 +260,4 @@ class OpenAIProvider extends AIProvider {
     }
 }
 
-module.exports = OpenAIProvider;
+module.exports = DeepseekProvider;

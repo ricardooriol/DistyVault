@@ -2,7 +2,7 @@
  * Abstract base class for AI providers
  * Defines the common interface that all AI providers must implement
  */
-const NumberingProcessor = require('./NumberingProcessor');
+const NumberingProcessor = require('./numberingProcessor');
 
 class AIProvider {
     constructor(config = {}) {

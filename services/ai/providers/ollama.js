@@ -2,7 +2,7 @@
  * Ollama AI Provider
  * Handles communication with local Ollama installation
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 const axios = require('axios');
 
 class OllamaProvider extends AIProvider {

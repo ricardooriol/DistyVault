@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const AIProviderFactory = require('../services/ai/AIProviderFactory');
+const AIProviderFactory = require('../services/ai/aiProviderFactory');
 
 /**
  * Test AI provider connection
@@ -150,7 +150,7 @@ router.post('/validate-ai-config', (req, res) => {
 });
 
 // Use singleton instance of AISettingsManager
-const AISettingsManager = require('../services/ai/AISettingsManager');
+const AISettingsManager = require('../services/ai/aiSettingsManager');
 const sharedSettingsManager = AISettingsManager.getInstance();
 
 /**

@@ -1,25 +1,25 @@
 /**
- * Anthropic Claude AI Provider
- * Handles communication with Anthropic's Claude API
+ * Grok AI Provider
+ * Handles communication with xAI's Grok API
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 const axios = require('axios');
 
-class AnthropicProvider extends AIProvider {
+class GrokProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'claude-3-5-haiku-latest';
-        this.endpoint = config.endpoint || 'https://api.anthropic.com/v1';
-        this.timeout = config.timeout || 60000; // 1 minute default
+        this.model = config.model || 'grok-3';
+        this.endpoint = config.endpoint || 'https://api.x.ai/v1';
+        this.timeout = config.timeout || 360000; // 6 minutes for reasoning models
         
         if (!this.apiKey) {
-            throw new Error('Anthropic API key is required');
+            throw new Error('Grok API key is required');
         }
     }
 
     /**
-     * Generate a distillation using Anthropic Claude
+     * Generate a distillation using Grok
      * @param {string} text - The text to distill
      * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
@@ -29,143 +29,131 @@ class AnthropicProvider extends AIProvider {
             const processedText = this.preprocessText(text);
             const prompt = this.createDistillationPrompt(processedText, options);
 
-            console.log(`Sending request to Anthropic with ${processedText.length} characters`);
+            console.log(`Sending request to Grok with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);
 
             const requestData = {
                 model: this.model,
-                max_tokens: options.max_tokens || 1000,
                 messages: [
                     {
                         role: 'user',
                         content: prompt
                     }
                 ],
+                max_tokens: options.max_tokens || 1000,
                 temperature: options.temperature || 0.7,
                 top_p: options.top_p || 1.0
             };
 
             const startTime = Date.now();
-            console.log(`Anthropic request started at: ${new Date().toISOString()}`);
+            console.log(`Grok request started at: ${new Date().toISOString()}`);
 
-            const response = await axios.post(`${this.endpoint}/messages`, requestData, {
+            const response = await axios.post(`${this.endpoint}/chat/completions`, requestData, {
                 timeout: this.timeout,
                 headers: {
-                    'x-api-key': this.apiKey,
-                    'Content-Type': 'application/json',
-                    'anthropic-version': '2023-06-01'
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
 
-            if (response.data && response.data.content && response.data.content[0]) {
-                const rawDistillation = response.data.content[0].text.trim();
-                console.log(`Anthropic response received in ${duration.toFixed(2)}s`);
+            if (response.data && response.data.choices && response.data.choices[0]) {
+                const rawDistillation = response.data.choices[0].message.content.trim();
+                console.log(`Grok response received in ${duration.toFixed(2)}s`);
                 console.log(`Distillation length: ${rawDistillation.length} characters`);
-                console.log(`Input tokens: ${response.data.usage?.input_tokens || 'unknown'}`);
-                console.log(`Output tokens: ${response.data.usage?.output_tokens || 'unknown'}`);
+                console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
                 
                 // Apply post-processing to fix numbering and other issues
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
             } else {
-                throw new Error('Invalid response format from Anthropic');
+                throw new Error('Invalid response format from Grok');
             }
 
         } catch (error) {
-            console.error('Error generating distillation with Anthropic:', error);
+            console.error('Error generating distillation with Grok:', error);
             
             if (error.response) {
                 const status = error.response.status;
                 const data = error.response.data;
                 
                 if (status === 401) {
-                    throw new Error('Invalid Anthropic API key. Please check your API key.');
+                    throw new Error('Invalid Grok API key. Please check your API key.');
                 } else if (status === 429) {
-                    throw new Error('Anthropic API rate limit exceeded. Please wait before making more requests.');
+                    throw new Error('Grok API rate limit exceeded. Please wait before making more requests.');
                 } else if (status === 400) {
-                    throw new Error(`Anthropic API error: ${data.error?.message || 'Bad request'}`);
+                    throw new Error(`Grok API error: ${data.error?.message || 'Bad request'}`);
                 } else {
-                    throw new Error(`Anthropic API error (${status}): ${data.error?.message || error.message}`);
+                    throw new Error(`Grok API error (${status}): ${data.error?.message || error.message}`);
                 }
             }
 
-            throw new Error(`Anthropic error: ${error.message}`);
+            throw new Error(`Grok error: ${error.message}`);
         }
     }
 
     /**
-     * Validate Anthropic configuration
+     * Validate Grok configuration
      * @returns {Promise<{valid: boolean, error?: string}>} - Validation result
      */
     async validateConfiguration() {
         try {
             // Basic API key format validation
-            if (!this.apiKey || !this.apiKey.startsWith('sk-ant-')) {
+            if (!this.apiKey || !this.apiKey.startsWith('xai-')) {
                 return {
                     valid: false,
-                    error: 'Invalid Anthropic API key format. API key should start with "sk-ant-"'
+                    error: 'Invalid Grok API key format. API key should start with "xai-"'
                 };
             }
 
             // Test API key with a simple request
-            const response = await axios.post(`${this.endpoint}/messages`, {
+            const response = await axios.post(`${this.endpoint}/chat/completions`, {
                 model: this.model,
-                max_tokens: 10,
                 messages: [
                     {
                         role: 'user',
                         content: 'Hello'
                     }
-                ]
+                ],
+                max_tokens: 10
             }, {
                 timeout: 10000,
                 headers: {
-                    'x-api-key': this.apiKey,
-                    'Content-Type': 'application/json',
-                    'anthropic-version': '2023-06-01'
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
-            if (response.data && response.data.content) {
+            if (response.data && response.data.choices) {
                 return { valid: true };
             } else {
                 return {
                     valid: false,
-                    error: 'Invalid response from Anthropic API'
+                    error: 'Invalid response from Grok API'
                 };
             }
 
         } catch (error) {
             if (error.response) {
                 const status = error.response.status;
-                const data = error.response.data;
-                
                 if (status === 401) {
                     return {
                         valid: false,
-                        error: 'Invalid Anthropic API key'
+                        error: 'Invalid Grok API key'
                     };
                 } else if (status === 429) {
                     return {
                         valid: false,
-                        error: 'Anthropic API rate limit exceeded'
+                        error: 'Grok API rate limit exceeded'
                     };
-                } else if (status === 400 && data.error?.type === 'invalid_request_error') {
-                    if (data.error.message.includes('model')) {
-                        return {
-                            valid: false,
-                            error: `Model "${this.model}" is not available`
-                        };
-                    }
                 }
             }
 
             return {
                 valid: false,
-                error: `Anthropic validation failed: ${error.message}`
+                error: `Grok validation failed: ${error.message}`
             };
         }
     }
@@ -180,27 +168,27 @@ class AnthropicProvider extends AIProvider {
                 type: 'string',
                 required: true,
                 sensitive: true,
-                description: 'Anthropic API key (starts with sk-ant-)'
+                description: 'Grok API key (starts with xai-)'
             },
             model: {
                 type: 'string',
                 required: false,
-                default: 'claude-3-5-haiku-latest',
-                description: 'Claude model to use'
+                default: 'grok-3',
+                description: 'Grok model to use'
             }
         };
     }
 
     /**
-     * Get available models from Anthropic
+     * Get available models from Grok
      * @returns {Array<string>} - List of available model names
      */
     getAvailableModels() {
         return [
-            'claude-opus-4-20250514',
-            'claude-sonnet-4-20250514',
-            'claude-3-7-sonnet-latest',
-            'claude-3-5-haiku-latest'
+            'grok-4-0709',
+            'grok-3',
+            'grok-3-mini',
+            'grok-3-fast'
         ];
     }
 
@@ -209,63 +197,58 @@ class AnthropicProvider extends AIProvider {
      * @returns {string} - Human-readable provider name
      */
     getDisplayName() {
-        return 'Anthropic Claude';
+        return 'Grok';
     }
 
     /**
-     * Get maximum input length for Anthropic
+     * Get maximum input length for Grok
      * @returns {number} - Maximum input length in characters
      */
     getMaxInputLength() {
-        // Claude models have different context windows
-        if (this.model.includes('claude-3')) {
-            return 150000; // ~200k tokens, leaving room for output
-        }
-        return 75000; // Conservative estimate for older models
+        // Grok has a large context window
+        return 100000; // ~25k tokens, conservative estimate
     }
 
 
 
     /**
-     * Test connection to Anthropic with a simple request
+     * Test connection to Grok with a simple request
      * @returns {Promise<{success: boolean, error?: string, latency?: number}>} - Test result
      */
     async testConnection() {
         const startTime = Date.now();
         
         try {
-            const response = await axios.post(`${this.endpoint}/messages`, {
+            const response = await axios.post(`${this.endpoint}/chat/completions`, {
                 model: this.model,
-                max_tokens: 20,
                 messages: [
                     {
                         role: 'user',
-                        content: 'Please respond with "Claude connection test successful" to confirm the connection.'
+                        content: 'Please respond with "Grok connection test successful" to confirm the connection.'
                     }
-                ]
+                ],
+                max_tokens: 20
             }, {
                 timeout: 30000,
                 headers: {
-                    'x-api-key': this.apiKey,
-                    'Content-Type': 'application/json',
-                    'anthropic-version': '2023-06-01'
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
             const latency = Date.now() - startTime;
 
-            if (response.data && response.data.content && response.data.content[0]) {
+            if (response.data && response.data.choices && response.data.choices[0]) {
                 return {
                     success: true,
                     latency: latency,
-                    response: response.data.content[0].text.trim(),
-                    inputTokens: response.data.usage?.input_tokens,
-                    outputTokens: response.data.usage?.output_tokens
+                    response: response.data.choices[0].message.content.trim(),
+                    tokensUsed: response.data.usage?.total_tokens
                 };
             } else {
                 return {
                     success: false,
-                    error: 'Invalid response format from Anthropic'
+                    error: 'Invalid response format from Grok'
                 };
             }
 
@@ -279,4 +262,4 @@ class AnthropicProvider extends AIProvider {
     }
 }
 
-module.exports = AnthropicProvider;
+module.exports = GrokProvider;

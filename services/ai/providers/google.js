@@ -2,7 +2,7 @@
  * Google Gemini AI Provider
  * Handles communication with Google's Gemini API using @google/genai
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 
 class GoogleProvider extends AIProvider {
     constructor(config = {}) {

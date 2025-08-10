@@ -1,25 +1,25 @@
 /**
- * Grok AI Provider
- * Handles communication with xAI's Grok API
+ * OpenAI AI Provider
+ * Handles communication with OpenAI's API
  */
-const AIProvider = require('../AIProvider');
+const AIProvider = require('../aiProvider');
 const axios = require('axios');
 
-class GrokProvider extends AIProvider {
+class OpenAIProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
         this.apiKey = config.apiKey;
-        this.model = config.model || 'grok-3';
-        this.endpoint = config.endpoint || 'https://api.x.ai/v1';
-        this.timeout = config.timeout || 360000; // 6 minutes for reasoning models
+        this.model = config.model || 'gpt-4o';
+        this.endpoint = config.endpoint || 'https://api.openai.com/v1';
+        this.timeout = config.timeout || 60000; // 1 minute default
         
         if (!this.apiKey) {
-            throw new Error('Grok API key is required');
+            throw new Error('OpenAI API key is required');
         }
     }
 
     /**
-     * Generate a distillation using Grok
+     * Generate a distillation using OpenAI
      * @param {string} text - The text to distill
      * @param {Object} options - Distillation options
      * @returns {Promise<string>} - The generated distillation
@@ -29,7 +29,7 @@ class GrokProvider extends AIProvider {
             const processedText = this.preprocessText(text);
             const prompt = this.createDistillationPrompt(processedText, options);
 
-            console.log(`Sending request to Grok with ${processedText.length} characters`);
+            console.log(`Sending request to OpenAI with ${processedText.length} characters`);
             console.log(`Using model: ${this.model}`);
 
             const requestData = {
@@ -46,7 +46,7 @@ class GrokProvider extends AIProvider {
             };
 
             const startTime = Date.now();
-            console.log(`Grok request started at: ${new Date().toISOString()}`);
+            console.log(`OpenAI request started at: ${new Date().toISOString()}`);
 
             const response = await axios.post(`${this.endpoint}/chat/completions`, requestData, {
                 timeout: this.timeout,
@@ -61,7 +61,7 @@ class GrokProvider extends AIProvider {
 
             if (response.data && response.data.choices && response.data.choices[0]) {
                 const rawDistillation = response.data.choices[0].message.content.trim();
-                console.log(`Grok response received in ${duration.toFixed(2)}s`);
+                console.log(`OpenAI response received in ${duration.toFixed(2)}s`);
                 console.log(`Distillation length: ${rawDistillation.length} characters`);
                 console.log(`Tokens used: ${response.data.usage?.total_tokens || 'unknown'}`);
                 
@@ -69,69 +69,68 @@ class GrokProvider extends AIProvider {
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
             } else {
-                throw new Error('Invalid response format from Grok');
+                throw new Error('Invalid response format from OpenAI');
             }
 
         } catch (error) {
-            console.error('Error generating distillation with Grok:', error);
+            console.error('Error generating distillation with OpenAI:', error);
             
             if (error.response) {
                 const status = error.response.status;
                 const data = error.response.data;
                 
                 if (status === 401) {
-                    throw new Error('Invalid Grok API key. Please check your API key.');
+                    throw new Error('Invalid OpenAI API key. Please check your API key.');
                 } else if (status === 429) {
-                    throw new Error('Grok API rate limit exceeded. Please wait before making more requests.');
+                    throw new Error('OpenAI API rate limit exceeded. Please wait before making more requests.');
                 } else if (status === 400) {
-                    throw new Error(`Grok API error: ${data.error?.message || 'Bad request'}`);
+                    throw new Error(`OpenAI API error: ${data.error?.message || 'Bad request'}`);
                 } else {
-                    throw new Error(`Grok API error (${status}): ${data.error?.message || error.message}`);
+                    throw new Error(`OpenAI API error (${status}): ${data.error?.message || error.message}`);
                 }
             }
 
-            throw new Error(`Grok error: ${error.message}`);
+            throw new Error(`OpenAI error: ${error.message}`);
         }
     }
 
     /**
-     * Validate Grok configuration
+     * Validate OpenAI configuration
      * @returns {Promise<{valid: boolean, error?: string}>} - Validation result
      */
     async validateConfiguration() {
         try {
             // Basic API key format validation
-            if (!this.apiKey || !this.apiKey.startsWith('xai-')) {
+            if (!this.apiKey || !this.apiKey.startsWith('sk-')) {
                 return {
                     valid: false,
-                    error: 'Invalid Grok API key format. API key should start with "xai-"'
+                    error: 'Invalid OpenAI API key format. API key should start with "sk-"'
                 };
             }
 
             // Test API key with a simple request
-            const response = await axios.post(`${this.endpoint}/chat/completions`, {
-                model: this.model,
-                messages: [
-                    {
-                        role: 'user',
-                        content: 'Hello'
-                    }
-                ],
-                max_tokens: 10
-            }, {
+            const response = await axios.get(`${this.endpoint}/models`, {
                 timeout: 10000,
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${this.apiKey}`
                 }
             });
 
-            if (response.data && response.data.choices) {
+            if (response.data && response.data.data) {
+                // Check if the specified model is available
+                const availableModels = response.data.data.map(model => model.id);
+                if (!availableModels.includes(this.model)) {
+                    return {
+                        valid: false,
+                        error: `Model "${this.model}" is not available. Available models: ${availableModels.slice(0, 5).join(', ')}...`
+                    };
+                }
+
                 return { valid: true };
             } else {
                 return {
                     valid: false,
-                    error: 'Invalid response from Grok API'
+                    error: 'Invalid response from OpenAI API'
                 };
             }
 
@@ -141,19 +140,19 @@ class GrokProvider extends AIProvider {
                 if (status === 401) {
                     return {
                         valid: false,
-                        error: 'Invalid Grok API key'
+                        error: 'Invalid OpenAI API key'
                     };
                 } else if (status === 429) {
                     return {
                         valid: false,
-                        error: 'Grok API rate limit exceeded'
+                        error: 'OpenAI API rate limit exceeded'
                     };
                 }
             }
 
             return {
                 valid: false,
-                error: `Grok validation failed: ${error.message}`
+                error: `OpenAI validation failed: ${error.message}`
             };
         }
     }
@@ -168,27 +167,27 @@ class GrokProvider extends AIProvider {
                 type: 'string',
                 required: true,
                 sensitive: true,
-                description: 'Grok API key (starts with xai-)'
+                description: 'OpenAI API key (starts with sk-)'
             },
             model: {
                 type: 'string',
                 required: false,
-                default: 'grok-3',
-                description: 'Grok model to use'
+                default: 'gpt-4o',
+                description: 'OpenAI model to use'
             }
         };
     }
 
     /**
-     * Get available models from Grok
+     * Get available models from OpenAI
      * @returns {Array<string>} - List of available model names
      */
     getAvailableModels() {
         return [
-            'grok-4-0709',
-            'grok-3',
-            'grok-3-mini',
-            'grok-3-fast'
+            'o3-mini',
+            'o4-mini',
+            'gpt-4o',
+            'gpt-4.1'
         ];
     }
 
@@ -197,34 +196,38 @@ class GrokProvider extends AIProvider {
      * @returns {string} - Human-readable provider name
      */
     getDisplayName() {
-        return 'Grok';
+        return 'OpenAI';
     }
 
     /**
-     * Get maximum input length for Grok
+     * Get maximum input length for OpenAI
      * @returns {number} - Maximum input length in characters
      */
     getMaxInputLength() {
-        // Grok has a large context window
-        return 100000; // ~25k tokens, conservative estimate
+        // GPT-3.5-turbo: ~4k tokens, GPT-4: ~8k tokens
+        // Rough estimate: 1 token ≈ 4 characters
+        if (this.model.includes('gpt-4')) {
+            return 25000; // ~6k tokens for input, leaving room for output
+        }
+        return 12000; // ~3k tokens for input, leaving room for output
     }
 
 
-
     /**
-     * Test connection to Grok with a simple request
+     * Test connection to OpenAI with a simple request
      * @returns {Promise<{success: boolean, error?: string, latency?: number}>} - Test result
      */
     async testConnection() {
         const startTime = Date.now();
         
         try {
+            // Test with a simple chat completion
             const response = await axios.post(`${this.endpoint}/chat/completions`, {
                 model: this.model,
                 messages: [
                     {
                         role: 'user',
-                        content: 'Please respond with "Grok connection test successful" to confirm the connection.'
+                        content: 'Please respond with "OpenAI connection test successful" to confirm the connection.'
                     }
                 ],
                 max_tokens: 20
@@ -248,7 +251,7 @@ class GrokProvider extends AIProvider {
             } else {
                 return {
                     success: false,
-                    error: 'Invalid response format from Grok'
+                    error: 'Invalid response format from OpenAI'
                 };
             }
 
@@ -262,4 +265,4 @@ class GrokProvider extends AIProvider {
     }
 }
 
-module.exports = GrokProvider;
+module.exports = OpenAIProvider;
