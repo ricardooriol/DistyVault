@@ -212,9 +212,8 @@ router.get('/ai-settings', (req, res) => {
     }
 });
 
-module.exports = router;/**
- * 
-Update processing queue settings
+/**
+ * Update processing queue settings
  * POST /api/processing-queue/settings
  */
 router.post('/processing-queue/settings', (req, res) => {
@@ -229,7 +228,7 @@ router.post('/processing-queue/settings', (req, res) => {
         }
 
         // Update the processing queue
-        const processingQueue = require('../services/ProcessingQueue');
+        const processingQueue = require('../services/processingQueue');
         processingQueue.setMaxConcurrent(concurrentProcessing);
 
         res.json({
@@ -252,7 +251,7 @@ router.post('/processing-queue/settings', (req, res) => {
  */
 router.get('/processing-queue/status', (req, res) => {
     try {
-        const processingQueue = require('../services/ProcessingQueue');
+        const processingQueue = require('../services/processingQueue');
         const status = processingQueue.getStatus();
 
         res.json({
@@ -268,3 +267,34 @@ router.get('/processing-queue/status', (req, res) => {
         });
     }
 });
+
+/**
+ * Get general settings (combined AI and processing queue settings)
+ * GET /api/settings
+ */
+router.get('/settings', (req, res) => {
+    try {
+        const aiSettings = sharedSettingsManager.loadSettings();
+        const processingQueue = require('../services/processingQueue');
+        const queueStatus = processingQueue.getStatus();
+
+        res.json({
+            success: true,
+            settings: {
+                ai: aiSettings,
+                processingQueue: {
+                    maxConcurrent: queueStatus.maxConcurrent,
+                    currentStatus: queueStatus
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading general settings:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error'
+        });
+    }
+});
+
+module.exports = router;
