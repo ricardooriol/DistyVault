@@ -8,7 +8,7 @@ const database = require('./database');
 const Distillation = require('../models/distillation');
 const AIProviderFactory = require('./ai/AIProviderFactory');
 const AISettingsManager = require('./ai/AISettingsManager');
-const processingQueue = require('./ProcessingQueue');
+const processingQueue = require('./processingQueue');
 const path = require('path');
 const fs = require('fs').promises;
 
