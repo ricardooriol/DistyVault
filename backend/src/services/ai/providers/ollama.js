@@ -158,12 +158,20 @@ class OllamaProvider extends AIProvider {
 
         } catch (error) {
             if (error.code === 'ECONNREFUSED') {
+                // Only log connection errors in development mode
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('Ollama connection refused');
+                }
                 return {
                     valid: false,
                     error: 'Cannot connect to Ollama. Please ensure Ollama is running.'
                 };
             }
 
+            // Only log validation errors in development mode
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('Ollama validation failed:', error.message);
+            }
             return {
                 valid: false,
                 error: `Ollama validation failed: ${error.message}`

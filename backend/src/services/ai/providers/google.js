@@ -65,9 +65,17 @@ class GoogleProvider extends AIProvider {
                     console.log(`Distillation length: ${rawDistillation.length} characters`);
                     console.log(`Web search was used to enhance the distillation`);
                     
+                    // Check if response is empty or filtered
+                    if (!rawDistillation || rawDistillation.length === 0) {
+                        console.error('Google Gemini returned empty response. Full response:', JSON.stringify(response, null, 2));
+                        console.error('Response candidates:', JSON.stringify(result.response.candidates, null, 2));
+                        throw new Error('Google Gemini returned empty content. This may be due to content filtering or API issues.');
+                    }
+                    
                     const processedDistillation = this.postProcessDistillation(rawDistillation);
                     return processedDistillation;
                 } else {
+                    console.error('Invalid response structure from Google Gemini:', JSON.stringify(response, null, 2));
                     throw new Error('Invalid response format from Google Gemini');
                 }
             } else {
@@ -136,9 +144,18 @@ class GoogleProvider extends AIProvider {
                 const rawDistillation = candidate.content.parts[0].text.trim();
                 console.log(`REST API web search response received`);
                 
+                // Check if response is empty or filtered
+                if (!rawDistillation || rawDistillation.length === 0) {
+                    console.error('Google Gemini REST API returned empty response. Full candidate:', JSON.stringify(candidate, null, 2));
+                    console.error('Finish reason:', candidate.finishReason);
+                    console.error('Safety ratings:', candidate.safetyRatings);
+                    throw new Error('Google Gemini returned empty content. This may be due to content filtering or API issues.');
+                }
+                
                 const processedDistillation = this.postProcessDistillation(rawDistillation);
                 return processedDistillation;
             } else {
+                console.error('Invalid content structure in Gemini response:', JSON.stringify(candidate, null, 2));
                 throw new Error('Invalid content structure in Gemini response');
             }
         } else {

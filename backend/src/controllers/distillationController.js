@@ -1,5 +1,5 @@
-const database = require('../../services/database');
-const processor = require('../../services/processor');
+const database = require('../services/database');
+const processor = require('../services/processor');
 
 class DistillationController {
     /**
@@ -278,7 +278,7 @@ class DistillationController {
             const archive = archiver('zip', { zlib: { level: 9 } });
 
             // Set headers for ZIP download
-            const zipFilename = `sawron-download.zip`;
+            const zipFilename = `distyvault-download.zip`;
             res.setHeader('Content-Type', 'application/zip');
             res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
             res.setHeader('Cache-Control', 'no-cache');

@@ -1,4 +1,4 @@
-const processor = require('../../services/processor');
+const processor = require('../services/processor');
 
 class ProcessingController {
     /**
@@ -52,18 +52,28 @@ class ProcessingController {
      */
     async stopProcess(req, res) {
         try {
-            const success = await processor.stopProcess(req.params.id);
+            const { id } = req.params;
+            console.log(`Stop request received for process: ${id}`);
+            
+            const success = await processor.stopProcessing(id);
             if (!success) {
+                console.log(`Failed to stop process ${id} - not found or already completed`);
                 return res.status(404).json({
                     status: 'error',
                     message: 'Process not found or already completed'
                 });
             }
-            res.json({ status: 'ok' });
+            
+            console.log(`Successfully stopped process: ${id}`);
+            res.json({ 
+                status: 'ok',
+                message: 'Process stopped successfully'
+            });
         } catch (error) {
+            console.error('Error stopping process:', error);
             res.status(500).json({
                 status: 'error',
-                message: error.message
+                message: error.message || 'Failed to stop process'
             });
         }
     }
@@ -75,7 +85,7 @@ class ProcessingController {
         try {
             // This would typically get the current processing status
             // For now, we'll delegate to the database to get the distillation status
-            const database = require('../../services/database');
+            const database = require('../services/database');
             const distillation = await database.getDistillation(req.params.id);
             
             if (!distillation) {

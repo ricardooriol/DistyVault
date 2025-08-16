@@ -10,10 +10,10 @@ const app = express();
 const PORT = 3000;
 
 // Configure multer for file uploads
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+//const uploadDir = path.join(__dirname, '..', 'uploads');
+//if (!fs.existsSync(uploadDir)) {
+//    fs.mkdirSync(uploadDir, { recursive: true });
+//}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -90,7 +90,18 @@ app.use((err, req, res, next) => {
     });
 });
 
+// Add process error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Don't exit the process, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit the process, just log the error
+});
+
 // Start the Express server
 app.listen(PORT, () => {
-    console.log(`SAWRON server up and running on http://localhost:${PORT}`);
+    console.log(`DistyVault server up and running on http://localhost:${PORT}`);
 });

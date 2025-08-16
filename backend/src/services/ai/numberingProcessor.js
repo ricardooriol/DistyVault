@@ -1,9 +1,76 @@
 /**
  * NumberingProcessor - Bulletproof utility for enforcing perfect numbering format
  * Ensures ALL AI outputs follow the exact format: "1. Sentence\nParagraph\n\n2. Sentence\nParagraph"
+ * 
+ * NEW: Now supports HTML formatting with proper bold main sentences and safe HTML output
+ * 
+ * Key Features:
+ * - Converts numbered text to HTML with <strong> tags for main sentences
+ * - Comprehensive XSS protection and HTML sanitization
+ * - Validates HTML structure and numbering sequence
+ * - Handles malformed input with multiple fallback strategies
+ * - Performance optimized for large content processing
  */
 
 class NumberingProcessor {
+    /**
+     * Fix numbering issues and format as HTML - BULLETPROOF VERSION
+     * @param {string} text - The text to process
+     * @returns {string} - HTML formatted text with perfect numbering
+     */
+    static fixNumberingAsHTML(text) {
+        if (!text || typeof text !== 'string') {
+            return text;
+        }
+
+        try {
+            // Step 1: Fix numbering using existing logic
+            let processedText = this.fixNumbering(text);
+
+            // Step 2: Convert to HTML format
+            let htmlContent = this.formatAsHTML(processedText);
+
+            // Step 3: Validate HTML format
+            if (!this.validateHTMLFormat(htmlContent)) {
+                console.warn('NumberingProcessor: HTML validation failed, applying force format with HTML');
+                // Try force format with HTML output
+                htmlContent = this.forceFormat(text, true);
+                
+                // Final validation
+                if (!this.validateHTMLFormat(htmlContent)) {
+                    console.warn('NumberingProcessor: Force format HTML also failed, using emergency HTML format');
+                    htmlContent = this.emergencyHTMLFormat(text);
+                }
+            }
+
+            return htmlContent;
+
+        } catch (error) {
+            console.warn('NumberingProcessor: Error in fixNumberingAsHTML, applying emergency format:', error.message);
+            return this.emergencyHTMLFormat(text);
+        }
+    }
+
+    /**
+     * Emergency HTML format for when all else fails
+     * @param {string} text - Original text
+     * @returns {string} - Emergency HTML formatted text
+     */
+    static emergencyHTMLFormat(text) {
+        if (!text || typeof text !== 'string') {
+            return text;
+        }
+
+        const escapedText = this.escapeHTML(text.trim());
+        
+        // Check if text already has some numbering
+        if (/^\d+[\.\)\:\-]/.test(text.trim())) {
+            return `<p><strong>${escapedText}</strong></p>`;
+        } else {
+            return `<p><strong>1. ${escapedText}</strong></p>`;
+        }
+    }
+
     /**
      * Fix numbering issues in AI-generated text - BULLETPROOF VERSION
      * @param {string} text - The text to process
@@ -103,6 +170,14 @@ class NumberingProcessor {
         // Check for numbers with line breaks immediately after (like "1.\nText")
         if (/(?:^|\n)\s*\d+\.\s*\n/.test(text)) {
             return true; // Number with immediate line break
+        }
+
+        // Check for inline numbering (numbers appearing in the middle of text after periods)
+        // This catches cases like "sentence. 2. next sentence" or "sentence.2. next sentence"
+        const inlineNumbers = (text.match(/\.\s*\d+\./g) || []);
+        if (inlineNumbers.length > 0) {
+            console.log('Detected inline numbering:', inlineNumbers);
+            return true; // Inline numbering detected
         }
 
         return false;
@@ -427,6 +502,8 @@ class NumberingProcessor {
         return formattedBlocks.join('\n\n');
     }
 
+
+
     /**
      * Final validation and cleanup
      * @param {string} text - Formatted text
@@ -537,50 +614,363 @@ class NumberingProcessor {
     }
 
     /**
-     * Force perfect format - nuclear option
-     * @param {string} text - Text to force format
-     * @returns {string} - Force formatted text
+     * Format processed text as HTML with proper bold formatting
+     * @param {string} text - Processed text with proper numbering
+     * @returns {string} - HTML formatted text
      */
-    static forceFormat(text) {
+    static formatAsHTML(text) {
         if (!text || typeof text !== 'string') {
             return text;
         }
 
-        // Processing text for bold formatting
+        try {
+            // Split text into numbered points
+            const points = text.split(/\n\n+/).filter(point => point.trim().length > 0);
+            
+            const htmlPoints = points.map(point => {
+                const lines = point.trim().split('\n');
+                const firstLine = lines[0].trim();
+                
+                // Extract number and main sentence from first line
+                const numberMatch = firstLine.match(/^(\d+)\.\s*(.+)$/);
+                
+                if (numberMatch) {
+                    const number = numberMatch[1];
+                    const mainSentence = numberMatch[2];
+                    const explanation = lines.slice(1).join(' ').trim(); // Join with spaces, not newlines
+                    
+                    return this.createHTMLNumberedPoint(number, mainSentence, explanation);
+                } else {
+                    // Fallback for malformed points
+                    return `<p>${this.escapeHTML(point)}</p>`;
+                }
+            });
+            
+            // Join with proper HTML spacing to create double line break between numbered points
+            return htmlPoints.join('\n\n<br>\n\n');
+            
+        } catch (error) {
+            console.warn('NumberingProcessor: Error in formatAsHTML, returning escaped text:', error.message);
+            return `<p>${this.escapeHTML(text)}</p>`;
+        }
+    }
 
-        // BULLETPROOF APPROACH: Split by numbered patterns and renumber everything sequentially
-        // This regex splits the text at every numbered pattern while keeping the content
-        const numberedSections = text.split(/(?=(?:^|\n)\s*\d+[\.\)\:\-])/);
-        const sections = [];
+    /**
+     * Create HTML structure for a numbered point
+     * @param {string} number - The point number
+     * @param {string} mainSentence - The main sentence
+     * @param {string} explanation - The explanation text
+     * @returns {string} - HTML formatted numbered point
+     */
+    static createHTMLNumberedPoint(number, mainSentence, explanation) {
+        const escapedMainSentence = this.escapeHTML(mainSentence);
+        const boldMainSentence = `<strong>${number}. ${escapedMainSentence}</strong>`;
+        
+        if (explanation && explanation.length > 0) {
+            const escapedExplanation = this.escapeHTML(explanation);
+            // Create separate paragraphs: bold main sentence, then explanation
+            // This creates the format: "1. Bold sentence\nExplanation\n\n2. Next bold sentence"
+            return `<p>${boldMainSentence}</p>\n<p>${escapedExplanation}</p>`;
+        } else {
+            return `<p>${boldMainSentence}</p>`;
+        }
+    }
 
-        for (let i = 0; i < numberedSections.length; i++) {
-            const section = numberedSections[i].trim();
+    /**
+     * Validate HTML format for safety and structure
+     * @param {string} html - HTML to validate
+     * @returns {boolean} - True if HTML is valid and safe
+     */
+    static validateHTMLFormat(html) {
+        if (!html || typeof html !== 'string') {
+            return false;
+        }
 
-            if (section.length === 0) continue;
+        try {
+            // Check for basic HTML structure
+            if (!html.includes('<p>') && !html.includes('<strong>')) {
+                return false;
+            }
 
-            // Remove the number from the beginning if it exists
-            const cleanedSection = section.replace(/^\s*\d+[\.\)\:\-]\s*/, '').trim();
+            // Check for proper strong tag pairing
+            const strongOpenTags = (html.match(/<strong>/g) || []).length;
+            const strongCloseTags = (html.match(/<\/strong>/g) || []).length;
+            
+            if (strongOpenTags !== strongCloseTags) {
+                console.warn('NumberingProcessor: Unmatched strong tags detected');
+                return false;
+            }
 
-            // Only include sections with substantial content
-            if (cleanedSection.length > 5) {
-                sections.push(cleanedSection);
-                // Extracted section for processing
+            // Check for proper p tag pairing
+            const pOpenTags = (html.match(/<p>/g) || []).length;
+            const pCloseTags = (html.match(/<\/p>/g) || []).length;
+            
+            if (pOpenTags !== pCloseTags) {
+                console.warn('NumberingProcessor: Unmatched p tags detected');
+                return false;
+            }
+
+            // Enhanced security validation - check for dangerous content
+            if (!this.isHTMLSafe(html)) {
+                console.warn('NumberingProcessor: Unsafe HTML content detected');
+                return false;
+            }
+
+            // Check for proper numbering structure
+            if (!this.hasValidNumberingStructure(html)) {
+                console.warn('NumberingProcessor: Invalid numbering structure in HTML');
+                return false;
+            }
+
+            return true;
+            
+        } catch (error) {
+            console.warn('NumberingProcessor: Error validating HTML format:', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Check if HTML content is safe from XSS and other security threats
+     * @param {string} html - HTML to check
+     * @returns {boolean} - True if HTML is safe
+     */
+    static isHTMLSafe(html) {
+        // Comprehensive list of dangerous patterns
+        const dangerousPatterns = [
+            // Script tags and JavaScript
+            /<script[\s\S]*?<\/script>/gi,
+            /<script[^>]*>/gi,
+            /javascript:/gi,
+            /vbscript:/gi,
+            /data:text\/html/gi,
+            
+            // Event handlers
+            /on\w+\s*=/gi,
+            /onclick/gi,
+            /onload/gi,
+            /onerror/gi,
+            /onmouseover/gi,
+            
+            // Dangerous tags
+            /<iframe[\s\S]*?<\/iframe>/gi,
+            /<iframe[^>]*>/gi,
+            /<object[\s\S]*?<\/object>/gi,
+            /<object[^>]*>/gi,
+            /<embed[\s\S]*?<\/embed>/gi,
+            /<embed[^>]*>/gi,
+            /<form[\s\S]*?<\/form>/gi,
+            /<form[^>]*>/gi,
+            /<input[^>]*>/gi,
+            /<textarea[\s\S]*?<\/textarea>/gi,
+            /<select[\s\S]*?<\/select>/gi,
+            /<button[\s\S]*?<\/button>/gi,
+            
+            // Meta and link tags that could be dangerous
+            /<meta[^>]*>/gi,
+            /<link[^>]*>/gi,
+            /<style[\s\S]*?<\/style>/gi,
+            
+            // Base64 encoded content that might be malicious
+            /data:image\/svg\+xml/gi,
+            
+            // Expression and behavior (IE specific)
+            /expression\s*\(/gi,
+            /behavior\s*:/gi,
+            
+            // Import statements
+            /@import/gi
+        ];
+
+        for (const pattern of dangerousPatterns) {
+            if (pattern.test(html)) {
+                return false;
+            }
+        }
+
+        // Check for only allowed tags
+        const allowedTags = ['p', 'strong', 'br'];
+        const tagMatches = html.match(/<\/?(\w+)[^>]*>/g) || [];
+        
+        for (const tagMatch of tagMatches) {
+            const tagName = tagMatch.match(/<\/?(\w+)/)[1].toLowerCase();
+            if (!allowedTags.includes(tagName)) {
+                console.warn(`NumberingProcessor: Disallowed tag detected: ${tagName}`);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if HTML has valid numbering structure
+     * @param {string} html - HTML to check
+     * @returns {boolean} - True if numbering structure is valid
+     */
+    static hasValidNumberingStructure(html) {
+        // Extract numbered points from HTML
+        const numberedMatches = html.match(/<strong>(\d+)\./g);
+        
+        if (!numberedMatches || numberedMatches.length === 0) {
+            return false;
+        }
+
+        // Extract numbers and check sequence
+        const numbers = numberedMatches.map(match => {
+            const numberMatch = match.match(/(\d+)/);
+            return numberMatch ? parseInt(numberMatch[1]) : 0;
+        });
+
+        // Should start with 1 and be sequential
+        for (let i = 0; i < numbers.length; i++) {
+            if (numbers[i] !== i + 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Sanitize HTML content by removing dangerous elements
+     * @param {string} html - HTML to sanitize
+     * @returns {string} - Sanitized HTML
+     */
+    static sanitizeHTML(html) {
+        if (!html || typeof html !== 'string') {
+            return html;
+        }
+
+        let sanitized = html;
+
+        // Remove dangerous patterns
+        const dangerousPatterns = [
+            /<script[\s\S]*?<\/script>/gi,
+            /<script[^>]*>/gi,
+            /javascript:/gi,
+            /vbscript:/gi,
+            /<iframe[\s\S]*?<\/iframe>/gi,
+            /<iframe[^>]*>/gi,
+            /<object[\s\S]*?<\/object>/gi,
+            /<embed[\s\S]*?<\/embed>/gi,
+            /<form[\s\S]*?<\/form>/gi,
+            /<input[^>]*>/gi,
+            /<meta[^>]*>/gi,
+            /<link[^>]*>/gi,
+            /<style[\s\S]*?<\/style>/gi
+        ];
+
+        for (const pattern of dangerousPatterns) {
+            sanitized = sanitized.replace(pattern, '');
+        }
+
+        // Remove event handlers from allowed tags
+        sanitized = sanitized.replace(/\s+on\w+\s*=[^>]*/gi, '');
+
+        // Remove any remaining disallowed tags, keeping only p, strong, and br
+        sanitized = sanitized.replace(/<(?!\/?(?:p|strong|br)\b)[^>]*>/gi, '');
+
+        return sanitized;
+    }
+
+    /**
+     * Escape HTML special characters for safety
+     * @param {string} text - Text to escape
+     * @returns {string} - HTML escaped text
+     */
+    static escapeHTML(text) {
+        if (!text || typeof text !== 'string') {
+            return text;
+        }
+
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
+    }
+
+    /**
+     * Force perfect format - nuclear option
+     * @param {string} text - Text to force format
+     * @param {boolean} htmlOutput - Whether to return HTML formatted output
+     * @returns {string} - Force formatted text (plain text or HTML)
+     */
+    static forceFormat(text, htmlOutput = false) {
+        if (!text || typeof text !== 'string') {
+            return text;
+        }
+
+        // BULLETPROOF APPROACH: Handle both line-based and inline numbered patterns
+        let sections = [];
+        
+        // First, check if we have inline numbering (numbers in continuous text)
+        const hasInlineNumbers = /\.\s*\d+\./g.test(text);
+        
+        if (hasInlineNumbers) {
+            console.log('Detected inline numbering, using inline splitting approach');
+            
+            // For inline numbering, split by number patterns that appear after sentence endings
+            const parts = text.split(/(\d+\.\s+)/);
+            
+            let currentSection = '';
+            
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                
+                // If this part is a number pattern (like "2. ")
+                if (/^\d+\.\s+$/.test(part)) {
+                    // Save the previous section if it has content
+                    if (currentSection.trim().length > 5) {
+                        sections.push(currentSection.trim());
+                    }
+                    currentSection = ''; // Start new section
+                } else {
+                    // This is content, add it to current section
+                    currentSection += part;
+                }
+            }
+            
+            // Don't forget the last section
+            if (currentSection.trim().length > 5) {
+                sections.push(currentSection.trim());
+            }
+        } else {
+            // Use the original approach for line-based numbering
+            const numberedSections = text.split(/(?=(?:^|\n)\s*\d+[\.\)\:\-])/);
+            
+            for (let i = 0; i < numberedSections.length; i++) {
+                const section = numberedSections[i].trim();
+
+                if (section.length === 0) continue;
+
+                // Remove the number from the beginning if it exists
+                const cleanedSection = section.replace(/^\s*\d+[\.\)\:\-]\s*/, '').trim();
+
+                // Only include sections with substantial content
+                if (cleanedSection.length > 5) {
+                    sections.push(cleanedSection);
+                }
             }
         }
 
         // If no numbered sections found, try splitting by double line breaks
         if (sections.length === 0) {
-            // No numbered sections found, trying paragraph split
             const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 10);
 
             if (paragraphs.length === 0) {
-                return `1. ${text.trim()}`;
+                const singlePoint = `1. ${text.trim()}`;
+                return htmlOutput ? this.formatAsHTML(singlePoint) : singlePoint;
             }
 
-            return paragraphs.map((paragraph, index) => {
+            const result = paragraphs.map((paragraph, index) => {
                 const cleaned = paragraph.trim().replace(/^\s*\d+[\.\)\:\-]\s*/, '');
                 return `${index + 1}. ${cleaned}`;
             }).join('\n\n');
+            
+            return htmlOutput ? this.formatAsHTML(result) : result;
         }
 
         // Apply sequential numbering to all sections
@@ -623,14 +1013,28 @@ class NumberingProcessor {
                         return `${number}. ${firstLine}`;
                     }
                 } else {
-                    // Single line
-                    return `${number}. ${section}`;
+                    // Single line - need to split into main sentence and explanation
+                    // Find the first sentence ending
+                    const sentenceEndMatch = section.match(/^([^.!?]*[.!?])/);
+                    if (sentenceEndMatch) {
+                        const mainSentence = sentenceEndMatch[1].trim();
+                        const explanation = section.substring(sentenceEndMatch[0].length).trim();
+                        
+                        if (explanation.length > 0) {
+                            return `${number}. ${mainSentence}\n${explanation}`;
+                        } else {
+                            return `${number}. ${mainSentence}`;
+                        }
+                    } else {
+                        // No sentence ending found, use the whole section as main sentence
+                        return `${number}. ${section}`;
+                    }
                 }
             }
         }).join('\n\n');
 
-        // Generated numbered sections with bold formatting
-        return result;
+        // Return HTML formatted result if requested
+        return htmlOutput ? this.formatAsHTML(result) : result;
     }
 }
 

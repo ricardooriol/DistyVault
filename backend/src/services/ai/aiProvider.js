@@ -23,9 +23,9 @@ class AIProvider {
     }
 
     /**
-     * Post-process the AI-generated distillation to fix common issues - BULLETPROOF VERSION
+     * Post-process the AI-generated distillation to ensure proper formatting
      * @param {string} rawDistillation - The raw distillation from the AI provider
-     * @returns {string} - The processed distillation with perfect numbering format
+     * @returns {string} - The processed distillation with proper HTML formatting
      */
     postProcessDistillation(rawDistillation) {
         if (!rawDistillation || typeof rawDistillation !== 'string') {
@@ -33,52 +33,60 @@ class AIProvider {
         }
 
         try {
-            console.log(`[${this.name}] Starting bulletproof numbering processing...`);
+            console.log(`[${this.name}] Starting bulletproof HTML numbering processing...`);
 
-            // Step 1: Apply the bulletproof numbering processor
-            let processedDistillation = NumberingProcessor.fixNumbering(rawDistillation);
+            // Step 1: Apply the bulletproof HTML numbering processor
+            let processedDistillation = NumberingProcessor.fixNumberingAsHTML(rawDistillation);
 
-            // Step 2: Validate the result
-            const isProperlyFormatted = NumberingProcessor.isProperlyFormatted(processedDistillation);
+            // Step 2: Validate the HTML result
+            const isValidHTML = NumberingProcessor.validateHTMLFormat(processedDistillation);
 
-            if (!isProperlyFormatted) {
-                console.warn(`[${this.name}] First pass failed, applying force format...`);
-                // Nuclear option: force perfect format
-                processedDistillation = NumberingProcessor.forceFormat(rawDistillation);
+            if (!isValidHTML) {
+                console.warn(`[${this.name}] HTML validation failed, applying force format with HTML...`);
+                // Nuclear option: force perfect format with HTML output
+                processedDistillation = NumberingProcessor.forceFormat(rawDistillation, true);
+                
+                // Final HTML validation
+                const finalHTMLValidation = NumberingProcessor.validateHTMLFormat(processedDistillation);
+                
+                if (!finalHTMLValidation) {
+                    console.error(`[${this.name}] CRITICAL: HTML formatting failed completely, using emergency HTML format`);
+                    // Absolute last resort
+                    processedDistillation = NumberingProcessor.emergencyHTMLFormat(rawDistillation);
+                }
             }
 
-            // Step 3: Final validation
-            const finalValidation = NumberingProcessor.isProperlyFormatted(processedDistillation);
-
-            if (!finalValidation) {
-                console.error(`[${this.name}] CRITICAL: Numbering processor failed completely, using emergency format`);
-                // Absolute last resort
-                processedDistillation = `1. ${rawDistillation.trim()}`;
-            }
-
-            // Step 4: Log the results
+            // Step 3: Log the results
             const originalStats = NumberingProcessor.getNumberingStats(rawDistillation);
-            const finalStats = NumberingProcessor.getNumberingStats(processedDistillation);
+            const isHTMLFormatted = processedDistillation.includes('<strong>') && processedDistillation.includes('<p>');
 
             if (processedDistillation !== rawDistillation) {
-                console.log(`[${this.name}] Numbering processing completed:`, {
+                console.log(`[${this.name}] HTML numbering processing completed:`, {
                     originalHadNumbering: originalStats.hasNumbering,
                     originalPoints: originalStats.totalPoints,
                     originalSequential: originalStats.isSequential,
-                    finalPoints: finalStats.totalPoints,
-                    finalSequential: finalStats.isSequential,
-                    processingSuccess: finalValidation
+                    htmlFormatted: isHTMLFormatted,
+                    htmlValid: NumberingProcessor.validateHTMLFormat(processedDistillation),
+                    outputLength: processedDistillation.length
                 });
             }
 
             return processedDistillation;
 
         } catch (error) {
-            console.error(`[${this.name}] CRITICAL ERROR in numbering processor:`, error.message);
-            // Emergency fallback
-            return `1. ${rawDistillation.trim()}`;
+            console.error(`[${this.name}] Error in HTML post-processing:`, error.message);
+            // Return emergency HTML format if processing fails
+            try {
+                return NumberingProcessor.emergencyHTMLFormat(rawDistillation);
+            } catch (emergencyError) {
+                console.error(`[${this.name}] Emergency HTML formatting also failed:`, emergencyError.message);
+                // Final fallback: return original text
+                return rawDistillation;
+            }
         }
     }
+
+
 
     /**
      * Validate the provider configuration
@@ -275,7 +283,8 @@ Following that sentence, write one or two detailed paragraphs to elaborate on th
 This follows the same pattern as the first point: a single, impactful sentence summarizing the next fundamental concept
 Follow up with one or two paragraphs of in-depth explanation, connecting this idea to previous points if it helps build a more cohesive mental model for the reader
 
-Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail. No point should be left unexplored or superficial.
+
+COVERAGE: Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail. No point should be left unexplored or superficial.
 
 
 CRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):
@@ -291,14 +300,14 @@ CRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):
 
 
 EXAMPLE OF PERFECT FORMAT:
-1. VMware's licensing changes are driving enterprise migration decisions
+1. The core concept drives the entire system architecture
 
-Following Broadcom's acquisition, VMware shifted from perpetual licenses to subscription models. This fundamental change in pricing structure has prompted many organizations to evaluate alternatives, as the new model significantly increases long-term costs for existing deployments.
+This fundamental principle shapes how all components interact and determines the scalability limits of the platform. Understanding this relationship is crucial because it affects both performance optimization strategies and future development decisions.
 
 
-2. Container orchestration platforms offer compelling migration paths
+2. Implementation details reveal critical trade-offs
 
-Kubernetes and similar technologies provide infrastructure abstraction that reduces vendor lock-in. Organizations can maintain application portability while gaining access to cloud-native features that weren't available in traditional virtualization platforms.
+The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.
 
 
 

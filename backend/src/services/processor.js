@@ -1,11 +1,11 @@
 /**
- * Processor service for SAWRON
+ * Processor service for DistyVault
  * Orchestrates the content extraction, distillation, and storage process
  */
 const contentExtractor = require('./contentExtractor');
 const ollamaService = require('./ollama');
 const database = require('./database');
-const Distillation = require('../models/distillation');
+const Distillation = require('./distillation');
 const AIProviderFactory = require('./ai/aiProviderFactory');
 const AISettingsManager = require('./ai/aiSettingsManager');
 const processingQueue = require('./processingQueue');
@@ -120,7 +120,7 @@ class Processor {
         distillation.addLog(`🚀 Starting processing of URL: ${url}`);
         distillation.addLog(`📋 Process ID: ${distillation.id}`);
         distillation.addLog(`⏰ Started at: ${new Date().toISOString()}`);
-        distillation.addLog(`🌐 User Agent: ${process.env.USER_AGENT || 'SAWRON/1.0'}`);
+        distillation.addLog(`🌐 User Agent: ${process.env.USER_AGENT || 'DistyVault/1.0'}`);
 
         // Save initial record to database
         await database.saveDistillation(distillation);
@@ -346,6 +346,12 @@ class Processor {
             } catch (error) {
                 console.error(`[${distillation.id}] Error processing URL ${url}:`, error);
 
+                // Check if this is a cancellation error - don't override stopped status
+                if (error.message && error.message.includes('cancelled by user')) {
+                    console.log(`[${distillation.id}] Process was cancelled by user - keeping stopped status`);
+                    return { success: false, stopped: true };
+                }
+
                 // Add detailed error logging
                 const errorDistillation = await database.getDistillation(distillation.id);
                 if (errorDistillation) {
@@ -378,12 +384,12 @@ class Processor {
         });
 
         return distillation;
-    } 
-   /**
-     * Process a YouTube playlist by extracting individual videos and processing each one
-     * @param {string} playlistUrl - The YouTube playlist URL
-     * @returns {Promise<Distillation>} - The created distillation object for tracking
-     */
+    }
+    /**
+      * Process a YouTube playlist by extracting individual videos and processing each one
+      * @param {string} playlistUrl - The YouTube playlist URL
+      * @returns {Promise<Distillation>} - The created distillation object for tracking
+      */
     async processYoutubePlaylist(playlistUrl) {
         console.log(`Processing YouTube playlist: ${playlistUrl}`);
 
@@ -774,6 +780,12 @@ class Processor {
             } catch (error) {
                 console.error(`[${distillation.id}] Error processing file ${file.originalname}:`, error);
 
+                // Check if this is a cancellation error - don't override stopped status
+                if (error.message && error.message.includes('cancelled by user')) {
+                    console.log(`[${distillation.id}] Process was cancelled by user - keeping stopped status`);
+                    return { success: false, stopped: true };
+                }
+
                 // Add detailed error logging
                 const errorDistillation = await database.getDistillation(distillation.id);
                 if (errorDistillation) {
@@ -839,11 +851,20 @@ class Processor {
         try {
             console.log(`[${id}] Stopping processing...`);
 
+            // Remove from processing queue if it's there
+            const removedFromQueue = processingQueue.removeFromQueue(id);
+            if (removedFromQueue) {
+                console.log(`[${id}] Removed from processing queue`);
+            }
+
             // Mark as cancelled in our tracking
             const processInfo = this.activeProcesses.get(id);
             if (processInfo) {
                 processInfo.cancelled = true;
                 console.log(`[${id}] Marked as cancelled in active processes`);
+
+                // Clean up the process info
+                this.activeProcesses.delete(id);
             }
 
             // Update database status
@@ -855,6 +876,243 @@ class Processor {
             console.error(`[${id}] Error stopping processing:`, error);
             return false;
         }
+    }
+
+    /**
+     * Generate a PDF from a distillation
+     * @param {string} distillationId - The ID of the distillation to convert
+     * @returns {Promise<{buffer: Buffer, filename: string}>} - The PDF buffer and filename
+     */
+    async generatePdf(distillationId) {
+        try {
+            const distillation = await database.getDistillation(distillationId);
+            if (!distillation) {
+                throw new Error('Distillation not found');
+            }
+
+            if (distillation.status !== 'completed') {
+                throw new Error('Distillation is not yet completed');
+            }
+
+            const puppeteer = require('puppeteer');
+
+            // Launch browser
+            const browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+
+            const page = await browser.newPage();
+
+            // Create HTML content with beautiful styling
+            const htmlContent = this.createPdfHtml(distillation);
+
+            // Set content and generate PDF
+            await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+            // Add a small delay to ensure content is fully rendered
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const pdfBuffer = await page.pdf({
+                format: 'A4',
+                margin: {
+                    top: '20mm',
+                    right: '20mm',
+                    bottom: '20mm',
+                    left: '20mm'
+                },
+                printBackground: true,
+                preferCSSPageSize: false,
+                displayHeaderFooter: false
+            });
+
+            await browser.close();
+
+            // Generate filename from title with ID for uniqueness
+            const filename = this.generatePdfFilename(distillation.title, distillationId);
+
+            return { buffer: pdfBuffer, filename };
+
+        } catch (error) {
+            console.error(`Error generating PDF for distillation ${distillationId}:`, error);
+            throw new Error(`PDF generation failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Generate a clean filename from the distillation title
+     * @param {string} title - The distillation title
+     * @param {string} distillationId - The distillation ID for uniqueness
+     * @returns {string} - Clean filename
+     */
+    generatePdfFilename(title, distillationId) {
+        if (!title) return `distillation-${distillationId}.pdf`;
+
+        // Clean the title for use as filename
+        let filename = title
+            .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+            .toLowerCase()
+            .substring(0, 80); // Limit to 80 characters
+
+        // Remove leading/trailing hyphens
+        filename = filename.replace(/^-+|-+$/g, '');
+
+        // Ensure it's not empty
+        if (!filename) filename = 'distillation';
+
+        // Add distillation ID to ensure uniqueness
+        return `${filename}-${distillationId}.pdf`;
+    }
+
+    /**
+     * Create HTML content for PDF generation
+     * @param {Distillation} distillation - The distillation object
+     * @returns {string} - HTML content
+     */
+    createPdfHtml(distillation) {
+        const formattedDate = new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(distillation.createdAt);
+
+        // Convert content to HTML with basic formatting
+        const contentHtml = this.formatContent(distillation.content || '');
+
+        return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${distillation.title}</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                
+                .header {
+                    border-bottom: 3px solid #007acc;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }
+                
+                .title {
+                    font-size: 28px;
+                    font-weight: bold;
+                    color: #007acc;
+                    margin: 0 0 10px 0;
+                }
+                
+                .meta {
+                    color: #666;
+                    font-size: 14px;
+                    margin-bottom: 5px;
+                }
+                
+                .meta strong {
+                    color: #333;
+                }
+                
+                .content {
+                    font-size: 16px;
+                    line-height: 1.8;
+                }
+                
+                .content h1, .content h2, .content h3 {
+                    color: #007acc;
+                    margin-top: 25px;
+                    margin-bottom: 15px;
+                }
+                
+                .content p {
+                    margin-bottom: 15px;
+                    text-align: justify;
+                }
+                
+                .content strong {
+                    font-weight: bold;
+                    font-weight: 700;
+                    color: #333;
+                }
+                
+                .content br {
+                    line-height: 2;
+                    margin: 10px 0;
+                }
+                
+                .content ul, .content ol {
+                    margin-bottom: 15px;
+                    padding-left: 25px;
+                }
+                
+                .content li {
+                    margin-bottom: 8px;
+                }
+                
+                .footer {
+                    margin-top: 40px;
+                    padding-top: 20px;
+                    border-top: 1px solid #ddd;
+                    font-size: 12px;
+                    color: #666;
+                    text-align: center;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1 class="title">${distillation.title}</h1>
+                <div class="meta">
+                    ${distillation.sourceUrl ? `<strong>Source:</strong> ${distillation.sourceUrl}<br>` : ''}
+                    ${distillation.sourceFile ? `<strong>Source:</strong> ${distillation.sourceFile.name}<br>` : ''}
+                    <strong>Generated:</strong> ${formattedDate}<br>
+                    ${distillation.wordCount ? `<strong>Word Count:</strong> ${distillation.wordCount} words<br>` : ''}
+                    ${distillation.processingTime ? `<strong>Processing Time:</strong> ${distillation.processingTime.toFixed(1)}s<br>` : ''}
+                </div>
+            </div>
+            
+            <div class="content">
+                ${contentHtml}
+            </div>
+            
+            <div class="footer">
+                💠 Distilled by DistyVault 💠
+            </div>
+        </body>
+        </html>
+        `;
+    }
+
+    /**
+     * Format content for HTML display
+     * @param {string} content - Content to format
+     * @returns {string} - Formatted HTML content
+     */
+    formatContent(content) {
+        if (!content) return '';
+
+        // Check if content is already HTML formatted (contains HTML tags)
+        if (content.includes('<p>') && content.includes('<strong>')) {
+            // Content is already HTML formatted from NumberingProcessor
+            return content;
+        }
+
+        // Fallback: Simple formatting for plain text content
+        return content
+            .split('\n\n')
+            .map(paragraph => paragraph.trim())
+            .filter(paragraph => paragraph.length > 0)
+            .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+            .join('');
     }
 
     /**

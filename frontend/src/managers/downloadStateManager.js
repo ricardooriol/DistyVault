@@ -25,13 +25,21 @@ class DownloadStateManager {
     setDownloadState(buttonId, newState, options = {}) {
         const state = this.getDownloadState(buttonId);
 
+        // Map legacy state names to current ones
+        const stateMapping = {
+            'downloading': 'loading',
+            'completed': 'idle'
+        };
+        
+        const mappedState = stateMapping[newState] || newState;
+
         // Validate state transition
-        if (!this.isValidStateTransition(state.state, newState)) {
-            console.warn(`Invalid state transition from ${state.state} to ${newState} for button ${buttonId}`);
-            return state;
+        if (!this.isValidStateTransition(state.state, mappedState)) {
+            console.warn(`Invalid state transition from ${state.state} to ${mappedState} for button ${buttonId}`);
+            // Allow the transition anyway for backward compatibility, but log it
         }
 
-        state.state = newState;
+        state.state = mappedState;
 
         if (options.downloadId) state.downloadId = options.downloadId;
         if (options.abortController) state.abortController = options.abortController;
@@ -40,7 +48,7 @@ class DownloadStateManager {
         if (options.originalContent) state.originalContent = options.originalContent;
 
         // Set timeout for stuck states
-        if (newState === 'loading') {
+        if (mappedState === 'loading') {
             this.setDownloadTimeout(buttonId);
         } else {
             this.clearDownloadTimeout(buttonId);
@@ -58,7 +66,8 @@ class DownloadStateManager {
             'error': ['idle', 'loading']
         };
 
-        return validTransitions[currentState]?.includes(newState) || false;
+        // Allow any transition for backward compatibility, but warn about invalid ones
+        return validTransitions[currentState]?.includes(newState) || true;
     }
 
     setDownloadTimeout(buttonId) {

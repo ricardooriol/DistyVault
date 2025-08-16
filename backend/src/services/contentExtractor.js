@@ -1,5 +1,5 @@
 /**
- * Content Extractor service for SAWRON
+ * Content Extractor service for DistyVault
  * Handles extraction of content from various sources
  */
 const axios = require('axios');

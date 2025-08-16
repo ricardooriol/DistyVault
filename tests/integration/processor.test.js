@@ -3,7 +3,7 @@
  * Tests content processing workflows and AI integration
  */
 
-const Processor = require('../../backend/src/services/processor');
+const processor = require('../../backend/src/services/processor');
 const database = require('../../backend/src/services/database');
 const contentExtractor = require('../../backend/src/services/contentExtractor');
 const AIProviderFactory = require('../../backend/src/services/ai/aiProviderFactory');
@@ -15,7 +15,6 @@ jest.mock('../../backend/src/services/ai/aiProviderFactory');
 jest.mock('../../backend/src/services/ai/aiSettingsManager');
 
 describe('Processor Integration Tests', () => {
-    let processor;
     let mockAIProvider;
 
     beforeEach(() => {
@@ -55,8 +54,7 @@ describe('Processor Integration Tests', () => {
             wordCount: 6
         });
 
-        // Create processor instance
-        processor = new Processor();
+        // Processor is already instantiated as a singleton
     });
 
     describe('URL Processing Workflow', () => {

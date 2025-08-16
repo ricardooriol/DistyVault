@@ -1,5 +1,5 @@
 /**
- * End-to-End Test Suite for SAWRON Application
+ * End-to-End Test Suite for DistyVault Application
  * Tests all major functionality from user perspective
  */
 
@@ -21,7 +21,7 @@ const database = require('../../backend/src/services/database');
 const processor = require('../../backend/src/services/processor');
 const ollamaService = require('../../backend/services/ollama');
 
-describe('SAWRON End-to-End Tests', () => {
+describe('DistyVault End-to-End Tests', () => {
     let app;
     let server;
 

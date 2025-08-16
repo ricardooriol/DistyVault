@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-console.log('🧪 SAWRON Validation Test Suite');
+console.log('🧪 DistyVault Validation Test Suite');
 console.log('================================');
 console.log('Running comprehensive tests to validate all functionality...\n');
 

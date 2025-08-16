@@ -1,4 +1,4 @@
-const ollamaService = require('../../services/ollama');
+const ollamaService = require('../services/ollama');
 
 class HealthController {
     /**
@@ -27,11 +27,11 @@ class HealthController {
             const ollamaAvailable = await ollamaService.checkAvailability();
             
             // Get processing queue status
-            const processingQueue = require('../../services/processingQueue');
+            const processingQueue = require('../services/processingQueue');
             const queueStatus = processingQueue.getStatus();
 
             // Get database status
-            const database = require('../../services/database');
+            const database = require('../services/database');
             let dbStatus = 'ok';
             try {
                 await database.getAllSummaries();

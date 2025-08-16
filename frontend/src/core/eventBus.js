@@ -376,3 +376,6 @@ EventBus.Events = {
     STATUS_HIDDEN: 'status:hidden',
     STATUS_UPDATED: 'status:updated'
 };
+
+// Export for use in other modules
+window.EventBus = EventBus;

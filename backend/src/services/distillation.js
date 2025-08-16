@@ -1,5 +1,5 @@
 /**
- * Enhanced Distillation model for SAWRON
+ * Enhanced Distillation model for DistyVault
  * Represents a processed content distillation with metadata and validation
  */
 class Distillation {
@@ -51,7 +51,7 @@ class Distillation {
      * @returns {string} - Unique identifier
      */
     generateId() {
-        return `dist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return `dist_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     }
 
     /**

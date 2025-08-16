@@ -1,5 +1,5 @@
-const AIProviderFactory = require('../../services/ai/aiProviderFactory');
-const AISettingsManager = require('../../services/ai/aiSettingsManager');
+const AIProviderFactory = require('../services/ai/aiProviderFactory');
+const AISettingsManager = require('../services/ai/aiSettingsManager');
 
 // Use singleton instance of AISettingsManager
 const sharedSettingsManager = AISettingsManager.getInstance();
@@ -10,12 +10,19 @@ class AISettingsController {
      */
     async testAiProvider(req, res) {
         try {
-            const { type, apiKey, model, endpoint } = req.body;
+            const { type, provider: providerName, apiKey, model, endpoint } = req.body;
+            
+            // Accept either 'type' or 'provider' for backward compatibility
+            // If neither is provided but endpoint is provided, assume it's Ollama
+            let providerType = type || providerName;
+            if (!providerType && endpoint) {
+                providerType = 'ollama';
+            }
 
-            console.log(`Testing AI provider: ${type}`);
+            console.log(`Testing AI provider: ${providerType}`);
 
             // Validate request
-            if (!type) {
+            if (!providerType) {
                 return res.status(400).json({
                     success: false,
                     error: 'Provider type is required'
@@ -24,13 +31,13 @@ class AISettingsController {
 
             // Create provider configuration
             const config = {
-                type: type,
+                type: providerType,
                 model: model,
                 endpoint: endpoint
             };
 
             // Add API key for online providers
-            if (type !== 'ollama' && apiKey) {
+            if (providerType !== 'ollama' && apiKey) {
                 config.apiKey = apiKey;
             }
 
@@ -186,7 +193,10 @@ class AISettingsController {
     getAiSettings(req, res) {
         try {
             const settings = sharedSettingsManager.loadSettings();
-            console.log('Backend: Loading AI settings:', JSON.stringify(settings, null, 2));
+            // Only log when settings are actually being loaded, not on every request
+            if (process.env.NODE_ENV === 'development') {
+                console.log('Backend: Loading AI settings');
+            }
 
             res.json({
                 success: true,
@@ -216,7 +226,7 @@ class AISettingsController {
             }
 
             // Update the processing queue
-            const processingQueue = require('../../services/processingQueue');
+            const processingQueue = require('../services/processingQueue');
             processingQueue.setMaxConcurrent(concurrentProcessing);
 
             res.json({
@@ -238,7 +248,7 @@ class AISettingsController {
      */
     getProcessingQueueStatus(req, res) {
         try {
-            const processingQueue = require('../../services/processingQueue');
+            const processingQueue = require('../services/processingQueue');
             const status = processingQueue.getStatus();
 
             res.json({
@@ -261,7 +271,7 @@ class AISettingsController {
     getGeneralSettings(req, res) {
         try {
             const aiSettings = sharedSettingsManager.loadSettings();
-            const processingQueue = require('../../services/processingQueue');
+            const processingQueue = require('../services/processingQueue');
             const queueStatus = processingQueue.getStatus();
 
             res.json({

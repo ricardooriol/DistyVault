@@ -72,6 +72,10 @@ class ModalManager {
 
             document.getElementById('distillation-meta').innerHTML = metaHtml;
             document.getElementById('distillation-content').innerHTML = this.formatContent(distillation.content || '');
+            
+            // Reset scroll position to top
+            this.resetModalScroll('distillation-modal');
+            
             document.getElementById('distillation-modal').style.display = 'block';
 
         } catch (error) {
@@ -93,6 +97,10 @@ class ModalManager {
 
             document.getElementById('raw-content-title').textContent = `Raw Content: ${distillation.title}`;
             document.getElementById('raw-content-text').textContent = distillation.rawContent;
+            
+            // Reset scroll position to top
+            this.resetModalScroll('raw-content-modal');
+            
             document.getElementById('raw-content-modal').style.display = 'block';
 
         } catch (error) {
@@ -213,6 +221,10 @@ class ModalManager {
             }
 
             document.getElementById('logs-content').innerHTML = logsHtml;
+            
+            // Reset scroll position to top
+            this.resetModalScroll('logs-modal');
+            
             document.getElementById('logs-modal').style.display = 'block';
 
         } catch (error) {
@@ -223,11 +235,37 @@ class ModalManager {
         }
     }
 
-    async openAISettingsModal() {
-        const modal = document.getElementById('ai-settings-modal');
-        modal.style.display = 'flex';
-        await loadAISettingsUI();
+    /**
+     * Reset scroll position for modal and its content areas
+     * @param {string} modalId - The modal element ID
+     */
+    resetModalScroll(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            // Immediate reset
+            modal.scrollTop = 0;
+            
+            // Reset scroll for common scrollable elements within the modal
+            const scrollableElements = modal.querySelectorAll('.modal-body, .modal-content, .distillation-content, .logs-content, .raw-content-text, #distillation-content, #logs-content, #raw-content-text');
+            scrollableElements.forEach(element => {
+                if (element && element.scrollTop !== undefined) {
+                    element.scrollTop = 0;
+                }
+            });
+            
+            // Additional reset after a short delay to ensure DOM is fully rendered
+            setTimeout(() => {
+                modal.scrollTop = 0;
+                scrollableElements.forEach(element => {
+                    if (element && element.scrollTop !== undefined) {
+                        element.scrollTop = 0;
+                    }
+                });
+            }, 10);
+        }
     }
+
+    // AI Settings modal is handled by SettingsModal component
 
     closeDistillationModal() {
         document.getElementById('distillation-modal').style.display = 'none';

@@ -22,4 +22,7 @@
     --status-error: #f44336;
     --status-pending: #ff9800;
     --status-stopped: #9e9e9e;
+    
+    /* Additional colors */
+    --primary-blue: #2196f3;
 }

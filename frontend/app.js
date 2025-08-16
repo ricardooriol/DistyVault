@@ -1,7 +1,7 @@
 /**
- * SAWRON Application Entry Point
+ * DistyVault Application Entry Point
  * 
- * This is the main entry point for the SAWRON knowledge distillation platform.
+ * This is the main entry point for the DistyVault knowledge distillation platform.
  * It initializes the application and sets up the global interface for HTML event handlers.
  * 
  * The application follows a modular architecture with:
@@ -9,14 +9,27 @@
  * - Utility modules (ViewportUtils, DateUtils, ValidationUtils, etc.)
  * - Manager classes (DownloadStateManager, TooltipManager, etc.)
  * - UI components (KnowledgeBaseTable, InputSection, etc.)
- * - Main application controller (SawronApp)
+ * - Main application controller (DistyVaultApp)
  */
+
+// Global error handling for unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+    // Check if this is an AbortError that we want to ignore
+    if (event.reason && (event.reason.name === 'AbortError' || event.reason.message === 'Request cancelled by user')) {
+        // Prevent the unhandled rejection from being logged
+        event.preventDefault();
+        return;
+    }
+    
+    // Log other unhandled rejections for debugging
+    console.error('Unhandled promise rejection:', event.reason);
+});
 
 // Ensure all required modules are loaded before initialization
 document.addEventListener('DOMContentLoaded', function() {
     // Verify critical dependencies are available
     const requiredClasses = [
-        'EventBus', 'ApiClient', 'SawronApp',
+        'EventBus', 'ApiClient', 'DistyVaultApp',
         'DownloadStateManager', 'TooltipManager', 'ModalManager', 'BulkActionsManager',
         'KnowledgeBaseTable', 'InputSection', 'StatusSection', 'SettingsModal'
     ];
@@ -31,11 +44,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     try {
         // Initialize the main application
-        const app = new SawronApp();
+        const app = new DistyVaultApp();
         
         // Make app globally accessible for debugging and HTML event handlers
         window.app = app;
-        window.SawronApp = app; // Backward compatibility
+        window.DistyVaultApp = app; // Backward compatibility
         
         // Expose functions for HTML onclick handlers
         // Input section functions
@@ -70,10 +83,13 @@ document.addEventListener('DOMContentLoaded', function() {
         window.saveAIConfiguration = () => app.settingsModal?.saveConfiguration();
         window.resetAIConfiguration = () => app.settingsModal?.resetConfiguration();
         
-        console.log('SAWRON application initialized successfully');
+        // Modal content functions
+        window.showDistillationModal = (id) => app.showDistillationModal(id);
+        window.showLogs = (id) => app.showLogs(id);
+        window.showRawContent = (id) => app.showRawContent(id);
         
     } catch (error) {
-        console.error('Failed to initialize SAWRON application:', error);
+        console.error('Failed to initialize DistyVault application:', error);
         
         // Show user-friendly error message
         const errorMessage = document.createElement('div');
@@ -93,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         errorMessage.innerHTML = `
             <h3>Application Error</h3>
-            <p>Failed to initialize SAWRON. Please refresh the page.</p>
+            <p>Failed to initialize DistyVault. Please refresh the page.</p>
             <small>Check the console for technical details.</small>
         `;
         document.body.appendChild(errorMessage);

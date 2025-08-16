@@ -1,16 +1,15 @@
-# 💠 SAWRON - Connect the Dots & Fill the Gaps 💠
-
-**The Ultimate Knowledge Distillation AI Processing Platform**
+# 💠 DistyVault - Gather, distill and control your knowledge 💠
 
 ---
 
-## What is SAWRON?
+## What is DistyVault?
 
-SAWRON is a powerful knowledge distillation platform that transforms diverse content sources into structured, actionable insights using advanced AI. You have complete control over your data processing - choose between **local AI processing** for maximum privacy or **online AI providers** for enhanced capabilities. The application runs locally on your machine, but you decide where the AI processing happens.
+DistyVault is a powerful knowledge distillation platform that transforms diverse content sources into structured, actionable documents using advanced AI. You have complete control over your data processing, being able to choose between **local AI processing** for maximum privacy or **online AI providers** for enhanced capabilities. The application runs locally on your machine, but you decide where the AI processing happens.
 
 ### Core Purpose
 
-SAWRON distills complex information from various sources into clear, numbered insights that help you:
+DistyVault distills complex information from various sources into clear, numbered insights that help you:
+
 - **Connect scattered information** across different content types
 - **Fill knowledge gaps** with AI-powered analysis and research
 - **Build a searchable knowledge base** of distilled insights
@@ -30,44 +29,10 @@ SAWRON distills complex information from various sources into clear, numbered in
 
 ---
 
-## Installation
-
-
-1. **Clone and Install**
-   ```bash
-   git clone https://github.com/your-username/sawron.git
-   cd sawron
-   npm install
-   ```
-
-2. **Start the Application**
-   ```bash
-   npm start
-   ```
-
-3. **Open in Browser**
-   ```
-   http://localhost:3000
-   ```
-
-4. **Configure AI Provider** (see Configuration section below)
-
-### Configuration Steps
-1. Click the Settings button (⚙️)
-2. **Choose your processing approach**:
-   - **Local**: Select Ollama for privacy-first processing
-   - **Online**: Choose OpenAI, Anthropic, Google, Grok, or DeepSeek for enhanced capabilities
-3. Enter your API key (for online providers) or configure Ollama endpoint (for local)
-4. Select your preferred model
-5. Test the connection and save
-
-
----
-
 ## Future Enhancements
 
 - **Web Search**: Real time web search to complement processing for all AI providers (only available in Gemini models at the moment)
-- **Additional AI Providers**: Integration with more AI services and local models
+- **Additional AI Providers**: Integration with more AI providers
 - **Export Formats**: Markdown, JSON, XML, and custom templates
 - **Automation**: Scheduled processing, webhooks, and workflow triggers
 - **App**: Native applications for Windows, MacOS, Linux, iOS and Android
@@ -76,12 +41,10 @@ SAWRON distills complex information from various sources into clear, numbered in
 
 ## License
 
-This project is licensed under the MIT License:
-
 ```
 MIT License
 
-Copyright (c) 2024 SAWRON
+Copyright (c) 2024 DistyVault
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

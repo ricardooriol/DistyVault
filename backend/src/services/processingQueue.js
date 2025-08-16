@@ -101,6 +101,36 @@ class ProcessingQueue {
     }
 
     /**
+     * Remove a specific task from the queue
+     * @param {string} id - Task ID to remove
+     * @returns {boolean} - True if task was found and removed
+     */
+    removeFromQueue(id) {
+        const initialLength = this.queue.length;
+        this.queue = this.queue.filter(task => {
+            if (task.id === id) {
+                task.reject(new Error('Processing stopped by user'));
+                return false;
+            }
+            return true;
+        });
+        
+        // Also remove from active processing if it's there
+        this.activeProcessing.delete(id);
+        
+        return this.queue.length < initialLength;
+    }
+
+    /**
+     * Check if a task is currently being processed
+     * @param {string} id - Task ID to check
+     * @returns {boolean} - True if task is active
+     */
+    isTaskActive(id) {
+        return this.activeProcessing.has(id);
+    }
+
+    /**
      * Clear the queue (for emergency stops)
      */
     clearQueue() {

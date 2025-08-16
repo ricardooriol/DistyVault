@@ -51,7 +51,7 @@ describe('Frontend Initialization Tests', () => {
             const viewport = document.querySelector('meta[name="viewport"]');
             expect(viewport.getAttribute('content')).toBe('width=device-width, initial-scale=1.0');
             
-            expect(document.title).toBe('SAWRON');
+            expect(document.title).toBe('DistyVault');
         });
 
         test('should load modular CSS correctly', () => {
@@ -151,7 +151,7 @@ describe('Frontend Initialization Tests', () => {
             expect(appJsContent).toContain('requiredClasses');
             expect(appJsContent).toContain('EventBus');
             expect(appJsContent).toContain('ApiClient');
-            expect(appJsContent).toContain('SawronApp');
+            expect(appJsContent).toContain('DistyVaultApp');
             
             // Check for global function exposure
             expect(appJsContent).toContain('window.startDistillation');

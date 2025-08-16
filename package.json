@@ -1,7 +1,7 @@
 {
-  "name": "sawron-knowledge-app",
+  "name": "distyvault-knowledge-app",
   "version": "1.0.0",
-  "description": "SAWRON - Connect the Dots & Fill the Gaps - Local Knowledge Processing App",
+  "description": "DistyVault - Connect the Dots & Fill the Gaps - Local Knowledge Processing App",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
@@ -47,6 +47,6 @@
     "ollama",
     "knowledge-distillation"
   ],
-  "author": "SAWRON",
+  "author": "DistyVault",
   "license": "MIT"
 }

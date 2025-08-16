@@ -92,32 +92,14 @@ class KnowledgeBaseTable {
     }
 
     /**
-     * Sort knowledge base items by status priority and time
+     * Sort knowledge base items by queued time (createdAt) descending - oldest first
      */
     sortKnowledgeBaseItems(items) {
         return items.sort((a, b) => {
-            // Define status priority (lower number = higher priority in display)
-            const statusPriority = {
-                'completed': 1,
-                'failed': 2,
-                'stopped': 3,
-                'distilling': 4,
-                'extracting': 5,
-                'pending': 6
-            };
-
-            const aPriority = statusPriority[a.status] || 7;
-            const bPriority = statusPriority[b.status] || 7;
-
-            // First sort by status priority
-            if (aPriority !== bPriority) {
-                return aPriority - bPriority;
-            }
-
-            // Within same status, sort by start time (most recent first)
-            const aTime = new Date(a.startTime || a.createdAt || 0);
-            const bTime = new Date(b.startTime || b.createdAt || 0);
-            return bTime - aTime;
+            // Sort by createdAt (oldest first) to maintain queue order
+            const aTime = new Date(a.createdAt || 0);
+            const bTime = new Date(b.createdAt || 0);
+            return aTime - bTime;
         });
     }
 
@@ -703,3 +685,6 @@ class KnowledgeBaseTable {
         });
     }
 }
+
+// Export for use in other modules
+window.KnowledgeBaseTable = KnowledgeBaseTable;

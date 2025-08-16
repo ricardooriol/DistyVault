@@ -86,7 +86,7 @@ class AISettingsManager {
                 endpoint: 'http://localhost:11434'
             },
             online: {
-                provider: 'openai',
+                provider: '',  // Empty to show "Select a provider"
                 apiKey: '',
                 model: 'gpt-3.5-turbo',
                 endpoint: ''
@@ -127,7 +127,7 @@ class AISettingsManager {
         // Validate online settings (only when in online mode)
         if (settings.mode === 'online' && settings.online) {
             const validProviders = ['openai', 'anthropic', 'google', 'microsoft', 'grok', 'deepseek'];
-            if (!settings.online.provider || !validProviders.includes(settings.online.provider)) {
+            if (settings.online.provider && !validProviders.includes(settings.online.provider)) {
                 errors.push(`Online provider must be one of: ${validProviders.join(', ')}`);
             }
             if (!settings.online.model || typeof settings.online.model !== 'string') {

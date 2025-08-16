@@ -26,9 +26,30 @@ class SettingsModal {
      * Initialize the settings modal component
      */
     init() {
+        // Clear any problematic stored settings that might cause provider to default to something other than empty
+        this.clearProblematicSettings();
+
         this.loadSettings().then(settings => {
             this.settings = settings;
         });
+    }
+
+    /**
+     * Clear any stored settings that might cause the provider to not default to empty
+     */
+    clearProblematicSettings() {
+        try {
+            const stored = localStorage.getItem('ai-provider-settings');
+            if (stored) {
+                const settings = JSON.parse(stored);
+                if (settings.online && settings.online.provider && settings.online.provider !== '') {
+                    settings.online.provider = '';
+                    localStorage.setItem('ai-provider-settings', JSON.stringify(settings));
+                }
+            }
+        } catch (error) {
+            console.error('Error clearing problematic settings:', error);
+        }
     }
 
     /**
@@ -37,8 +58,48 @@ class SettingsModal {
     async openModal() {
         const modal = DomUtils.getElementById('ai-settings-modal');
         if (modal) {
+            // Reset scroll position to top
+            this.resetModalScroll(modal);
+            
             modal.style.display = 'flex';
+
+            // FORCE reset provider to empty before loading settings
+            const providerSelect = DomUtils.getElementById('provider-select');
+            if (providerSelect) {
+                providerSelect.value = '';
+                providerSelect.selectedIndex = 0;
+            }
+
             await this.loadSettingsUI();
+        }
+    }
+
+    /**
+     * Reset scroll position for modal and its content areas
+     * @param {HTMLElement} modal - The modal element
+     */
+    resetModalScroll(modal) {
+        if (modal) {
+            // Immediate reset
+            modal.scrollTop = 0;
+            
+            // Reset scroll for common scrollable elements within the modal
+            const scrollableElements = modal.querySelectorAll('.modal-body, .modal-content, .settings-content, .form-container, #ai-settings-form, .provider-config');
+            scrollableElements.forEach(element => {
+                if (element && element.scrollTop !== undefined) {
+                    element.scrollTop = 0;
+                }
+            });
+            
+            // Additional reset after a short delay to ensure DOM is fully rendered
+            setTimeout(() => {
+                modal.scrollTop = 0;
+                scrollableElements.forEach(element => {
+                    if (element && element.scrollTop !== undefined) {
+                        element.scrollTop = 0;
+                    }
+                });
+            }, 10);
         }
     }
 
@@ -59,14 +120,26 @@ class SettingsModal {
         try {
             // Try to load from backend first
             const result = await this.app.apiClient.getAiSettings();
-            if (result.success) {
-                return result.settings;
+            if (result.success && result.settings) {
+                // FORCE provider to be empty if not explicitly set
+                const settings = result.settings;
+                if (!settings.online || !settings.online.provider) {
+                    settings.online = settings.online || {};
+                    settings.online.provider = '';
+                }
+                return settings;
             }
 
             // Fallback to localStorage
             const stored = localStorage.getItem('ai-provider-settings');
             if (stored) {
-                return JSON.parse(stored);
+                const settings = JSON.parse(stored);
+                // FORCE provider to be empty if not explicitly set
+                if (!settings.online || !settings.online.provider) {
+                    settings.online = settings.online || {};
+                    settings.online.provider = '';
+                }
+                return settings;
             }
         } catch (error) {
             console.error('Error loading AI settings:', error);
@@ -80,14 +153,14 @@ class SettingsModal {
      */
     getDefaultSettings() {
         return {
-            mode: 'offline',
+            mode: 'online',
             concurrentProcessing: 1,
             offline: {
                 model: '',
                 endpoint: 'http://localhost:11434'
             },
             online: {
-                provider: 'openai',
+                provider: '',  // Empty to show "Select a provider"
                 apiKey: '',
                 model: 'gpt-3.5-turbo',
                 endpoint: ''
@@ -102,7 +175,7 @@ class SettingsModal {
     async saveSettings(settings) {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
-            
+
             // Save to backend (in-memory only for security)
             const result = await this.app.apiClient.saveAiSettings(this.settings);
             if (result.success) {
@@ -166,7 +239,7 @@ class SettingsModal {
 
         // Update mode description
         if (modeDescription) {
-            modeDescription.textContent = settings.mode === 'offline' 
+            modeDescription.textContent = settings.mode === 'offline'
                 ? 'Use local Ollama server for processing'
                 : 'Use cloud-based AI providers for processing';
         }
@@ -185,7 +258,7 @@ class SettingsModal {
         // Load offline settings
         const ollamaModel = DomUtils.getElementById('ollama-model');
         const ollamaEndpoint = DomUtils.getElementById('ollama-endpoint');
-        
+
         if (ollamaModel) {
             ollamaModel.value = settings.offline.model || '';
         }
@@ -199,11 +272,35 @@ class SettingsModal {
         const apiKey = DomUtils.getElementById('api-key');
 
         if (providerSelect) {
-            providerSelect.value = settings.online.provider || 'openai';
-            this.handleProviderChange();
-        }
+            // ALWAYS start with empty provider to show "Select a provider"
+            // Only use saved provider if it's explicitly set and valid
+            let providerValue = '';
 
-        if (modelSelect) {
+            if (settings.online.provider &&
+                ['openai', 'anthropic', 'google', 'grok', 'deepseek'].includes(settings.online.provider)) {
+                providerValue = settings.online.provider;
+            }
+
+            providerSelect.value = providerValue;
+            providerSelect.selectedIndex = providerValue ?
+                Array.from(providerSelect.options).findIndex(opt => opt.value === providerValue) : 0;
+
+            // Force the change handler to update the UI properly
+            setTimeout(() => {
+                this.handleProviderChange();
+                // Set model value after provider change is complete
+                if (modelSelect) {
+                    const savedModel = settings.online.model || 'gpt-3.5-turbo';
+                    modelSelect.value = savedModel;
+                    
+                    // If the saved model is not available in the dropdown, select the first available option
+                    if (modelSelect.selectedIndex === -1 && modelSelect.options.length > 0) {
+                        modelSelect.selectedIndex = 0;
+                    }
+                }
+            }, 0);
+        } else if (modelSelect) {
+            // If no provider is selected, still set the model value
             modelSelect.value = settings.online.model || 'gpt-3.5-turbo';
         }
 
@@ -249,7 +346,7 @@ class SettingsModal {
 
         // Update description
         if (modeDescription) {
-            modeDescription.textContent = isOnline 
+            modeDescription.textContent = isOnline
                 ? 'Use cloud-based AI providers for processing'
                 : 'Use local Ollama server for processing';
         }
@@ -276,10 +373,26 @@ class SettingsModal {
         if (!providerSelect || !modelSelect) return;
 
         const selectedProvider = providerSelect.value;
+
+        // Clear model options first
+        modelSelect.innerHTML = '';
+
+        if (!selectedProvider) {
+            // No provider selected, add placeholder
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Select a provider first';
+            option.disabled = true;
+            modelSelect.appendChild(option);
+            
+            // Update API key help text to show generic message
+            this.updateApiKeyHelp();
+            return;
+        }
+
         const models = this.providerModels[selectedProvider] || [];
 
-        // Clear and populate model options
-        modelSelect.innerHTML = '';
+        // Populate model options
         models.forEach(model => {
             const option = document.createElement('option');
             option.value = model;
@@ -301,10 +414,18 @@ class SettingsModal {
         if (!providerSelect || !apiKeyHelp) return;
 
         const selectedProvider = providerSelect.value;
+
+        if (!selectedProvider) {
+            apiKeyHelp.textContent = 'Select a provider to see API key instructions';
+            return;
+        }
+
         const providerInfo = this.providerInfo[selectedProvider];
 
         if (providerInfo) {
             apiKeyHelp.textContent = providerInfo.help;
+        } else {
+            apiKeyHelp.textContent = 'Enter your API key for the selected provider';
         }
     }
 
@@ -343,12 +464,10 @@ class SettingsModal {
      */
     async testOllamaConnection() {
         const testBtn = DomUtils.getElementById('test-ollama-btn');
-        const testResults = DomUtils.getElementById('test-results');
-        const testResultContent = DomUtils.getElementById('test-result-content');
         const ollamaModel = DomUtils.getElementById('ollama-model');
         const ollamaEndpoint = DomUtils.getElementById('ollama-endpoint');
 
-        if (!testBtn || !testResults || !testResultContent || !ollamaModel || !ollamaEndpoint) return;
+        if (!testBtn || !ollamaModel || !ollamaEndpoint) return;
 
         const originalText = testBtn.innerHTML;
         testBtn.disabled = true;
@@ -359,34 +478,39 @@ class SettingsModal {
                 model: ollamaModel.value,
                 endpoint: ollamaEndpoint.value
             });
-            
-            testResults.style.display = 'block';
+
+            // Update button with result
             if (result.success) {
-                testResultContent.innerHTML = `
-                    <div class="test-success">
-                        <span class="test-icon">✅</span>
-                        <span class="test-message">Connection successful! Model "${result.model}" is available.</span>
-                    </div>
-                `;
+                testBtn.innerHTML = '<span class="btn-icon">✅</span><span class="btn-text">Connection successful!</span>';
+                testBtn.style.backgroundColor = '#4caf50';
+                testBtn.style.color = 'white';
             } else {
-                testResultContent.innerHTML = `
-                    <div class="test-error">
-                        <span class="test-icon">❌</span>
-                        <span class="test-message">Connection failed: ${result.error}</span>
-                    </div>
-                `;
+                testBtn.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">Connection failed!</span>';
+                testBtn.style.backgroundColor = '#f44336';
+                testBtn.style.color = 'white';
             }
+
+            // Reset button after 5 seconds
+            setTimeout(() => {
+                testBtn.innerHTML = originalText;
+                testBtn.style.backgroundColor = '';
+                testBtn.style.color = '';
+                testBtn.disabled = false;
+            }, 5000);
+
         } catch (error) {
-            testResults.style.display = 'block';
-            testResultContent.innerHTML = `
-                <div class="test-error">
-                    <span class="test-icon">❌</span>
-                    <span class="test-message">Test failed: ${error.message}</span>
-                </div>
-            `;
-        } finally {
-            testBtn.disabled = false;
-            testBtn.innerHTML = originalText;
+            // Show error state
+            testBtn.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">Connection failed!</span>';
+            testBtn.style.backgroundColor = '#f44336';
+            testBtn.style.color = 'white';
+
+            // Reset button after 5 seconds
+            setTimeout(() => {
+                testBtn.innerHTML = originalText;
+                testBtn.style.backgroundColor = '';
+                testBtn.style.color = '';
+                testBtn.disabled = false;
+            }, 5000);
         }
     }
 
@@ -395,13 +519,11 @@ class SettingsModal {
      */
     async testProviderConnection() {
         const testBtn = DomUtils.getElementById('test-provider-btn');
-        const testResults = DomUtils.getElementById('test-results');
-        const testResultContent = DomUtils.getElementById('test-result-content');
         const providerSelect = DomUtils.getElementById('provider-select');
         const modelSelect = DomUtils.getElementById('model-select');
         const apiKey = DomUtils.getElementById('api-key');
 
-        if (!testBtn || !testResults || !testResultContent || !providerSelect || !modelSelect || !apiKey) return;
+        if (!testBtn || !providerSelect || !modelSelect || !apiKey) return;
 
         const originalText = testBtn.innerHTML;
         testBtn.disabled = true;
@@ -413,34 +535,39 @@ class SettingsModal {
                 model: modelSelect.value,
                 apiKey: apiKey.value
             });
-            
-            testResults.style.display = 'block';
+
+            // Update button with result
             if (result.success) {
-                testResultContent.innerHTML = `
-                    <div class="test-success">
-                        <span class="test-icon">✅</span>
-                        <span class="test-message">API key is valid! Connected to ${result.provider} ${result.model}.</span>
-                    </div>
-                `;
+                testBtn.innerHTML = '<span class="btn-icon">✅</span><span class="btn-text">API key is valid!</span>';
+                testBtn.style.backgroundColor = '#4caf50';
+                testBtn.style.color = 'white';
             } else {
-                testResultContent.innerHTML = `
-                    <div class="test-error">
-                        <span class="test-icon">❌</span>
-                        <span class="test-message">API test failed: ${result.error}</span>
-                    </div>
-                `;
+                testBtn.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">API key is invalid!</span>';
+                testBtn.style.backgroundColor = '#f44336';
+                testBtn.style.color = 'white';
             }
+
+            // Reset button after 5 seconds
+            setTimeout(() => {
+                testBtn.innerHTML = originalText;
+                testBtn.style.backgroundColor = '';
+                testBtn.style.color = '';
+                testBtn.disabled = false;
+            }, 5000);
+
         } catch (error) {
-            testResults.style.display = 'block';
-            testResultContent.innerHTML = `
-                <div class="test-error">
-                    <span class="test-icon">❌</span>
-                    <span class="test-message">Test failed: ${error.message}</span>
-                </div>
-            `;
-        } finally {
-            testBtn.disabled = false;
-            testBtn.innerHTML = originalText;
+            // Show error state
+            testBtn.innerHTML = '<span class="btn-icon">❌</span><span class="btn-text">API key is invalid!</span>';
+            testBtn.style.backgroundColor = '#f44336';
+            testBtn.style.color = 'white';
+
+            // Reset button after 5 seconds
+            setTimeout(() => {
+                testBtn.innerHTML = originalText;
+                testBtn.style.backgroundColor = '';
+                testBtn.style.color = '';
+                testBtn.disabled = false;
+            }, 5000);
         }
     }
 
@@ -451,29 +578,47 @@ class SettingsModal {
         const saveBtn = DomUtils.getElementById('save-config-btn');
         if (!saveBtn) return;
 
+        // Clear any existing validation errors
+        this.clearValidationErrors();
+
         const originalText = saveBtn.innerHTML;
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Saving...</span>';
 
         try {
             const settings = this.collectSettingsFromUI();
+
+            // Validate settings before saving
+            const validationErrors = this.validateSettings(settings);
+            if (validationErrors.length > 0) {
+                // Show validation errors and don't close modal
+                this.showValidationErrors(validationErrors);
+                return;
+            }
+
             const success = await this.saveSettings(settings);
 
             if (success) {
-                // Show success feedback
-                saveBtn.innerHTML = '<span class="btn-icon">✅</span><span class="btn-text">Saved!</span>';
-                setTimeout(() => {
-                    saveBtn.innerHTML = originalText;
-                    saveBtn.disabled = false;
-                }, 2000);
+                // Only close modal if save was successful
+                this.closeModal();
+                this.app.showTemporaryMessage('Settings saved', 'success');
             } else {
                 throw new Error('Failed to save settings');
             }
         } catch (error) {
-            ErrorUtils.handleApiError('save configuration', error, {
-                showAlert: true,
-                defaultMessage: 'Error saving configuration'
-            });
+            console.error('Error saving configuration:', error);
+
+            // Handle error gracefully - don't close modal on error
+            if (typeof ErrorUtils !== 'undefined') {
+                ErrorUtils.handleApiError('save configuration', error, {
+                    showAlert: true,
+                    defaultMessage: 'Error saving configuration'
+                });
+            } else {
+                this.app.showTemporaryMessage('Failed to save settings', 'error');
+            }
+        } finally {
+            // Reset button state
             saveBtn.innerHTML = originalText;
             saveBtn.disabled = false;
         }
@@ -482,13 +627,47 @@ class SettingsModal {
     /**
      * Reset AI configuration to defaults
      */
-    resetConfiguration() {
+    async resetConfiguration() {
         if (!confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
             return;
         }
 
-        this.settings = this.getDefaultSettings();
-        this.loadSettingsUI();
+        const resetBtn = DomUtils.getElementById('reset-config-btn') || document.querySelector('.reset-btn');
+        const originalText = resetBtn ? resetBtn.innerHTML : '';
+
+        if (resetBtn) {
+            resetBtn.disabled = true;
+            resetBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Resetting...</span>';
+        }
+
+        try {
+            // Reset to default settings
+            this.settings = this.getDefaultSettings();
+            
+            // Clear any stored settings to ensure clean reset
+            localStorage.removeItem('ai-provider-settings');
+
+            // Close modal immediately after showing resetting state
+            this.closeModal();
+
+            // Save the reset settings
+            const success = await this.saveSettings(this.settings);
+
+            if (success) {
+                this.app.showTemporaryMessage('Settings reset', 'success');
+            } else {
+                throw new Error('Failed to save reset settings');
+            }
+        } catch (error) {
+            console.error('Error resetting configuration:', error);
+            this.app.showTemporaryMessage('Failed to reset settings', 'error');
+        } finally {
+            // Reset button state
+            if (resetBtn) {
+                resetBtn.innerHTML = originalText;
+                resetBtn.disabled = false;
+            }
+        }
     }
 
     /**
@@ -511,12 +690,126 @@ class SettingsModal {
                 endpoint: ollamaEndpoint ? ollamaEndpoint.value : 'http://localhost:11434'
             },
             online: {
-                provider: providerSelect ? providerSelect.value : 'openai',
+                provider: providerSelect ? providerSelect.value : '',
                 apiKey: apiKey ? apiKey.value : '',
                 model: modelSelect ? modelSelect.value : 'gpt-3.5-turbo',
                 endpoint: ''
             }
         };
+    }
+
+    /**
+     * Validate settings before saving
+     */
+    validateSettings(settings) {
+        const errors = [];
+
+        if (settings.mode === 'online') {
+            // Validate online provider settings
+            if (!settings.online.provider) {
+                errors.push({
+                    field: 'provider-select',
+                    message: 'Please select an AI provider'
+                });
+            } else {
+                const validProviders = ['openai', 'anthropic', 'google', 'grok', 'deepseek'];
+                if (!validProviders.includes(settings.online.provider)) {
+                    errors.push({
+                        field: 'provider-select',
+                        message: 'Please select a valid AI provider'
+                    });
+                }
+            }
+
+            if (!settings.online.model) {
+                errors.push({
+                    field: 'model-select',
+                    message: 'Please select a model'
+                });
+            }
+
+            if (!settings.online.apiKey || settings.online.apiKey.trim() === '') {
+                errors.push({
+                    field: 'api-key',
+                    message: 'Please enter your API key'
+                });
+            }
+        } else {
+            // Validate offline settings
+            if (!settings.offline.model || settings.offline.model.trim() === '') {
+                errors.push({
+                    field: 'ollama-model',
+                    message: 'Please enter a model name'
+                });
+            }
+
+            if (!settings.offline.endpoint || settings.offline.endpoint.trim() === '') {
+                errors.push({
+                    field: 'ollama-endpoint',
+                    message: 'Please enter an endpoint URL'
+                });
+            }
+        }
+
+        return errors;
+    }
+
+    /**
+     * Show validation errors in the UI
+     */
+    showValidationErrors(errors) {
+        errors.forEach(error => {
+            const field = DomUtils.getElementById(error.field);
+            if (field) {
+                // Add error class to field
+                field.classList.add('error');
+
+                // Special handling for API key error
+                if (error.field === 'api-key') {
+                    const apiKeyError = DomUtils.getElementById('api-key-error');
+                    if (apiKeyError) {
+                        apiKeyError.style.display = 'block';
+                        apiKeyError.textContent = error.message;
+                    }
+                } else {
+                    // Create or update error message for other fields
+                    let errorElement = field.parentNode.querySelector('.error-message');
+                    if (!errorElement) {
+                        errorElement = document.createElement('small');
+                        errorElement.className = 'error-message';
+                        errorElement.style.color = '#f44336';
+                        errorElement.style.display = 'block';
+                        field.parentNode.appendChild(errorElement);
+                    }
+                    errorElement.textContent = error.message;
+                }
+            }
+        });
+
+        // Show a general error message
+        this.app.showTemporaryMessage('Please fix the highlighted fields', 'error');
+    }
+
+    /**
+     * Clear validation errors from the UI
+     */
+    clearValidationErrors() {
+        // Remove error classes and messages
+        const errorFields = document.querySelectorAll('.form-input.error, .form-select.error');
+        errorFields.forEach(field => {
+            field.classList.remove('error');
+        });
+
+        const errorMessages = document.querySelectorAll('.error-message');
+        errorMessages.forEach(message => {
+            message.remove();
+        });
+
+        // Hide API key error specifically
+        const apiKeyError = DomUtils.getElementById('api-key-error');
+        if (apiKeyError) {
+            apiKeyError.style.display = 'none';
+        }
     }
 
     /**
@@ -540,6 +833,5 @@ class SettingsModal {
     }
 }
 
-// Global functions are now handled in init.js
-
-// Global functions are now handled in init.js
+// Export for use in other modules
+window.SettingsModal = SettingsModal;

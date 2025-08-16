@@ -27,7 +27,7 @@ const ollamaService = require('../backend/services/ollama');
 const AIProviderFactory = require('../backend/src/services/ai/aiProviderFactory');
 const AISettingsManager = require('../backend/src/services/ai/aiSettingsManager');
 
-describe('SAWRON Comprehensive Validation Tests', () => {
+describe('DistyVault Comprehensive Validation Tests', () => {
     let app;
     let dom;
     let window;

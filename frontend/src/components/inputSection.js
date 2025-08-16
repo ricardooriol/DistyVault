@@ -393,5 +393,8 @@ async function pasteFromClipboard(event) {
     }
 }
 
+// Export for use in other modules
+window.InputSection = InputSection;
+
 // Global functions are now handled in init.js
 window.pasteFromClipboard = pasteFromClipboard;

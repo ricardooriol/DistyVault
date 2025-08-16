@@ -160,15 +160,19 @@
     white-space: nowrap !important;
     max-width: 0 !important;
     min-width: 0 !important;
+    vertical-align: middle;
+    display: table-cell;
 }
 
 .status-cell .status-icon {
     margin-right: 0.5rem;
+    vertical-align: middle;
 }
 
 .status-cell .status-text {
     font-weight: 600;
     font-size: 0.8rem;
+    vertical-align: middle;
 }
 
 .status-cell .processing-step {

@@ -13,7 +13,7 @@ describe('Database Integration Tests', () => {
 
     beforeAll(() => {
         // Create test directory
-        testDbPath = path.join(__dirname, '../temp/test-sawron.db');
+        testDbPath = path.join(__dirname, '../temp/test-distyvault.db');
         const testDir = path.dirname(testDbPath);
         if (!fs.existsSync(testDir)) {
             fs.mkdirSync(testDir, { recursive: true });
@@ -71,7 +71,7 @@ describe('Database Integration Tests', () => {
                 title: 'Test Article',
                 sourceUrl: 'https://example.com/test',
                 sourceType: 'url',
-                status: 'processing'
+                status: 'extracting'
             });
 
             // Save distillation
@@ -84,7 +84,7 @@ describe('Database Integration Tests', () => {
             expect(retrieved.title).toBe('Test Article');
             expect(retrieved.sourceUrl).toBe('https://example.com/test');
             expect(retrieved.sourceType).toBe('url');
-            expect(retrieved.status).toBe('processing');
+            expect(retrieved.status).toBe('extracting');
         });
 
         test('should update existing distillation', async () => {
@@ -92,7 +92,7 @@ describe('Database Integration Tests', () => {
                 title: 'Test Article',
                 sourceUrl: 'https://example.com/test',
                 sourceType: 'url',
-                status: 'processing'
+                status: 'extracting'
             });
 
             await database.saveDistillation(testDistillation);
@@ -162,7 +162,7 @@ describe('Database Integration Tests', () => {
                     title: 'React Components',
                     content: 'Building reusable components in React applications',
                     sourceType: 'file',
-                    status: 'processing'
+                    status: 'extracting'
                 })
             ];
 
@@ -211,9 +211,9 @@ describe('Database Integration Tests', () => {
             const completedDistillations = allDistillations.filter(d => d.status === 'completed');
             expect(completedDistillations).toHaveLength(2);
             
-            const processingDistillations = allDistillations.filter(d => d.status === 'processing');
-            expect(processingDistillations).toHaveLength(1);
-            expect(processingDistillations[0].title).toBe('React Components');
+            const extractingDistillations = allDistillations.filter(d => d.status === 'extracting');
+            expect(extractingDistillations).toHaveLength(1);
+            expect(extractingDistillations[0].title).toBe('React Components');
         });
     });
 

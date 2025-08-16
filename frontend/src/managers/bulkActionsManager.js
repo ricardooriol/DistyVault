@@ -201,12 +201,14 @@ class BulkActionsManager {
             });
 
             // Request a ZIP file from the backend endpoint
-            const result = await this.app.apiClient.bulkDownload(selectedIds);
+            const result = await this.app.apiClient.bulkDownload(selectedIds, {
+                signal: abortController.signal
+            });
 
             // Handle the ZIP file download
             const blob = result.blob;
             const contentDisposition = result.headers.get('Content-Disposition');
-            let filename = `sawron-download.zip`; // Default filename
+            let filename = `distyvault-download.zip`; // Default filename
 
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
@@ -235,11 +237,21 @@ class BulkActionsManager {
             }, 100);
 
         } catch (error) {
-            if (ErrorUtils.isUserCancellation(error)) return;
+            // Check if the download was cancelled
+            if (error.name === 'AbortError' || error.message === 'Request cancelled by user') {
+                // Silently handle cancellation without logging
+                this.app.downloadStateManager.setDownloadState(buttonId, 'idle');
+                return;
+            }
             
-            const errorMessage = ErrorUtils.handleApiError('bulk download', error, {
-                defaultMessage: 'Bulk download failed'
-            });
+            if (typeof ErrorUtils !== 'undefined' && ErrorUtils.isUserCancellation && ErrorUtils.isUserCancellation(error)) {
+                return;
+            }
+            
+            const errorMessage = typeof ErrorUtils !== 'undefined' && ErrorUtils.handleApiError ? 
+                ErrorUtils.handleApiError('bulk download', error, {
+                    defaultMessage: 'Bulk download failed'
+                }) : 'Bulk download failed';
             
             this.app.downloadStateManager.setDownloadState(buttonId, 'error', {
                 errorMessage
@@ -296,11 +308,21 @@ class BulkActionsManager {
             }, 100);
 
         } catch (error) {
-            if (ErrorUtils.isUserCancellation(error)) return;
+            // Check if the download was cancelled
+            if (error.name === 'AbortError' || error.message === 'Request cancelled by user') {
+                // Silently handle cancellation without logging
+                this.app.downloadStateManager.setDownloadState(buttonId, 'idle');
+                return;
+            }
             
-            const errorMessage = ErrorUtils.handleApiError('single download from bulk', error, {
-                defaultMessage: 'Download failed'
-            });
+            if (typeof ErrorUtils !== 'undefined' && ErrorUtils.isUserCancellation && ErrorUtils.isUserCancellation(error)) {
+                return;
+            }
+            
+            const errorMessage = typeof ErrorUtils !== 'undefined' && ErrorUtils.handleApiError ? 
+                ErrorUtils.handleApiError('single download from bulk', error, {
+                    defaultMessage: 'Download failed'
+                }) : 'Download failed';
             
             this.app.downloadStateManager.setDownloadState(buttonId, 'error', {
                 errorMessage
@@ -402,6 +424,9 @@ class BulkActionsManager {
         }
 
         try {
+            // Show initial message
+            this.app.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
+
             // Process selected items from bottom to top (reverse order) with delay to ensure proper sequencing
             const idsToRetry = [...selectedIds].reverse();
             for (let i = 0; i < idsToRetry.length; i++) {
@@ -410,10 +435,11 @@ class BulkActionsManager {
                 if (i > 0) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
-                await this.app.retryDistillation(id);
+                await this.app.retryDistillation(id, true); // Silent mode for bulk operations
             }
 
-            this.app.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
+            // Show completion message
+            this.app.showTemporaryMessage(`Successfully initiated retry for ${selectedIds.length} items`, 'success');
 
             // Clear selection after retry
             this.clearAllSelections();
@@ -443,6 +469,9 @@ class BulkActionsManager {
                 return;
             }
 
+            // Show initial message
+            this.app.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
+
             // Process items from bottom to top (reverse order) with delay to ensure proper sequencing
             const itemsToRetry = [...allItems].reverse();
             for (let i = 0; i < itemsToRetry.length; i++) {
@@ -451,10 +480,11 @@ class BulkActionsManager {
                 if (i > 0) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
-                await this.app.retryDistillation(item.id);
+                await this.app.retryDistillation(item.id, true); // Silent mode for bulk operations
             }
 
-            this.app.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
+            // Show completion message
+            this.app.showTemporaryMessage(`Successfully initiated retry for all ${allItems.length} items`, 'success');
 
             // Force MULTIPLE immediate status updates after retry all
             this.app.forceStatusUpdate();
@@ -484,6 +514,9 @@ class BulkActionsManager {
                 return;
             }
 
+            // Show initial message
+            this.app.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
+
             // Process failed items from bottom to top (reverse order) with delay to ensure proper sequencing
             const itemsToRetry = [...failedItems].reverse();
             for (let i = 0; i < itemsToRetry.length; i++) {
@@ -492,10 +525,11 @@ class BulkActionsManager {
                 if (i > 0) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
-                await this.app.retryDistillation(item.id);
+                await this.app.retryDistillation(item.id, true); // Silent mode for bulk operations
             }
 
-            this.app.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
+            // Show completion message
+            this.app.showTemporaryMessage(`Successfully initiated retry for ${failedItems.length} failed items`, 'success');
 
             // Force MULTIPLE immediate status updates after retry failed
             this.app.forceStatusUpdate();

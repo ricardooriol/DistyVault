@@ -2,9 +2,6 @@ const express = require('express');
 const router = express.Router();
 const aiSettingsController = require('../controllers/aiSettingsController');
 
-// Test AI provider connection
-router.post('/test-ai-provider', aiSettingsController.testAiProvider);
-
 // Get available providers
 router.get('/ai-providers', aiSettingsController.getAvailableProviders);
 
@@ -19,6 +16,12 @@ router.post('/ai-settings', aiSettingsController.saveAiSettings);
 
 // Get AI provider settings
 router.get('/ai-settings', aiSettingsController.getAiSettings);
+
+// Test AI provider connection
+router.post('/ai-settings/test-provider', aiSettingsController.testAiProvider);
+
+// Test Ollama connection (uses same method)
+router.post('/ai-settings/test-ollama', aiSettingsController.testAiProvider);
 
 // Update processing queue settings
 router.post('/processing-queue/settings', aiSettingsController.updateProcessingQueueSettings);

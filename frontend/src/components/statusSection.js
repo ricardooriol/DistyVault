@@ -407,3 +407,6 @@ class StatusSection {
         }
     }
 }
+
+// Export for use in other modules
+window.StatusSection = StatusSection;

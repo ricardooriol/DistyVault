@@ -1,6 +1,6 @@
-# SAWRON Test Suite Documentation
+# DistyVault Test Suite Documentation
 
-This comprehensive test suite validates all functionality of the SAWRON knowledge distillation platform to ensure no regressions occur during refactoring.
+This comprehensive test suite validates all functionality of the DistyVault knowledge distillation platform to ensure no regressions occur during refactoring.
 
 ## Test Structure
 
@@ -151,7 +151,7 @@ The test suite validates all requirements from the specification:
 
 ### Environment Configuration
 Tests use the following configuration:
-- Test database: `tests/temp/test-sawron.db`
+- Test database: `tests/temp/test-distyvault.db`
 - Test timeout: 30 seconds
 - Coverage threshold: 70% for all metrics
 - Mock external services (AI providers, file system)

@@ -1,5 +1,5 @@
 /**
- * Ollama service for SAWRON
+ * Ollama service for DistyVault
  * Handles communication with the local Ollama instance
  */
 const axios = require('axios');
@@ -98,13 +98,16 @@ ${text}`;
             const models = response.data.models || [];
             const hasModel = models.some(model => model.name === this.model);
             
-            if (!hasModel) {
+            if (!hasModel && process.env.NODE_ENV === 'development') {
                 console.warn(`Model ${this.model} not found. Available models:`, models.map(m => m.name));
             }
             
             return hasModel;
         } catch (error) {
-            console.error('Ollama service not available:', error.message);
+            // Only log Ollama availability errors in development mode to reduce spam
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Ollama service not available:', error.message);
+            }
             return false;
         }
     }

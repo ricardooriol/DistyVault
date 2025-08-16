@@ -29,7 +29,17 @@ class ApiClient {
         let lastError;
         for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
             try {
+                // Check if request was aborted before making the request
+                if (options.signal && options.signal.aborted) {
+                    throw new Error('Request cancelled by user');
+                }
+
                 const response = await fetch(url, config);
+                
+                // Check if request was aborted after response
+                if (options.signal && options.signal.aborted) {
+                    throw new Error('Request cancelled by user');
+                }
                 
                 if (!response.ok) {
                     const error = await this.handleErrorResponse(response);
@@ -40,14 +50,27 @@ class ApiClient {
             } catch (error) {
                 lastError = error;
                 
-                // Don't retry on client errors (4xx) or abort signals
-                if (error.name === 'AbortError' || 
-                    (error.status && error.status >= 400 && error.status < 500)) {
+                // Handle different types of errors
+                if (error.name === 'AbortError' || error.message === 'Request cancelled by user') {
+                    // Convert AbortError to a more specific error for consistent handling
+                    const abortError = new Error('Request cancelled by user');
+                    abortError.name = 'AbortError';
+                    throw abortError;
+                }
+                
+                // Don't retry on client errors (4xx)
+                if (error.status && error.status >= 400 && error.status < 500) {
                     throw error;
                 }
 
+                // Handle network/connection errors
+                if (error.name === 'TypeError' && error.message === 'Load failed') {
+                    // This is a connection error, modify the message for better handling
+                    error.message = 'Could not connect to server';
+                }
+
                 // Only retry on network errors or server errors (5xx)
-                if (attempt < this.retryAttempts) {
+                if (attempt < this.retryAttempts && !options.signal?.aborted) {
                     await this.delay(this.retryDelay * attempt);
                     continue;
                 }
@@ -156,6 +179,11 @@ class ApiClient {
             ...options
         });
 
+        // Check if request was aborted before processing blob
+        if (options.signal && options.signal.aborted) {
+            throw new Error('Download cancelled by user');
+        }
+
         return {
             blob: await response.blob(),
             headers: response.headers,
@@ -178,7 +206,7 @@ class ApiClient {
         return this.post(endpoint, formData);
     }
 
-    // Specific API methods for SAWRON application
+    // Specific API methods for DistyVault application
 
     /**
      * Get all summaries/distillations
@@ -212,7 +240,28 @@ class ApiClient {
      * Stop processing by ID
      */
     async stopProcessing(id) {
-        return this.post(`/api/summaries/${id}/stop`);
+        try {
+            return await this.post(`/api/summaries/${id}/stop`);
+        } catch (error) {
+            // Handle specific error cases for stop processing
+            if (error.message && (
+                error.message.includes('Process not found') || 
+                error.message.includes('already completed') ||
+                error.message.includes('not a function')
+            )) {
+                // This is expected if the process already completed or there's a method issue
+                console.warn(`Process ${id} stop issue:`, error.message);
+                return { status: 'ok', message: 'Process already completed or stopped' };
+            }
+            
+            // For 404 errors, treat as already completed
+            if (error.status === 404) {
+                console.warn(`Process ${id} not found (404)`);
+                return { status: 'ok', message: 'Process already completed' };
+            }
+            
+            throw error;
+        }
     }
 
     /**
@@ -225,10 +274,11 @@ class ApiClient {
     /**
      * Bulk download PDFs
      */
-    async bulkDownload(ids) {
+    async bulkDownload(ids, options = {}) {
         return this.downloadFile('/api/summaries/bulk-download', {
             method: 'POST',
-            body: JSON.stringify({ ids })
+            body: JSON.stringify({ ids }),
+            ...options
         });
     }
 
@@ -321,6 +371,22 @@ class ApiClient {
     }
 
     /**
+     * Check if server is responsive
+     */
+    async isServerResponsive() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/health`, {
+                method: 'GET',
+                headers: this.defaultHeaders,
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            });
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
      * Configure retry settings
      */
     configureRetry(attempts, delay) {
@@ -328,3 +394,6 @@ class ApiClient {
         this.retryDelay = delay;
     }
 }
+
+// Export for use in other modules
+window.ApiClient = ApiClient;

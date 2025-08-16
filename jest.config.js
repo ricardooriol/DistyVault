@@ -1,5 +1,5 @@
 /**
- * Jest Configuration for SAWRON Test Suite
+ * Jest Configuration for DistyVault Test Suite
  */
 
 module.exports = {

@@ -1,15 +1,15 @@
 /**
- * Database service for SAWRON
+ * Database service for DistyVault
  * Handles persistence of distillations using SQLite
  */
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const Distillation = require('../models/distillation');
+const Distillation = require('./distillation');
 
 class Database {
     constructor() {
-        this.dbPath = path.join(__dirname, '../../data/sawron.db');
+        this.dbPath = path.join(__dirname, '../../data/distyvault.db');
         this.ensureDbDirectory();
         this.db = new sqlite3.Database(this.dbPath);
         this.init();
@@ -130,8 +130,8 @@ class Database {
 
     async getAllSummaries() {
         return new Promise((resolve, reject) => {
-            // Always order by createdAt ASC to ensure consistent top-to-bottom processing order
-            // This ensures that playlist videos process in the correct order (first video first)
+            // Always order by createdAt ASC to ensure consistent queue order (oldest first)
+            // This ensures that items are processed in the order they were queued
             this.db.all('SELECT * FROM summaries ORDER BY createdAt ASC', (err, rows) => {
                 if (err) {
                     reject(err);
