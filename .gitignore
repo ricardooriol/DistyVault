@@ -13,10 +13,6 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 
-# Tests and coverage reports
-tests/
-coverage/
-
 # Documentation
 readmes/
 
