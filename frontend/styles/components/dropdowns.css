@@ -1,0 +1,147 @@
+/* Action Dropdown Styles - Fixed positioning and flickering */
+.action-dropdown {
+    position: relative;
+    display: inline-block;
+    z-index: 1;
+}
+
+/* When dropdown is open, elevate the entire row and dropdown */
+.action-dropdown.show {
+    z-index: 2147483647;
+    position: relative;
+}
+
+/* Ensure the parent row gets elevated when dropdown is open */
+.knowledge-base-table tbody tr:has(.action-dropdown.show) {
+    position: relative;
+    z-index: 2147483646;
+}
+
+/* Fallback for browsers that don't support :has() */
+.knowledge-base-table tbody tr.dropdown-open {
+    position: relative;
+    z-index: 2147483646;
+}
+
+/* Ensure action buttons don't interfere with dropdown stacking */
+.action-buttons {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure upload and distill buttons don't interfere with dropdowns */
+.upload-btn,
+.distill-btn {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure table cells don't create stacking contexts that interfere with dropdowns */
+.actions-cell {
+    position: relative;
+    z-index: auto;
+}
+
+.action-dropdown-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    min-height: 32px;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.action-dropdown-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--text-primary);
+}
+
+.action-dropdown-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.action-dropdown-content {
+    display: none;
+    position: fixed !important;
+    background: var(--bg-primary);
+    border: 2px solid var(--primary-orange);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 2147483647 !important;
+    min-width: max-content;
+    width: auto;
+    overflow: hidden;
+    /* Ensure dropdown is always on top */
+    isolation: isolate;
+    /* Force hardware acceleration for better rendering */
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+.action-dropdown.show .action-dropdown-content {
+    display: block !important;
+    z-index: 2147483647 !important;
+    position: fixed !important;
+}
+
+.action-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.action-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.action-dropdown-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.action-dropdown-item:focus {
+    outline: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.action-dropdown-item.delete-item:hover {
+    background: var(--status-error);
+    color: white;
+}
+
+.action-dropdown-item.retry-item:hover {
+    background: var(--primary-orange);
+    color: white;
+}
+
+/* Responsive Dropdown */
+@media (max-width: 480px) {
+    .action-dropdown-content {
+        right: 0;
+        min-width: 180px;
+        max-width: 200px;
+    }
+}

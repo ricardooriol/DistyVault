@@ -1,0 +1,103 @@
+/* Loading Animation */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.btn-loading {
+    position: relative;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    border: 2px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Download Button States */
+.downloading {
+    position: relative;
+    opacity: 0.8;
+}
+
+.downloading .btn-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.downloading.cancellable {
+    opacity: 1;
+    background: var(--status-error) !important;
+    color: white !important;
+}
+
+.downloading.cancellable:hover {
+    background: #d32f2f !important;
+}
+
+.download-error {
+    background: var(--status-error) !important;
+    color: white !important;
+    animation: errorFlash 0.3s ease-in-out;
+}
+
+.download-error:hover {
+    background: #d32f2f !important;
+}
+
+@keyframes errorFlash {
+    0% {
+        background: var(--status-error);
+    }
+
+    50% {
+        background: #ff6b6b;
+    }
+
+    100% {
+        background: var(--status-error);
+    }
+}
+
+/* Progress Bar Animation */
+.progress-bar {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    height: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, var(--primary-orange), var(--orange-light));
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 8px;
+}

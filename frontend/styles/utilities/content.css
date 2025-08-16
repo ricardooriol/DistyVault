@@ -1,0 +1,199 @@
+/* Content Formatting */
+.distillation-content {
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.distillation-content h1,
+.distillation-content h2,
+.distillation-content h3 {
+    color: var(--primary-orange);
+    margin: 1.5rem 0 1rem 0;
+}
+
+.distillation-content p {
+    margin-bottom: 1rem;
+}
+
+.distillation-content ol,
+.distillation-content ul {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.distillation-content li {
+    margin-bottom: 0.5rem;
+}
+
+.distillation-content strong {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+}
+
+.distillation-content b,
+.distillation-content strong {
+    font-weight: bold !important;
+    font-weight: 700 !important;
+}
+
+/* Raw content and logs */
+.raw-content {
+    background: var(--bg-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.logs-content {
+    background: var(--bg-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-time {
+    color: var(--text-muted);
+    margin-right: 0.5rem;
+}
+
+.log-info {
+    color: var(--text-secondary);
+}
+
+.log-warn {
+    color: #ff9800;
+}
+
+.log-error {
+    color: var(--status-error);
+}
+
+/* Enhanced log styling */
+.log-section {
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.log-section-title {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-entry {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-level {
+    font-weight: bold;
+    margin-right: 0.5rem;
+    min-width: 60px;
+    display: inline-block;
+}
+
+.log-message {
+    word-wrap: break-word;
+}
+
+/* Modal content formatting - Manual numbered lists */
+.modal-body ol.manual-numbered {
+    padding-left: 0 !important;
+    list-style: none !important;
+    margin-left: 0 !important;
+    margin-bottom: 1rem !important;
+    counter-reset: none !important;
+}
+
+.modal-body ol.manual-numbered li {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 0 !important;
+    position: relative !important;
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-increment: none !important;
+}
+
+.modal-body ol.manual-numbered li::before {
+    display: none !important;
+    content: none !important;
+}
+
+.modal-body ol.manual-numbered li::marker {
+    display: none !important;
+    content: none !important;
+}
+
+/* Black bold numbers as requested */
+.modal-body ol.manual-numbered li .list-number,
+ol.manual-numbered li .list-number,
+.list-number {
+    color: var(--text-primary) !important;
+    font-weight: bold !important;
+    margin-right: 0.5rem !important;
+    display: inline-block !important;
+    min-width: 1.5rem !important;
+    text-align: left !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Additional reset for manual numbered lists */
+.modal-body ol.manual-numbered,
+.modal-body ol.manual-numbered * {
+    list-style: none !important;
+    list-style-type: none !important;
+    counter-reset: none !important;
+    counter-increment: none !important;
+}
+
+/* Fallback for regular ol elements */
+.modal-body ol:not(.manual-numbered) {
+    padding-left: 1.5rem !important;
+    list-style-type: decimal !important;
+}
+
+.modal-body ol:not(.manual-numbered) li {
+    display: list-item !important;
+    margin-bottom: 0.5rem !important;
+    list-style-type: decimal !important;
+}
+
+.modal-body ul {
+    padding-left: 1.5rem;
+}
+
+.modal-body ul>li {
+    margin-bottom: 0.5rem;
+    list-style-type: disc;
+}

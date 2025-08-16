@@ -2,13 +2,19 @@
   "name": "sawron-knowledge-app",
   "version": "1.0.0",
   "description": "SAWRON - Connect the Dots & Fill the Gaps - Local Knowledge Processing App",
-  "main": "server.js",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:validation": "node tests/run-validation-tests.js",
+    "test:comprehensive": "jest tests/comprehensive-validation.test.js --verbose",
+    "test:automated-execution": "jest tests/automated-execution.test.js --verbose",
+    "test:e2e": "jest tests/e2e --verbose",
+    "test:integration": "jest tests/integration --verbose",
+    "test:unit": "jest tests/unit --verbose"
   },
   "dependencies": {
     "@google/genai": "^0.3.0",
@@ -30,6 +36,7 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
+    "jsdom": "^23.2.0",
     "nodemon": "^3.0.2",
     "supertest": "^7.1.4"
   },

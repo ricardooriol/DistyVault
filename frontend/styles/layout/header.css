@@ -1,0 +1,49 @@
+/* Header Layout */
+.header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 0;
+    position: relative;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    text-align: center;
+}
+
+/* Align settings button to the far left of the header */
+.left-aligned-settings {
+    position: absolute;
+    top: 1.5rem;
+    left: 2rem;
+}
+
+.header-actions {
+    position: absolute;
+    top: 1.5rem;
+    right: 2rem;
+}
+
+/* Responsive Header */
+@media (max-width: 768px) {
+    .left-aligned-settings {
+        left: 1rem;
+        top: 1rem;
+    }
+    
+    .header-content {
+        padding: 0 1rem;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .header-actions {
+        justify-content: center;
+    }
+}

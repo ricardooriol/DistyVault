@@ -1,0 +1,138 @@
+/* Status Section */
+.status-icon {
+    font-size: 1.5rem;
+}
+
+.status-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.status-message {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Bulk Actions Bar */
+.bulk-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
+}
+
+.bulk-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.bulk-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-action-btn {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    border: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    appearance: none;
+    outline: none;
+    box-shadow: none;
+    text-decoration: none;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.bulk-action-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.bulk-action-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.bulk-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.bulk-action-btn.select-all-btn {
+    background: var(--primary-orange);
+    color: white;
+}
+
+.bulk-action-btn.select-all-btn:hover:not(:disabled) {
+    background: var(--orange-hover);
+}
+
+.bulk-action-btn.download-btn {
+    background: var(--status-completed);
+    color: white;
+}
+
+.bulk-action-btn.download-btn:hover:not(:disabled) {
+    background: #45a049;
+}
+
+.bulk-action-btn.delete-btn {
+    background: var(--status-error);
+    color: white;
+}
+
+.bulk-action-btn.delete-btn:hover:not(:disabled) {
+    background: #d32f2f;
+}
+
+.bulk-action-btn.retry-btn {
+    background: var(--primary-orange);
+    color: white;
+}
+
+.bulk-action-btn.retry-btn:hover:not(:disabled) {
+    background: var(--orange-hover);
+}
+
+.bulk-action-btn.retry-all-btn {
+    background: #2196f3;
+    color: white;
+}
+
+.bulk-action-btn.retry-all-btn:hover:not(:disabled) {
+    background: #1976d2;
+}
+
+.bulk-action-btn.retry-failed-btn {
+    background: #ff9800;
+    color: white;
+}
+
+.bulk-action-btn.retry-failed-btn:hover:not(:disabled) {
+    background: #f57c00;
+}
+
+.selected-count {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}

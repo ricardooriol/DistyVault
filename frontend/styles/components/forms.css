@@ -1,0 +1,285 @@
+/* Form Elements */
+.main-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.input-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+}
+
+.main-input-field {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    text-align: center;
+    min-width: 0;
+}
+
+.main-input-field:focus {
+    outline: none;
+    border-color: var(--primary-orange);
+    box-shadow: 0 0 0 3px var(--shadow-light);
+}
+
+.main-input-field::placeholder {
+    color: white;
+    opacity: 1;
+}
+
+.file-upload-btn,
+.dropzone-btn {
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 150px;
+    height: 56px;
+    box-sizing: border-box;
+}
+
+.file-upload-btn:hover,
+.dropzone-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--text-primary);
+}
+
+.file-upload-btn .btn-text,
+.dropzone-btn .btn-text {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.dropzone-btn.dragover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--primary-orange);
+}
+
+/* Ensure all buttons in the input row have consistent styling */
+.input-row .file-upload-btn,
+.input-row .dropzone-btn,
+.input-row .distill-btn {
+    flex-shrink: 0;
+}
+
+/* Additional responsive adjustments */
+@media (max-width: 480px) {
+    .input-row {
+        gap: 0.75rem;
+    }
+    
+    .file-upload-btn .btn-text,
+    .dropzone-btn .btn-text {
+        font-size: 0.9rem;
+    }
+}
+
+.search-input,
+.filter-select {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    height: 44px;
+    box-sizing: border-box;
+}
+
+.filter-select {
+    text-align: center;
+    text-align-last: center;
+}
+
+.search-input {
+    width: 250px;
+}
+
+.search-input:focus,
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-orange);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--primary-orange);
+    box-shadow: 0 0 0 2px var(--shadow-light);
+}
+
+.form-input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-help {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+/* API Key Input */
+.api-key-input-container {
+    position: relative;
+    display: flex;
+}
+
+.api-key-input-container .form-input {
+    padding-right: 3rem;
+}
+
+/* Mode Toggle */
+.mode-toggle-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.mode-toggle {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 30px;
+}
+
+.mode-toggle input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    transition: 0.3s;
+    border-radius: 30px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--text-secondary);
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+input:checked+.toggle-slider {
+    background-color: var(--primary-orange);
+    border-color: var(--primary-orange);
+}
+
+input:checked+.toggle-slider:before {
+    transform: translateX(30px);
+    background-color: white;
+}
+
+.mode-labels {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.mode-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+}
+
+.mode-label.active {
+    color: var(--primary-orange);
+    font-weight: 500;
+}
+
+.mode-description {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+/* Responsive Forms */
+@media (max-width: 768px) {
+    .main-input-group {
+        gap: 1rem;
+    }
+
+    .input-row {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .main-input-field {
+        padding: 1rem 1.5rem;
+    }
+
+    .file-upload-btn,
+    .dropzone-btn,
+    .distill-btn {
+        width: 100%;
+        min-width: auto;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    .mode-labels {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+}

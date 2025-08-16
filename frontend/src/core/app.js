@@ -1,0 +1,646 @@
+/**
+ * SawronApp - Main application controller
+ * Coordinates all components and manages application state
+ */
+class SawronApp {
+    constructor() {
+        // Core services
+        this.apiClient = new ApiClient();
+        this.eventBus = new EventBus();
+        
+        // Application state
+        this.knowledgeBase = [];
+        this.currentFilter = 'all';
+        this.refreshInterval = null;
+        this.statusMonitorInterval = null;
+        this.chronometerInterval = null;
+        
+        // Component managers
+        this.downloadStateManager = null;
+        this.tooltipManager = null;
+        this.modalManager = null;
+        this.bulkActionsManager = null;
+        
+        // UI components
+        this.knowledgeBaseTable = null;
+        this.inputSection = null;
+        this.statusSection = null;
+        this.settingsModal = null;
+        
+        // Backward compatibility
+        this.selectedItems = new Set();
+        
+        this.init();
+    }
+
+    /**
+     * Initialize the application
+     */
+    init() {
+        this.setupEventListeners();
+        this.initializeComponents();
+        this.loadKnowledgeBase();
+        this.startAutoRefresh();
+        this.startChronometer();
+        this.initializeTooltips();
+    }
+
+    /**
+     * Set up global event listeners
+     */
+    setupEventListeners() {
+        // Listen for API errors
+        this.eventBus.on(EventBus.Events.ERROR_OCCURRED, this.handleError, this);
+        
+        // Listen for knowledge base updates
+        this.eventBus.on(EventBus.Events.KNOWLEDGE_BASE_UPDATED, this.onKnowledgeBaseUpdated, this);
+        
+        // Listen for processing events
+        this.eventBus.on(EventBus.Events.PROCESSING_STARTED, this.onProcessingStarted, this);
+        this.eventBus.on(EventBus.Events.PROCESSING_COMPLETED, this.onProcessingCompleted, this);
+        
+        // Listen for selection changes
+        this.eventBus.on(EventBus.Events.SELECTION_CHANGED, this.onSelectionChanged, this);
+    }
+
+    /**
+     * Initialize all component managers and UI components
+     */
+    initializeComponents() {
+        // Initialize component managers
+        this.downloadStateManager = new DownloadStateManager();
+        this.tooltipManager = new TooltipManager();
+        this.modalManager = new ModalManager();
+        this.bulkActionsManager = new BulkActionsManager(this);
+        
+        // Initialize UI components
+        this.knowledgeBaseTable = new KnowledgeBaseTable(this);
+        this.inputSection = new InputSection(this);
+        this.statusSection = new StatusSection(this);
+        this.settingsModal = new SettingsModal(this);
+        
+        // Set up backward compatibility
+        this.selectedItems = this.bulkActionsManager.selectedItems;
+        
+        // Initialize all components
+        this.knowledgeBaseTable.init();
+        this.inputSection.init();
+        this.statusSection.init();
+        this.settingsModal.init();
+        
+        // Hide bulk actions bar initially to prevent flash
+        const bulkActionsBar = DomUtils.getElementById('bulk-actions-bar');
+        if (bulkActionsBar) {
+            bulkActionsBar.style.display = 'none';
+        }
+    }
+
+    /**
+     * Load knowledge base data
+     */
+    async loadKnowledgeBase() {
+        try {
+            const data = await this.apiClient.getSummaries();
+            this.knowledgeBase = this.sortKnowledgeBaseItems(data);
+            
+            // Emit event for components to react
+            this.eventBus.emit(EventBus.Events.KNOWLEDGE_BASE_LOADED, this.knowledgeBase);
+            
+            // Delegate to table component
+            if (this.knowledgeBaseTable) {
+                this.knowledgeBaseTable.knowledgeBase = this.knowledgeBase;
+                this.knowledgeBaseTable.renderKnowledgeBase();
+            }
+            
+            return this.knowledgeBase;
+        } catch (error) {
+            console.error('Failed to load knowledge base:', error);
+            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
+                message: 'Failed to load knowledge base',
+                error
+            });
+            return [];
+        }
+    }
+
+    /**
+     * Start automatic refresh monitoring
+     */
+    startAutoRefresh() {
+        this.startStatusMonitoring();
+    }
+
+    /**
+     * Start status monitoring for live updates
+     */
+    startStatusMonitoring() {
+        this.statusMonitorInterval = setInterval(() => {
+            this.checkForStatusUpdates();
+        }, 2000);
+    }
+
+    /**
+     * Start chronometer for processing time updates
+     */
+    startChronometer() {
+        this.chronometerInterval = setInterval(() => {
+            this.updateProcessingTimes();
+        }, 500);
+    }
+
+    /**
+     * Stop all automatic refresh intervals
+     */
+    stopAutoRefresh() {
+        if (this.statusMonitorInterval) {
+            clearInterval(this.statusMonitorInterval);
+            this.statusMonitorInterval = null;
+        }
+        if (this.chronometerInterval) {
+            clearInterval(this.chronometerInterval);
+            this.chronometerInterval = null;
+        }
+    }
+
+    /**
+     * Check for status updates
+     */
+    async checkForStatusUpdates() {
+        try {
+            const latestData = await this.apiClient.getSummaries();
+            
+            // Check for changes
+            const itemsToCheck = [...this.knowledgeBase];
+            let needsReSort = false;
+            
+            itemsToCheck.forEach(oldItem => {
+                const newItem = latestData.find(item => item.id === oldItem.id);
+                if (newItem && this.hasItemChanged(oldItem, newItem)) {
+                    if (oldItem.status !== newItem.status) {
+                        needsReSort = true;
+                    }
+                    
+                    // Update item and emit event
+                    const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
+                    if (index !== -1) {
+                        this.knowledgeBase[index] = newItem;
+                        this.eventBus.emit(EventBus.Events.ITEM_UPDATED, newItem);
+                    }
+                }
+            });
+            
+            // Check for new items
+            const newItems = latestData.filter(item =>
+                !this.knowledgeBase.find(existing => existing.id === item.id)
+            );
+            
+            if (newItems.length > 0) {
+                this.knowledgeBase = this.sortKnowledgeBaseItems([...this.knowledgeBase, ...newItems]);
+                newItems.forEach(item => {
+                    this.eventBus.emit(EventBus.Events.ITEM_ADDED, item);
+                });
+                needsReSort = true;
+            }
+            
+            // Check for deleted items
+            const deletedItems = this.knowledgeBase.filter(oldItem =>
+                !latestData.find(item => item.id === oldItem.id)
+            );
+            
+            deletedItems.forEach(deletedItem => {
+                const index = this.knowledgeBase.findIndex(item => item.id === deletedItem.id);
+                if (index !== -1) {
+                    this.knowledgeBase.splice(index, 1);
+                    this.eventBus.emit(EventBus.Events.ITEM_DELETED, deletedItem);
+                }
+            });
+            
+            // Re-sort and re-render if needed
+            if (needsReSort) {
+                this.knowledgeBase = this.sortKnowledgeBaseItems(this.knowledgeBase);
+                this.eventBus.emit(EventBus.Events.KNOWLEDGE_BASE_UPDATED, this.knowledgeBase);
+            }
+            
+        } catch (error) {
+            console.warn('Status update error:', error.message);
+        }
+    }
+
+    /**
+     * Force immediate status update
+     */
+    forceStatusUpdate() {
+        this.checkForStatusUpdates();
+    }
+
+    /**
+     * Update processing times for live chronometer
+     */
+    updateProcessingTimes() {
+        if (this.knowledgeBaseTable) {
+            this.knowledgeBaseTable.updateProcessingTimes();
+        }
+    }
+
+    /**
+     * Check if an item has changed
+     */
+    hasItemChanged(oldItem, newItem) {
+        return (
+            newItem.status !== oldItem.status ||
+            newItem.processingStep !== oldItem.processingStep ||
+            newItem.title !== oldItem.title ||
+            newItem.startTime !== oldItem.startTime ||
+            newItem.distillingStartTime !== oldItem.distillingStartTime ||
+            newItem.completedAt !== oldItem.completedAt ||
+            newItem.processingTime !== oldItem.processingTime ||
+            newItem.wordCount !== oldItem.wordCount ||
+            newItem.error !== oldItem.error ||
+            newItem.elapsedTime !== oldItem.elapsedTime ||
+            newItem.content !== oldItem.content ||
+            newItem.rawContent !== oldItem.rawContent ||
+            newItem.sourceUrl !== oldItem.sourceUrl ||
+            newItem.sourceType !== oldItem.sourceType ||
+            JSON.stringify(newItem.sourceFile) !== JSON.stringify(oldItem.sourceFile) ||
+            JSON.stringify(newItem.logs) !== JSON.stringify(oldItem.logs)
+        );
+    }
+
+    /**
+     * Sort knowledge base items
+     */
+    sortKnowledgeBaseItems(items) {
+        if (this.knowledgeBaseTable) {
+            return this.knowledgeBaseTable.sortKnowledgeBaseItems(items);
+        }
+        return items;
+    }
+
+    /**
+     * Filter knowledge base
+     */
+    filterKnowledgeBase(searchTerm, type) {
+        this.currentFilter = type;
+        if (this.knowledgeBaseTable) {
+            return this.knowledgeBaseTable.filterKnowledgeBase(searchTerm, type);
+        }
+    }
+
+    /**
+     * Initialize tooltips
+     */
+    initializeTooltips() {
+        document.addEventListener('mouseover', (e) => {
+            const element = e.target.closest('[data-tooltip]');
+            if (element) {
+                const tooltipText = element.getAttribute('data-tooltip');
+                if (tooltipText && tooltipText.trim()) {
+                    this.tooltipManager.showTooltip(element, tooltipText);
+                }
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const element = e.target.closest('[data-tooltip]');
+            if (element) {
+                this.tooltipManager.hideTooltip();
+            }
+        });
+
+        document.addEventListener('scroll', () => {
+            this.tooltipManager.cleanupStuckTooltips();
+        }, true);
+
+        window.addEventListener('resize', () => {
+            this.tooltipManager.cleanupStuckTooltips();
+        });
+    }
+
+    // API wrapper methods using centralized client
+
+    /**
+     * Delete distillation
+     */
+    async deleteDistillation(id) {
+        try {
+            await this.apiClient.deleteSummary(id);
+            
+            // Remove from local data
+            this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== id);
+            this.selectedItems.delete(id);
+            
+            // Emit events
+            this.eventBus.emit(EventBus.Events.ITEM_DELETED, { id });
+            this.eventBus.emit(EventBus.Events.KNOWLEDGE_BASE_UPDATED, this.knowledgeBase);
+            
+            // Update UI
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (row) {
+                row.remove();
+            }
+            
+            this.showTemporaryMessage('Item deleted successfully', 'success');
+            
+        } catch (error) {
+            console.error('Error deleting distillation:', error);
+            this.showTemporaryMessage('Failed to delete item', 'error');
+            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
+                message: 'Failed to delete item',
+                error
+            });
+        }
+    }
+
+    /**
+     * Retry distillation
+     */
+    async retryDistillation(id) {
+        try {
+            await this.apiClient.retryDistillation(id);
+            this.showTemporaryMessage('Retry initiated', 'success');
+            this.forceStatusUpdate();
+            
+            this.eventBus.emit(EventBus.Events.PROCESSING_STARTED, { id });
+            
+        } catch (error) {
+            console.error('Error retrying distillation:', error);
+            this.showTemporaryMessage('Failed to retry', 'error');
+            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
+                message: 'Failed to retry distillation',
+                error
+            });
+        }
+    }
+
+    /**
+     * Stop processing
+     */
+    async stopProcessing(id) {
+        try {
+            await this.apiClient.stopProcessing(id);
+            this.showTemporaryMessage('Processing stopped', 'success');
+            this.forceStatusUpdate();
+            
+            this.eventBus.emit(EventBus.Events.PROCESSING_STOPPED, { id });
+            
+        } catch (error) {
+            console.error('Error stopping processing:', error);
+            this.showTemporaryMessage('Failed to stop processing', 'error');
+            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
+                message: 'Failed to stop processing',
+                error
+            });
+        }
+    }
+
+    /**
+     * Handle download click
+     */
+    async handleDownloadClick(id) {
+        const buttonId = `download-btn-${id}`;
+        
+        try {
+            // Set download state
+            this.downloadStateManager.setDownloadState(buttonId, 'downloading');
+            
+            const result = await this.apiClient.downloadPdf(id);
+            
+            // Create download
+            const blob = result.blob;
+            const contentDisposition = result.headers.get('Content-Disposition');
+            let filename = `distillation-${id}.pdf`;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            this.downloadStateManager.setDownloadState(buttonId, 'completed');
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            this.downloadStateManager.setDownloadState(buttonId, 'error');
+            this.showTemporaryMessage('Download failed', 'error');
+            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
+                message: 'Download failed',
+                error
+            });
+        }
+    }
+
+    /**
+     * Show temporary message
+     */
+    showTemporaryMessage(message, type = 'info') {
+        let messageContainer = document.getElementById('temp-message-container');
+        if (!messageContainer) {
+            messageContainer = document.createElement('div');
+            messageContainer.id = 'temp-message-container';
+            messageContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 400px;
+            `;
+            document.body.appendChild(messageContainer);
+        }
+
+        const messageElement = document.createElement('div');
+        messageElement.style.cssText = `
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+            background: ${type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : type === 'error' ? '#f44336' : '#2196f3'};
+        `;
+
+        messageElement.textContent = message;
+        messageContainer.appendChild(messageElement);
+
+        setTimeout(() => {
+            messageElement.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.parentNode.removeChild(messageElement);
+                }
+            }, 300);
+        }, 4000);
+    }
+
+    // Event handlers
+
+    /**
+     * Handle errors
+     */
+    handleError(errorData) {
+        console.error('Application error:', errorData);
+        // Could show user-friendly error messages here
+    }
+
+    /**
+     * Handle knowledge base updates
+     */
+    onKnowledgeBaseUpdated(data) {
+        if (this.knowledgeBaseTable) {
+            this.knowledgeBaseTable.knowledgeBase = this.knowledgeBase;
+            this.knowledgeBaseTable.renderKnowledgeBase();
+        }
+    }
+
+    /**
+     * Handle processing started
+     */
+    onProcessingStarted(data) {
+        // Could show processing indicators
+    }
+
+    /**
+     * Handle processing completed
+     */
+    onProcessingCompleted(data) {
+        // Could show completion notifications
+    }
+
+    /**
+     * Handle selection changes
+     */
+    onSelectionChanged(data) {
+        // Update bulk actions UI
+        if (this.bulkActionsManager) {
+            this.bulkActionsManager.updateBulkActionsBar();
+        }
+    }
+
+    // Backward compatibility methods - delegate to components
+
+    // Input section delegation
+    handleInputChange(value) {
+        return this.inputSection?.handleInputChange(value);
+    }
+
+    handleFileSelection(files) {
+        return this.inputSection?.handleFileSelection(files);
+    }
+
+    showFileDisplay(file) {
+        return this.inputSection?.showFileDisplay(file);
+    }
+
+    removeFile() {
+        return this.inputSection?.removeFile();
+    }
+
+    updateButtonStates() {
+        return this.inputSection?.updateButtonStates();
+    }
+
+    get selectedFile() {
+        return this.inputSection?.selectedFile;
+    }
+
+    set selectedFile(value) {
+        if (this.inputSection) {
+            this.inputSection.selectedFile = value;
+        }
+    }
+
+    async startDistillation() {
+        return this.inputSection?.startDistillation();
+    }
+
+    // Status section delegation
+    showStatus(message, progress = 0) {
+        return this.statusSection?.showStatus(message, progress);
+    }
+
+    hideStatus() {
+        return this.statusSection?.hideStatus();
+    }
+
+    // Bulk actions delegation
+    clearAllSelections() {
+        return this.bulkActionsManager?.clearAllSelections();
+    }
+
+    forceBulkActionsRefresh() {
+        return this.bulkActionsManager?.forceBulkActionsRefresh();
+    }
+
+    nuclearSelectionReset() {
+        return this.bulkActionsManager?.nuclearSelectionReset();
+    }
+
+    handleRowSelection() {
+        return this.bulkActionsManager?.handleRowSelection();
+    }
+
+    updateBulkActionsBar() {
+        return this.bulkActionsManager?.updateBulkActionsBar();
+    }
+
+    toggleSelectAll() {
+        return this.bulkActionsManager?.toggleSelectAll();
+    }
+
+    handleBulkDownloadClick() {
+        return this.bulkActionsManager?.handleBulkDownloadClick();
+    }
+
+    async bulkDownload() {
+        return this.bulkActionsManager?.bulkDownload();
+    }
+
+    async bulkDelete() {
+        return this.bulkActionsManager?.bulkDelete();
+    }
+
+    async bulkRetry() {
+        return this.bulkActionsManager?.bulkRetry();
+    }
+
+    async bulkRetryAll() {
+        return this.bulkActionsManager?.bulkRetryAll();
+    }
+
+    async bulkRetryFailed() {
+        return this.bulkActionsManager?.bulkRetryFailed();
+    }
+
+    getSelectedIds() {
+        return this.bulkActionsManager?.getSelectedIds();
+    }
+
+    // Knowledge base table delegation
+    renderKnowledgeBase() {
+        return this.knowledgeBaseTable?.renderKnowledgeBase();
+    }
+
+    // Utility methods
+    isValidUrl(string) {
+        return ValidationUtils.isValidUrl(string);
+    }
+
+    formatTimeDisplay(timeInSeconds) {
+        return DateUtils.formatTimeDisplay(timeInSeconds);
+    }
+
+    calculateProcessingTimeDisplay(item) {
+        return DateUtils.calculateProcessingTimeDisplay(item);
+    }
+}

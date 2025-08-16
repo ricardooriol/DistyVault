@@ -1,0 +1,369 @@
+/* Button Styles */
+.settings-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--primary-orange);
+}
+
+.paste-btn-inside {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.paste-btn-inside:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--primary-orange);
+}
+
+.paste-btn {
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.paste-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--text-primary);
+}
+
+.upload-btn,
+.distill-btn {
+    background: var(--primary-orange);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    min-width: 150px;
+    height: 56px;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.upload-btn:hover,
+.distill-btn:hover {
+    background: var(--orange-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px var(--shadow-medium);
+}
+
+.upload-btn:active,
+.distill-btn:active {
+    transform: translateY(0);
+}
+
+.upload-btn.disabled,
+.distill-btn.disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.upload-btn.disabled:hover,
+.distill-btn.disabled:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    transform: none;
+    box-shadow: none;
+}
+
+.refresh-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    height: 44px;
+    box-sizing: border-box;
+}
+
+.refresh-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-orange);
+    color: var(--text-primary);
+}
+
+.remove-file-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.remove-file-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Button icon sizing */
+.btn-icon {
+    font-size: 1.2rem;
+    display: inline-block;
+}
+
+.settings-btn .btn-icon {
+    font-size: 3.5rem;
+}
+
+.upload-btn .btn-icon,
+.distill-btn .btn-icon {
+    font-size: 1.2rem;
+}
+
+.upload-btn .btn-text,
+.distill-btn .btn-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.refresh-btn .btn-icon {
+    font-size: 1rem;
+}
+
+/* Action buttons */
+.action-btn {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    border: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.action-btn:focus {
+    outline: 2px solid var(--primary-orange);
+    outline-offset: 2px;
+}
+
+.action-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.view-btn {
+    background: var(--primary-orange);
+    color: white;
+    order: 1;
+}
+
+.view-btn:hover {
+    background: var(--orange-hover);
+}
+
+.download-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    order: 2;
+}
+
+.download-btn:hover {
+    background: var(--border-color);
+}
+
+.stop-btn {
+    background: var(--status-error);
+    color: white;
+    order: 4;
+}
+
+.stop-btn:hover {
+    background: #d32f2f;
+}
+
+.debug-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    order: 3;
+}
+
+.debug-btn:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.delete-btn {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    order: 5;
+}
+
+.delete-btn:hover {
+    background: var(--status-error);
+    color: white;
+    border-color: var(--status-error);
+}
+
+/* Test Button */
+.test-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    margin-top: 1rem;
+}
+
+.test-btn:hover {
+    background: var(--border-hover);
+    border-color: var(--border-hover);
+}
+
+.test-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.test-btn.testing {
+    background: var(--status-processing);
+    border-color: var(--status-processing);
+}
+
+.test-btn.success {
+    background: var(--status-completed);
+    border-color: var(--status-completed);
+}
+
+.test-btn.error {
+    background: var(--status-error);
+    border-color: var(--status-error);
+}
+
+/* Save and Reset Buttons */
+.save-btn {
+    background: var(--primary-orange);
+    border: 1px solid var(--primary-orange);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 180px;
+    width: 180px;
+}
+
+.save-btn:hover {
+    background: var(--orange-hover);
+    border-color: var(--orange-hover);
+}
+
+.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.reset-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.reset-btn:hover {
+    background: var(--border-hover);
+    border-color: var(--border-hover);
+}
+
+/* Toggle visibility button */
+.toggle-visibility-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: color 0.2s ease;
+}
+
+.toggle-visibility-btn:hover {
+    color: var(--text-secondary);
+}
