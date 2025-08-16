@@ -381,9 +381,8 @@ class BulkActionsManager {
                         <tr>
                             <td colspan="8" class="empty-state-cell">
                                 <div class="empty-state">
-                                    <div class="empty-icon">🎯</div>
-                                    <h3>Ready to Process Knowledge</h3>
-                                    <p>Start by entering a URL, YouTube video, or uploading a document above.</p>
+                                    <h3>Ready to Distill Knowledge</h3>
+                                    <p>Start by pasting a URL, YouTube video/playlist, or uploading a document above</p>
                                 </div>
                             </td>
                         </tr>

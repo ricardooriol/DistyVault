@@ -1,5 +1,5 @@
 {
-  "name": "distyvault-knowledge-app",
+  "name": "distyvault",
   "version": "1.0.0",
   "description": "DistyVault - Connect the Dots & Fill the Gaps - Local Knowledge Processing App",
   "main": "backend/server.js",
