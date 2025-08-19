@@ -72,9 +72,7 @@ app.use('/api', processingRoutes);
 app.use('/api', aiSettingsRoutes);
 app.use('/api', healthRoutes);
 
-// Special handling for file upload route (needs multer middleware)
-const processingController = require('./src/controllers/processingController');
-app.post('/api/process/file', upload.single('file'), processingController.processFile);
+// ...existing code...
 
 // Main route
 app.get('/', (req, res) => {

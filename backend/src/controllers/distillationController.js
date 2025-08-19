@@ -94,25 +94,39 @@ class DistillationController {
                 console.log('Retrying URL processing for:', distillation.sourceUrl);
                 retryResult = await processor.processUrl(distillation.sourceUrl);
             } else if (distillation.sourceType === 'file' && distillation.sourceFile) {
-                // For file retries, we need to check if we still have the raw content
-                if (!distillation.rawContent) {
+                // For file retries, use rawContent if available, otherwise re-extract from file path
+                if (distillation.rawContent) {
+                    console.log('Retrying file processing for:', distillation.sourceFile.name, '(using rawContent)');
+                    const mockFile = {
+                        originalname: distillation.sourceFile.name,
+                        mimetype: distillation.sourceFile.type,
+                        size: distillation.sourceFile.size,
+                        path: distillation.sourceFile.savedPath || null
+                    };
+                    retryResult = await processor.processFile(mockFile);
+                } else if (distillation.sourceFile.savedPath) {
+                    const fs = require('fs');
+                    if (fs.existsSync(distillation.sourceFile.savedPath)) {
+                        console.log('Retrying file processing for:', distillation.sourceFile.name, '(using savedPath)');
+                        const mockFile = {
+                            originalname: distillation.sourceFile.name,
+                            mimetype: distillation.sourceFile.type,
+                            size: distillation.sourceFile.size,
+                            path: distillation.sourceFile.savedPath
+                        };
+                        retryResult = await processor.processFile(mockFile);
+                    } else {
+                        return res.status(400).json({
+                            status: 'error',
+                            message: 'Cannot retry file processing - file not found on disk'
+                        });
+                    }
+                } else {
                     return res.status(400).json({
                         status: 'error',
-                        message: 'Cannot retry file processing - original file content not available'
+                        message: 'Cannot retry file processing - original file content not available and file path missing'
                     });
                 }
-
-                console.log('Retrying file processing for:', distillation.sourceFile.name);
-
-                // Create a mock file object from the stored data
-                const mockFile = {
-                    originalname: distillation.sourceFile.name,
-                    mimetype: distillation.sourceFile.type,
-                    size: distillation.sourceFile.size,
-                    path: null // We'll use rawContent instead
-                };
-
-                retryResult = await processor.retryFileProcessing(req.params.id, mockFile, distillation.rawContent);
             } else {
                 console.log('Cannot determine retry method. sourceType:', distillation.sourceType, 'sourceUrl:', !!distillation.sourceUrl, 'sourceFile:', !!distillation.sourceFile, 'rawContent:', !!distillation.rawContent);
                 return res.status(400).json({

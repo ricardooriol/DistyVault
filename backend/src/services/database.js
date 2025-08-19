@@ -143,14 +143,30 @@ class Database {
     }
 
     async deleteDistillation(id) {
-        return new Promise((resolve, reject) => {
-            this.db.run('DELETE FROM summaries WHERE id = ?', [id], function (err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(this.changes > 0);
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Get the distillation to check if it's a file upload
+                const distillation = await this.getDistillation(id);
+                if (distillation && distillation.sourceType === 'file' && distillation.sourceFile && distillation.sourceFile.savedPath) {
+                    const fs = require('fs');
+                    fs.unlink(distillation.sourceFile.savedPath, (err) => {
+                        if (err) {
+                            console.warn(`Could not delete file ${distillation.sourceFile.savedPath}:`, err.message);
+                        } else {
+                            console.log(`Deleted file ${distillation.sourceFile.savedPath}`);
+                        }
+                    });
                 }
-            });
+                this.db.run('DELETE FROM summaries WHERE id = ?', [id], function (err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.changes > 0);
+                    }
+                });
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 
@@ -248,13 +264,21 @@ class Database {
     }
 
     rowToDistillation(row) {
+        let sourceFile = null;
+        if (row.sourceFile) {
+            try {
+                sourceFile = JSON.parse(row.sourceFile);
+            } catch (e) {
+                sourceFile = null;
+            }
+        }
         return new Distillation({
             id: row.id,
             title: row.title,
             content: row.content,
             sourceUrl: row.sourceUrl,
             sourceType: row.sourceType,
-            sourceFile: row.sourceFile ? JSON.parse(row.sourceFile) : null,
+            sourceFile: sourceFile,
             status: row.status,
             processingStep: row.processingStep,
             rawContent: row.rawContent,

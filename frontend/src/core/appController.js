@@ -357,6 +357,11 @@ class DistyVaultApp {
             if (row) {
                 row.remove();
             }
+                
+                // Re-render table to update bulk actions bar visibility
+                if (this.knowledgeBaseTable) {
+                    this.knowledgeBaseTable.renderKnowledgeBase();
+                }
 
             this.showTemporaryMessage('Item deleted successfully', 'success');
 

@@ -60,11 +60,6 @@ class InputSection {
                 dropzone.style.color = 'var(--text-muted)';
                 this.handleFileSelection(e.dataTransfer.files);
             });
-
-            // Click handler for dropzone
-            dropzone.addEventListener('click', () => {
-                DomUtils.getElementById('file-input').click();
-            });
         }
     }
 

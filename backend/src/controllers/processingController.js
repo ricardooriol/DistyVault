@@ -31,12 +31,13 @@ class ProcessingController {
     async processFile(req, res) {
         try {
             if (!req.file) {
+                console.error('No file received in request:', req.body, req.headers);
                 return res.status(400).json({
                     status: 'error',
                     message: 'No file uploaded'
                 });
             }
-
+            console.log('File received:', req.file);
             const distillation = await processor.processFile(req.file);
             res.status(202).json(distillation);
         } catch (error) {

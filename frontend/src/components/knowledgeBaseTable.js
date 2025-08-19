@@ -107,6 +107,10 @@ class KnowledgeBaseTable {
      * Render the complete knowledge base table
      */
     renderKnowledgeBase() {
+        if (this.knowledgeBase.length === 0) {
+            this.renderFilteredKnowledgeBase([]);
+            return;
+        }
         const searchTerm = DomUtils.getElementById('search-input').value;
         this.filterKnowledgeBase(searchTerm, this.currentFilter);
     }
@@ -117,6 +121,7 @@ class KnowledgeBaseTable {
     renderFilteredKnowledgeBase(items) {
         const tbody = DomUtils.getElementById('knowledge-base-tbody');
         const bulkActionsBar = DomUtils.getElementById('bulk-actions-bar');
+            const tableHead = document.querySelector('#knowledge-base-table thead');
         
         // Store currently open dropdown to restore after rendering
         const openDropdown = document.querySelector('.action-dropdown.show');
@@ -129,9 +134,17 @@ class KnowledgeBaseTable {
                 bulkActionsBar.style.display = 'none';
                 this.app.selectedItems.clear();
             }
+                // Hide table header when empty
+                if (tableHead) {
+                    tableHead.style.display = 'none';
+                }
             return;
         }
 
+            // Show table header when items exist
+            if (tableHead) {
+                tableHead.style.display = 'table-header-group';
+            }
         tbody.innerHTML = items.map(item => this.createTableRow(item)).join('');
 
         // Show bulk actions bar when there are items

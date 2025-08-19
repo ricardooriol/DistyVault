@@ -602,7 +602,8 @@ class Processor {
             sourceFile: {
                 name: file.originalname,
                 type: file.mimetype,
-                size: file.size
+                size: file.size,
+                savedPath: file.path // Store the actual saved file path
             },
             status: 'pending',
             processingStep: 'Queued for processing'

@@ -245,6 +245,11 @@ class BulkActionsManager {
             }
             
             if (typeof ErrorUtils !== 'undefined' && ErrorUtils.isUserCancellation && ErrorUtils.isUserCancellation(error)) {
+                
+                // Re-render table to update header and bulk actions bar visibility
+                if (this.app.knowledgeBaseTable) {
+                    this.app.knowledgeBaseTable.renderKnowledgeBase();
+                }
                 return;
             }
             
@@ -363,41 +368,19 @@ class BulkActionsManager {
                 this.app.showTemporaryMessage('No items were deleted. Please try again.', 'error');
             }
 
-            // Remove deleted rows from table (use selectedIds since we know which ones were requested)
-            selectedIds.forEach(id => {
-                const row = document.querySelector(`tr[data-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-            });
-
             // Update local data
             this.app.knowledgeBase = this.app.knowledgeBase.filter(item => !selectedIds.includes(item.id));
-
-            // Check if table is now empty
-            const tbody = document.getElementById('knowledge-base-tbody');
-            if (tbody.children.length === 0) {
-                tbody.innerHTML = `
-                        <tr>
-                            <td colspan="8" class="empty-state-cell">
-                                <div class="empty-state">
-                                    <h3>Ready to Distill Knowledge</h3>
-                                    <p>Start by pasting a URL, YouTube video/playlist, or uploading a document above</p>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
+            if (this.app.knowledgeBaseTable) {
+                this.app.knowledgeBaseTable.knowledgeBase = this.app.knowledgeBase;
             }
-
-            // Hide bulk actions bar
-            document.getElementById('bulk-actions-bar').style.display = 'none';
 
             // Clear selection
             this.clearAllSelections();
 
-            // Force refresh bulk actions bar to ensure consistency
-            setTimeout(() => this.nuclearSelectionReset(), 100);
-            setTimeout(() => this.nuclearSelectionReset(), 500);
+            // Re-render table to update header, bulk actions bar, and empty state
+            if (this.app.knowledgeBaseTable) {
+                this.app.knowledgeBaseTable.renderKnowledgeBase();
+            }
 
         } catch (error) {
             ErrorUtils.handleApiError('bulk delete', error, {
