@@ -4,8 +4,9 @@ node_modules/
 # Old Sawron working code for referencing
 oldCode.txt
 
-# Databases
+# Databases and data
 backend/data
+uploads/
 
 # Logs
 npm-debug.log*
