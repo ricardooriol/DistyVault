@@ -3,11 +3,10 @@
  * Orchestrates the content extraction, distillation, and storage process
  */
 const contentExtractor = require('./contentExtractor');
-const ollamaService = require('./ollama');
 const database = require('./database');
 const Distillation = require('./distillation');
-const AIProviderFactory = require('./ai/aiProviderFactory');
-const AISettingsManager = require('./ai/aiSettingsManager');
+const AIProviderFactory = require('../ai/aiProviderFactory');
+const AISettingsManager = require('../ai/aiSettingsManager');
 const processingQueue = require('./processingQueue');
 const path = require('path');
 const fs = require('fs').promises;

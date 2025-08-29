@@ -1,4 +1,5 @@
-const ollamaService = require('../services/ollama');
+const AIProviderFactory = require('../services/ai/aiProviderFactory');
+const AISettingsManager = require('../services/ai/aiSettingsManager');
 
 class HealthController {
     /**
@@ -6,10 +7,21 @@ class HealthController {
      */
     async getHealth(req, res) {
         try {
-            const ollamaAvailable = await ollamaService.checkAvailability();
+            // Check current AI provider availability
+            let aiProviderStatus = 'unavailable';
+            try {
+                const aiSettingsManager = AISettingsManager.getInstance();
+                const config = aiSettingsManager.getCurrentProviderConfig();
+                const aiProvider = AIProviderFactory.createProvider(config);
+                const validation = await aiProvider.validateConfiguration();
+                aiProviderStatus = validation.valid ? 'available' : 'unavailable';
+            } catch (error) {
+                aiProviderStatus = 'unavailable';
+            }
+
             res.json({
                 status: 'ok',
-                ollama: ollamaAvailable ? 'available' : 'unavailable'
+                aiProvider: aiProviderStatus
             });
         } catch (error) {
             res.status(500).json({
@@ -24,14 +36,26 @@ class HealthController {
      */
     async getSystemStatus(req, res) {
         try {
-            const ollamaAvailable = await ollamaService.checkAvailability();
+            // Check current AI provider availability
+            let aiProviderStatus = 'unavailable';
+            let aiProviderName = 'unknown';
+            try {
+                const aiSettingsManager = AISettingsManager.getInstance();
+                const config = aiSettingsManager.getCurrentProviderConfig();
+                const aiProvider = AIProviderFactory.createProvider(config);
+                const validation = await aiProvider.validateConfiguration();
+                aiProviderStatus = validation.valid ? 'available' : 'unavailable';
+                aiProviderName = aiProvider.getDisplayName();
+            } catch (error) {
+                aiProviderStatus = 'unavailable';
+            }
             
             // Get processing queue status
-            const processingQueue = require('../services/processingQueue');
+            const processingQueue = require('../services/processing/processingQueue');
             const queueStatus = processingQueue.getStatus();
 
             // Get database status
-            const database = require('../services/database');
+            const database = require('../services/processing/database');
             let dbStatus = 'ok';
             try {
                 await database.getAllSummaries();
@@ -43,8 +67,9 @@ class HealthController {
                 status: 'ok',
                 timestamp: new Date().toISOString(),
                 services: {
-                    ollama: {
-                        status: ollamaAvailable ? 'available' : 'unavailable'
+                    aiProvider: {
+                        name: aiProviderName,
+                        status: aiProviderStatus
                     },
                     database: {
                         status: dbStatus

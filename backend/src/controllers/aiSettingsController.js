@@ -226,7 +226,7 @@ class AISettingsController {
             }
 
             // Update the processing queue
-            const processingQueue = require('../services/processingQueue');
+            const processingQueue = require('../services/processing/processingQueue');
             processingQueue.setMaxConcurrent(concurrentProcessing);
 
             res.json({
@@ -248,7 +248,7 @@ class AISettingsController {
      */
     getProcessingQueueStatus(req, res) {
         try {
-            const processingQueue = require('../services/processingQueue');
+            const processingQueue = require('../services/processing/processingQueue');
             const status = processingQueue.getStatus();
 
             res.json({
@@ -271,7 +271,7 @@ class AISettingsController {
     getGeneralSettings(req, res) {
         try {
             const aiSettings = sharedSettingsManager.loadSettings();
-            const processingQueue = require('../services/processingQueue');
+            const processingQueue = require('../services/processing/processingQueue');
             const queueStatus = processingQueue.getStatus();
 
             res.json({

@@ -1,4 +1,4 @@
-const processor = require('../services/processor');
+const processor = require('../services/processing/processor');
 
 class ProcessingController {
     /**
@@ -86,7 +86,7 @@ class ProcessingController {
         try {
             // This would typically get the current processing status
             // For now, we'll delegate to the database to get the distillation status
-            const database = require('../services/database');
+            const database = require('../services/processing/database');
             const distillation = await database.getDistillation(req.params.id);
             
             if (!distillation) {

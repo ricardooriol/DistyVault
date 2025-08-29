@@ -1,5 +1,5 @@
-const database = require('../services/database');
-const processor = require('../services/processor');
+const database = require('../services/processing/database');
+const processor = require('../services/processing/processor');
 
 class DistillationController {
     /**
