@@ -19,6 +19,7 @@ readmes/
 
 # IDE files
 .vscode/
+.kiro/
 .idea/
 *.swp
 *.swo
