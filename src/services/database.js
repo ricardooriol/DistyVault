@@ -4,7 +4,7 @@
  */
 (function() {
     const DB_NAME = 'DistyVaultDB';
-    const DB_VERSION = 1;
+    const DB_VERSION = 1; // baseline; we now open without specifying version to avoid VersionError
     const STORE_NAME = 'distillations';
 
     class Database {
@@ -18,9 +18,10 @@
         // IndexedDB setup
         // ===============
         initDB() {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 try {
-                    const request = indexedDB.open(DB_NAME, DB_VERSION);
+                    // Open without specifying version to use existing version and avoid VersionError
+                    const request = indexedDB.open(DB_NAME);
 
                     request.onupgradeneeded = (event) => {
                         const db = request.result;
@@ -46,7 +47,10 @@
                             resolve(db);
                         }
                     };
-                    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+                    request.onerror = () => {
+                        console.warn('IndexedDB open failed, falling back to localStorage:', request.error);
+                        resolve(null);
+                    };
                 } catch (err) {
                     console.warn('IndexedDB init failed, will use localStorage fallback:', err);
                     resolve(null);
@@ -58,7 +62,13 @@
             if (!this.supportsIndexedDB) {
                 return fn(null);
             }
-            let db = await this.dbPromise;
+            let db;
+            try {
+                db = await this.dbPromise;
+            } catch (e) {
+                console.warn('IndexedDB initialization error, using localStorage fallback:', e);
+                return fn(null);
+            }
             if (!db) return fn(null);
             // Ensure the object store exists; if not, attempt to create via upgrade
             if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -108,28 +118,37 @@
                     // Close current connection if present
                     try { currentDb && currentDb.close && currentDb.close(); } catch {}
 
-                    // Bump version to trigger onupgradeneeded
-                    const nextVersion = (currentDb?.version || DB_VERSION) + 1;
-                    const req = indexedDB.open(DB_NAME, nextVersion);
+                    // Re-open to get actual current version, then bump by +1
+                    const probe = indexedDB.open(DB_NAME);
+                    probe.onsuccess = () => {
+                        const live = probe.result;
+                        const nextVersion = (live?.version || DB_VERSION) + 1;
+                        try { live && live.close && live.close(); } catch {}
+                        const req = indexedDB.open(DB_NAME, nextVersion);
 
-                    req.onupgradeneeded = () => {
-                        const db2 = req.result;
-                        if (!db2.objectStoreNames.contains(STORE_NAME)) {
-                            const store = db2.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                            store.createIndex('status', 'status', { unique: false });
-                            store.createIndex('createdAt', 'createdAt', { unique: false });
-                        }
-                    };
+                        req.onupgradeneeded = () => {
+                            const db2 = req.result;
+                            if (!db2.objectStoreNames.contains(STORE_NAME)) {
+                                const store = db2.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                                store.createIndex('status', 'status', { unique: false });
+                                store.createIndex('createdAt', 'createdAt', { unique: false });
+                            }
+                        };
 
-                    req.onsuccess = () => {
-                        const db2 = req.result;
-                        this.dbPromise = Promise.resolve(db2);
-                        this._ensuringStore = null;
-                        resolve(db2);
+                        req.onsuccess = () => {
+                            const db2 = req.result;
+                            this.dbPromise = Promise.resolve(db2);
+                            this._ensuringStore = null;
+                            resolve(db2);
+                        };
+                        req.onerror = () => {
+                            this._ensuringStore = null;
+                            reject(req.error || new Error('ensureStore open failed'));
+                        };
                     };
-                    req.onerror = () => {
+                    probe.onerror = () => {
                         this._ensuringStore = null;
-                        reject(req.error || new Error('ensureStore open failed'));
+                        reject(probe.error || new Error('probe open failed'));
                     };
                 } catch (e) {
                     this._ensuringStore = null;
