@@ -73,13 +73,54 @@ class ApiClient {
         return { status: 'ok', message: 'Process stopped' };
     }
 
-    /** Download as HTML (client-side), returned as blob */
+    /** Download as PDF (client-side) using jsPDF + html2canvas */
     async downloadPdf(id) {
         const item = await this.db.getDistillation(id);
         if (!item || !item.content) throw new Error('Nothing to download');
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${(item.title||'Distillation')}</title></head><body>${item.content}</body></html>`;
-        const blob = new Blob([html], { type: 'text/html' });
-        const headers = new Headers({ 'Content-Disposition': `attachment; filename="${this._safeFilename((item.title||'distillation'))}.html"` });
+        // Lazy-load jsPDF and html2canvas from CDN
+        await this._ensurePdfLibs();
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '800px';
+        container.innerHTML = `<div style="font-family: Inter, Arial, sans-serif; line-height: 1.4;">${item.content}</div>`;
+        document.body.appendChild(container);
+        const opt = { scale: 2, useCORS: true, backgroundColor: '#ffffff' };
+        const canvas = await window.html2canvas(container, opt);
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth - 80; // margins
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        let y = 40;
+        let remainingHeight = imgHeight;
+        let position = y;
+        // Add pages if content exceeds one page
+        const pageImgHeight = pageHeight - 80; // 40 top/bottom margins
+        let srcY = 0;
+        const pxPerPt = canvas.height / imgHeight; // map rendered image height in pt to canvas px
+        while (remainingHeight > 0) {
+            const sliceHeightPt = Math.min(pageImgHeight, remainingHeight);
+            const sliceHeightPx = Math.floor(sliceHeightPt * pxPerPt);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = sliceHeightPx;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+            const sliceImg = sliceCanvas.toDataURL('image/png');
+            pdf.addImage(sliceImg, 'PNG', 40, position, imgWidth, sliceHeightPt);
+            remainingHeight -= sliceHeightPt;
+            srcY += sliceHeightPx;
+            if (remainingHeight > 0) {
+                pdf.addPage();
+                position = y;
+            }
+        }
+        document.body.removeChild(container);
+        const blob = pdf.output('blob');
+        const headers = new Headers({ 'Content-Disposition': `attachment; filename="${this._safeFilename((item.title||'distillation'))}.pdf"` });
         return { blob, headers, status: 200 };
     }
 
@@ -276,6 +317,29 @@ class ApiClient {
     _isCancelled(id) { return this.cancellations.get(id)?.cancelled; }
     async _markStopped(id) { await this.db.updateDistillationStatus(id, 'stopped', 'Processing stopped by user'); }
     _safeFilename(name) { return String(name).replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').toLowerCase() || 'distillation'; }
+
+    async _ensurePdfLibs() {
+        if (window.jspdf && window.html2canvas) return;
+        // Load html2canvas
+        if (!window.html2canvas) {
+            await this._loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+        }
+        // Load jsPDF
+        if (!window.jspdf) {
+            await this._loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+        }
+    }
+
+    _loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('Failed to load: ' + src));
+            document.head.appendChild(s);
+        });
+    }
 }
 
 // Export for use in other modules
