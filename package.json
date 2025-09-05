@@ -9,7 +9,11 @@
     "serve": "python3 -m http.server 8000"
   },
   "dependencies": {
-    "sql.js": "^1.10.3"
+    "sql.js": "^1.10.3",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
+    "busboy": "^1.6.0",
+    "@langchain/community": "^0.3.2"
   },
   "devDependencies": {},
   "keywords": [

@@ -226,9 +226,9 @@
             if (errorMessage) item.error = errorMessage;
 
             // Track key timestamps
-            if (status === 'processing' && !item.startTime) item.startTime = new Date();
+            if ((status === 'extracting' || status === 'processing') && !item.startTime) item.startTime = new Date();
             if (status === 'distilling') item.distillingStartTime = new Date();
-            if (status === 'failed' || status === 'cancelled') item.completedAt = new Date();
+            if (status === 'error' || status === 'stopped' || status === 'failed' || status === 'cancelled') item.completedAt = new Date();
 
             // Update elapsedTime if possible
             if (item.startTime) {
@@ -307,15 +307,19 @@
             }
         }
 
-        // Basic sort: prioritize queued/processing/distilling at top, then by createdAt desc
+    // Basic sort: prioritize active (pending/extracting/distilling) at top, then by createdAt desc
         _sortForUi(items) {
             const statusRank = {
-                processing: 0,
-                distilling: 1,
-                queued: 2,
-                completed: 3,
-                failed: 4,
-                cancelled: 5
+        pending: 0,
+        extracting: 1,
+        distilling: 2,
+        processing: 3, // legacy
+        queued: 4,     // legacy
+        completed: 5,
+        error: 6,
+        stopped: 7,
+        failed: 8,     // legacy
+        cancelled: 9   // legacy
             };
             return [...items].sort((a, b) => {
                 const ar = statusRank[a.status] ?? 99;
