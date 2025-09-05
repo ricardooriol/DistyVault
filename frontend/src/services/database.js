@@ -11,6 +11,7 @@
         constructor() {
             this.supportsIndexedDB = typeof indexedDB !== 'undefined';
             this.dbPromise = this.supportsIndexedDB ? this.initDB() : null;
+            this._ensuringStore = null; // guard concurrent ensureStore calls
         }
 
         // ===============
@@ -30,7 +31,21 @@
                         }
                     };
 
-                    request.onsuccess = () => resolve(request.result);
+                    request.onsuccess = async () => {
+                        const db = request.result;
+                        // If, for any reason, the store is missing (old/corrupt DB), try to upgrade and create it
+                        if (!db.objectStoreNames.contains(STORE_NAME)) {
+                            try {
+                                const upgraded = await this.ensureStore(db);
+                                resolve(upgraded);
+                            } catch (e) {
+                                console.warn('Failed to ensure object store, falling back to localStorage:', e);
+                                resolve(null);
+                            }
+                        } else {
+                            resolve(db);
+                        }
+                    };
                     request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
                 } catch (err) {
                     console.warn('IndexedDB init failed, will use localStorage fallback:', err);
@@ -43,8 +58,17 @@
             if (!this.supportsIndexedDB) {
                 return fn(null);
             }
-            const db = await this.dbPromise;
+            let db = await this.dbPromise;
             if (!db) return fn(null);
+            // Ensure the object store exists; if not, attempt to create via upgrade
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                try {
+                    db = await this.ensureStore(db);
+                } catch (e) {
+                    console.warn('withStore: ensureStore failed, using localStorage fallback:', e);
+                    return fn(null);
+                }
+            }
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, mode);
                 const store = tx.objectStore(STORE_NAME);
@@ -59,6 +83,61 @@
                 tx.onerror = () => reject(tx.error || new Error('Transaction failed'));
                 tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
             });
+        }
+
+        /**
+         * Ensure the target object store exists by performing a version upgrade if needed.
+         * Returns a DB instance that contains the required store.
+         */
+        async ensureStore(currentDb) {
+            if (!this.supportsIndexedDB) return null;
+
+            // De-duplicate concurrent calls
+            if (this._ensuringStore) {
+                return this._ensuringStore;
+            }
+
+            this._ensuringStore = new Promise((resolve, reject) => {
+                try {
+                    const needUpgrade = !currentDb || !currentDb.objectStoreNames.contains(STORE_NAME);
+                    if (!needUpgrade) {
+                        this._ensuringStore = null;
+                        return resolve(currentDb);
+                    }
+
+                    // Close current connection if present
+                    try { currentDb && currentDb.close && currentDb.close(); } catch {}
+
+                    // Bump version to trigger onupgradeneeded
+                    const nextVersion = (currentDb?.version || DB_VERSION) + 1;
+                    const req = indexedDB.open(DB_NAME, nextVersion);
+
+                    req.onupgradeneeded = () => {
+                        const db2 = req.result;
+                        if (!db2.objectStoreNames.contains(STORE_NAME)) {
+                            const store = db2.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                            store.createIndex('status', 'status', { unique: false });
+                            store.createIndex('createdAt', 'createdAt', { unique: false });
+                        }
+                    };
+
+                    req.onsuccess = () => {
+                        const db2 = req.result;
+                        this.dbPromise = Promise.resolve(db2);
+                        this._ensuringStore = null;
+                        resolve(db2);
+                    };
+                    req.onerror = () => {
+                        this._ensuringStore = null;
+                        reject(req.error || new Error('ensureStore open failed'));
+                    };
+                } catch (e) {
+                    this._ensuringStore = null;
+                    reject(e);
+                }
+            });
+
+            return this._ensuringStore;
         }
 
         // ========
