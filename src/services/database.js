@@ -257,6 +257,32 @@
             return this.saveDistillation(item);
         }
 
+        /** Append a log entry to a distillation */
+        async addLog(id, message, level = 'info', data = null) {
+            const item = await this.getDistillation(id);
+            if (!item) return false;
+            const entry = {
+                timestamp: new Date(),
+                level,
+                message,
+                data: data || undefined
+            };
+            item.logs = Array.isArray(item.logs) ? [...item.logs, entry] : [entry];
+            return this.saveDistillation(item);
+        }
+
+        /** Reset timing fields for a fresh retry run */
+        async resetTiming(id) {
+            const item = await this.getDistillation(id);
+            if (!item) return false;
+            item.startTime = new Date();
+            item.distillingStartTime = null;
+            item.completedAt = null;
+            item.elapsedTime = 0;
+            item.processingTime = 0;
+            return this.saveDistillation(item);
+        }
+
         async getDistillation(id) {
             if (this.supportsIndexedDB) {
                 return this.withStore('readonly', (store) => {

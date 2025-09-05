@@ -4,7 +4,8 @@
  */
 class AIService {
     constructor() {
-        this.config = this.loadConfig();
+    this.config = this.loadConfig();
+    this.database = new Database();
     }
 
     loadConfig() {
@@ -24,19 +25,25 @@ class AIService {
         localStorage.setItem('aiConfig', JSON.stringify(this.config));
     }
 
-    async distillContent(content) {
+    async distillContent(content, context = {}) {
         // Check if configuration is complete
         if (this.config.mode === 'offline') {
             if (!this.config.ollamaEndpoint || !this.config.ollamaModel) {
                 throw new Error('AI provider configuration is incomplete. Please configure Ollama settings.');
             }
+            if (context?.id) await this.database.addLog(context.id, 'Calling Ollama', 'info', { model: this.config.ollamaModel });
+            const t0 = Date.now();
             const raw = await this.distillWithOllama(content);
+            if (context?.id) await this.database.addLog(context.id, 'Received Ollama response', 'info', { ms: Date.now() - t0 });
             return this.postProcessDistillation(raw);
         } else {
             if (!this.config.provider || !this.config.apiKey) {
                 throw new Error('AI provider configuration is incomplete. Please configure your AI provider and API key in Settings.');
             }
+            if (context?.id) await this.database.addLog(context.id, 'Calling AI provider', 'info', { provider: this.config.provider, model: this.config.model || 'auto' });
+            const t0 = Date.now();
             const raw = await this.distillWithProvider(content);
+            if (context?.id) await this.database.addLog(context.id, 'Received AI response', 'info', { ms: Date.now() - t0 });
             return this.postProcessDistillation(raw);
         }
     }
@@ -301,6 +308,22 @@ ${text}`;
                     processed = NumberingProcessor.emergencyHTMLFormat(rawDistillation);
                 }
             }
+            // Emphasize main sentences when they end with a colon pattern like "Main point:"
+            try {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = processed;
+                wrapper.querySelectorAll('ol > li').forEach(li => {
+                    const text = li.textContent || '';
+                    const firstLine = text.split('\n')[0] || '';
+                    const colonIdx = firstLine.indexOf(':');
+                    if (colonIdx > 0 && colonIdx < 140) {
+                        const bold = firstLine.slice(0, colonIdx + 1);
+                        const rest = firstLine.slice(colonIdx + 1);
+                        li.innerHTML = `<strong>${bold}</strong>${rest}${li.innerHTML.slice(firstLine.length)}`;
+                    }
+                });
+                processed = wrapper.innerHTML;
+            } catch {}
             return processed;
         } catch (e) {
             try { return NumberingProcessor.emergencyHTMLFormat(rawDistillation); } catch { return rawDistillation; }
