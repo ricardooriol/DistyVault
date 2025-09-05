@@ -114,15 +114,15 @@ class SettingsModal {
     }
 
     /**
-     * Load settings from backend or localStorage
+     * Load settings from client-side storage
      */
     async loadSettings() {
         try {
-            // Try to load from backend first
+            // Load from AI service first (has in-memory API keys)
             const result = await this.app.apiClient.getAiSettings();
-            if (result.success && result.settings) {
+            if (result) {
                 // FORCE provider to be empty if not explicitly set
-                const settings = result.settings;
+                const settings = result;
                 if (!settings.online || !settings.online.provider) {
                     settings.online = settings.online || {};
                     settings.online.provider = '';
@@ -170,40 +170,25 @@ class SettingsModal {
     }
 
     /**
-     * Save settings to backend and localStorage
+     * Save settings to client-side storage
      */
     async saveSettings(settings) {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
 
-            // Save to backend (in-memory only for security)
-            const result = await this.app.apiClient.saveAiSettings(this.settings);
-            if (result.success) {
-                // Save non-sensitive settings to localStorage for UI persistence
-                const localSettings = { ...this.settings };
-                if (localSettings.online && localSettings.online.apiKey) {
-                    localSettings.online.apiKey = ''; // Don't store API key locally
-                }
-                localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
-                return true;
-            } else {
-                throw new Error(result.error || 'Failed to save settings to backend');
-            }
-        } catch (error) {
-            console.error('Error saving AI settings to backend:', error);
+            // Save to AI service (in-memory for API keys)
+            await this.app.apiClient.saveAiSettings(this.settings);
 
-            // Fallback to localStorage only (without API key)
-            try {
-                const localSettings = { ...this.settings };
-                if (localSettings.online && localSettings.online.apiKey) {
-                    localSettings.online.apiKey = ''; // Don't store API key locally
-                }
-                localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
-                return true;
-            } catch (localError) {
-                console.error('Error saving AI settings to localStorage:', localError);
-                return false;
+            // Save non-sensitive settings to localStorage for UI persistence
+            const localSettings = { ...this.settings };
+            if (localSettings.online && localSettings.online.apiKey) {
+                localSettings.online.apiKey = ''; // Don't store API key locally
             }
+            localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
+            return true;
+        } catch (error) {
+            console.error('Error saving AI settings:', error);
+            return false;
         }
     }
 

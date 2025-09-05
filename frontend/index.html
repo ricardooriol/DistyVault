@@ -327,6 +327,29 @@
         </div>
     </div>
 
+    <!-- Polyfills -->
+    <script>
+        // requestIdleCallback polyfill
+        if (!window.requestIdleCallback) {
+            window.requestIdleCallback = function(callback, options) {
+                const start = Date.now();
+                return setTimeout(function() {
+                    callback({
+                        didTimeout: false,
+                        timeRemaining: function() {
+                            return Math.max(0, 50 - (Date.now() - start));
+                        }
+                    });
+                }, 1);
+            };
+        }
+        if (!window.cancelIdleCallback) {
+            window.cancelIdleCallback = function(id) {
+                clearTimeout(id);
+            };
+        }
+    </script>
+    
     <!-- SQL.js Library -->
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
     

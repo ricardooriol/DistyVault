@@ -25,9 +25,16 @@ class AIService {
     }
 
     async distillContent(content) {
+        // Check if configuration is complete
         if (this.config.mode === 'offline') {
+            if (!this.config.ollamaEndpoint || !this.config.ollamaModel) {
+                throw new Error('AI provider configuration is incomplete. Please configure Ollama settings.');
+            }
             return await this.distillWithOllama(content);
         } else {
+            if (!this.config.provider || !this.config.apiKey) {
+                throw new Error('AI provider configuration is incomplete. Please configure your AI provider and API key in Settings.');
+            }
             return await this.distillWithProvider(content);
         }
     }

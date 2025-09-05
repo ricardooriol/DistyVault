@@ -144,7 +144,23 @@ class Processor {
                 'Processing with AI...'
             );
 
-            const distilledContent = await this.aiService.distillContent(rawContent);
+            let distilledContent;
+            try {
+                distilledContent = await this.aiService.distillContent(rawContent);
+            } catch (aiError) {
+                if (aiError.message.includes('configuration is incomplete')) {
+                    // For configuration errors, provide a helpful fallback
+                    distilledContent = `Content extracted successfully, but AI distillation is not configured.
+
+Please configure your AI provider in Settings to enable automatic distillation.
+
+Raw content preview:
+${rawContent.substring(0, 500)}${rawContent.length > 500 ? '...' : ''}`;
+                } else {
+                    throw aiError;
+                }
+            }
+            
             const wordCount = distilledContent.split(/\s+/).length;
 
             await this.database.updateDistillationContent(
