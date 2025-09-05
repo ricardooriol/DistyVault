@@ -329,25 +329,32 @@
 
     <!-- Polyfills -->
     <script>
-        // requestIdleCallback polyfill
-        if (!window.requestIdleCallback) {
-            window.requestIdleCallback = function(callback, options) {
-                const start = Date.now();
-                return setTimeout(function() {
-                    callback({
-                        didTimeout: false,
-                        timeRemaining: function() {
-                            return Math.max(0, 50 - (Date.now() - start));
-                        }
-                    });
-                }, 1);
-            };
-        }
-        if (!window.cancelIdleCallback) {
-            window.cancelIdleCallback = function(id) {
-                clearTimeout(id);
-            };
-        }
+        // requestIdleCallback polyfill (define on window and global scope)
+        (function() {
+            if (!('requestIdleCallback' in window)) {
+                window.requestIdleCallback = function(callback, options) {
+                    const start = Date.now();
+                    return setTimeout(function() {
+                        callback({
+                            didTimeout: false,
+                            timeRemaining: function() {
+                                return Math.max(0, 50 - (Date.now() - start));
+                            }
+                        });
+                    }, 1);
+                };
+            }
+            if (typeof requestIdleCallback === 'undefined') {
+                // Bind to global for scripts that reference the function name directly
+                try { var requestIdleCallback = window.requestIdleCallback.bind(window); } catch (e) {}
+            }
+            if (!('cancelIdleCallback' in window)) {
+                window.cancelIdleCallback = function(id) { clearTimeout(id); };
+            }
+            if (typeof cancelIdleCallback === 'undefined') {
+                try { var cancelIdleCallback = window.cancelIdleCallback.bind(window); } catch (e) {}
+            }
+        })();
     </script>
     
     <!-- SQL.js Library -->
