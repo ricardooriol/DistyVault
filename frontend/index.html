@@ -327,7 +327,15 @@
         </div>
     </div>
 
-    <!-- Core Modules (must load first) -->
+    <!-- SQL.js Library -->
+    <script src="https://sql.js.org/dist/sql-wasm.js"></script>
+    
+    <!-- Core Services (must load first) -->
+    <script src="src/services/database.js"></script>
+    <script src="src/services/aiService.js"></script>
+    <script src="src/services/processor.js"></script>
+    
+    <!-- Core Modules -->
     <script src="src/core/eventBus.js"></script>
     <script src="src/core/apiClient.js"></script>
 

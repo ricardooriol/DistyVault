@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DistyVault Migration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .pass { background-color: #d4edda; border-color: #c3e6cb; }
+        .fail { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>DistyVault Migration Test</h1>
+    <div id="test-results"></div>
+
+    <script src="https://sql.js.org/dist/sql-wasm.js"></script>
+    <script src="frontend/src/services/database.js"></script>
+    <script src="frontend/src/services/aiService.js"></script>
+    <script src="frontend/src/services/processor.js"></script>
+    <script src="frontend/src/core/apiClient.js"></script>
+
+    <script>
+        async function runTests() {
+            const results = document.getElementById('test-results');
+            
+            function addResult(test, status, message) {
+                const div = document.createElement('div');
+                div.className = `test ${status}`;
+                div.innerHTML = `<strong>${test}:</strong> ${message}`;
+                results.appendChild(div);
+            }
+
+            // Test 1: Check if sql.js loads
+            try {
+                addResult('SQL.js Loading', 'info', 'Testing sql.js initialization...');
+                const SQL = await window.initSqlJs({
+                    locateFile: file => `https://sql.js.org/dist/${file}`
+                });
+                addResult('SQL.js Loading', 'pass', 'sql.js loaded successfully');
+            } catch (error) {
+                addResult('SQL.js Loading', 'fail', `sql.js failed to load: ${error.message}`);
+                return;
+            }
+
+            // Test 2: Database initialization
+            try {
+                addResult('Database Init', 'info', 'Testing database initialization...');
+                const db = new Database();
+                await db.init();
+                addResult('Database Init', 'pass', 'Database initialized successfully');
+            } catch (error) {
+                addResult('Database Init', 'fail', `Database init failed: ${error.message}`);
+                return;
+            }
+
+            // Test 3: AI Service
+            try {
+                addResult('AI Service', 'info', 'Testing AI service...');
+                const aiService = new AIService();
+                addResult('AI Service', 'pass', 'AI service created successfully');
+            } catch (error) {
+                addResult('AI Service', 'fail', `AI service failed: ${error.message}`);
+            }
+
+            // Test 4: Processor
+            try {
+                addResult('Processor', 'info', 'Testing processor...');
+                const processor = new Processor();
+                addResult('Processor', 'pass', 'Processor created successfully');
+            } catch (error) {
+                addResult('Processor', 'fail', `Processor failed: ${error.message}`);
+            }
+
+            // Test 5: API Client
+            try {
+                addResult('API Client', 'info', 'Testing API client...');
+                const apiClient = new ApiClient();
+                addResult('API Client', 'pass', 'API client created successfully');
+            } catch (error) {
+                addResult('API Client', 'fail', `API client failed: ${error.message}`);
+            }
+
+            // Test 6: Check for old SQLite references
+            try {
+                addResult('SQLite Check', 'info', 'Checking for old SQLite references...');
+                if (typeof sqlite3 !== 'undefined') {
+                    addResult('SQLite Check', 'fail', 'Old SQLite3 still present - migration incomplete');
+                } else {
+                    addResult('SQLite Check', 'pass', 'No old SQLite3 references found');
+                }
+            } catch (error) {
+                addResult('SQLite Check', 'pass', 'No old SQLite3 references found');
+            }
+
+            // Test 7: Test database operations
+            try {
+                addResult('Database Operations', 'info', 'Testing database operations...');
+                const db = new Database();
+                await db.init();
+                
+                // Create a test distillation
+                const testDistillation = {
+                    id: 'test_123',
+                    title: 'Test Distillation',
+                    content: 'This is a test',
+                    sourceUrl: 'https://example.com',
+                    sourceType: 'url',
+                    status: 'completed',
+                    createdAt: new Date(),
+                    logs: []
+                };
+                
+                await db.saveDistillation(testDistillation);
+                const retrieved = await db.getDistillation('test_123');
+                
+                if (retrieved && retrieved.title === 'Test Distillation') {
+                    addResult('Database Operations', 'pass', 'Database CRUD operations working');
+                } else {
+                    addResult('Database Operations', 'fail', 'Database CRUD operations failed');
+                }
+                
+                // Clean up
+                await db.deleteDistillation('test_123');
+            } catch (error) {
+                addResult('Database Operations', 'fail', `Database operations failed: ${error.message}`);
+            }
+
+            addResult('Migration Test', 'pass', 'Migration test completed! Check individual results above.');
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', runTests);
+    </script>
+</body>
+</html>

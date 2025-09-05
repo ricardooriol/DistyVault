@@ -2,44 +2,16 @@
   "name": "distyvault",
   "version": "1.0.0",
   "description": "DistyVault - Connect the Dots & Fill the Gaps - Local Knowledge Processing App",
-  "main": "backend/server.js",
+  "main": "index.html",
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:validation": "node tests/run-validation-tests.js",
-    "test:comprehensive": "jest tests/comprehensive-validation.test.js --verbose",
-    "test:automated-execution": "jest tests/automated-execution.test.js --verbose",
-    "test:e2e": "jest tests/e2e --verbose",
-    "test:integration": "jest tests/integration --verbose",
-    "test:unit": "jest tests/unit --verbose"
+    "start": "python3 -m http.server 8000",
+    "dev": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000"
   },
   "dependencies": {
-    "@google/genai": "^0.3.0",
-    "@google/generative-ai": "^0.24.1",
-    "@langchain/community": "^0.3.49",
-    "@langchain/core": "^0.3.66",
-    "archiver": "^7.0.1",
-    "axios": "^1.6.2",
-    "cheerio": "^1.0.0-rc.12",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "mammoth": "^1.6.0",
-    "multer": "^2.0.2",
-    "pdf-parse": "^1.1.1",
-    "puppeteer": "^24.15.0",
-    "sqlite3": "^5.1.6",
-    "youtube-transcript": "^1.0.6",
-    "youtubei.js": "^15.0.1"
+    "sql.js": "^1.10.3"
   },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "jsdom": "^23.2.0",
-    "nodemon": "^3.0.2",
-    "supertest": "^7.1.4"
-  },
+  "devDependencies": {},
   "keywords": [
     "knowledge",
     "local",

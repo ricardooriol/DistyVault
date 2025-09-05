@@ -23,7 +23,7 @@ DistyVault distills complex information from various sources into clear, numbere
 - **🤖 Multi-AI Support** - Works with OpenAI, Anthropic, Google, Grok, DeepSeek, and Ollama
 - **📚 Universal Content Processing** - YouTube videos/playlists, web pages and documents
 - **⚡ Real-time Processing** - Live status updates and progress tracking
-- **💾 Local Knowledge Base** - SQLite-powered storage with full-text search
+- **💾 Local Knowledge Base** - Client-side storage with sql.js + IndexedDB
 - **📊 Bulk Operations** - Process multiple items, bulk download, and batch management
 - **🎨 Modern Interface** - Clean, intuitive browser-based UI
 
