@@ -70,7 +70,7 @@ class DistyVaultApp {
         // Initialize component managers
         this.downloadStateManager = new DownloadStateManager();
         this.tooltipManager = new TooltipManager();
-        this.modalManager = new ModalManager();
+    this.modalManager = new ModalManager(this);
         this.bulkActionsManager = new BulkActionsManager(this);
 
         // Initialize UI components

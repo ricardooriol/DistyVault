@@ -1,33 +1,34 @@
 // Modal Management System
 class ModalManager {
-    constructor() {
+    constructor(app) {
+        this.app = app;
         this.setupEventListeners();
     }
 
     setupEventListeners() {
         // Modal close event listeners
-        document.getElementById('distillation-modal').addEventListener('click', (e) => {
+    document.getElementById('distillation-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                this.closeDistillationModal();
+        this.closeModal('distillation-modal');
             }
         });
 
-        document.getElementById('raw-content-modal').addEventListener('click', (e) => {
+    document.getElementById('raw-content-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                this.closeRawContentModal();
+        this.closeModal('raw-content-modal');
             }
         });
 
-        document.getElementById('logs-modal').addEventListener('click', (e) => {
+    document.getElementById('logs-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                this.closeLogsModal();
+        this.closeModal('logs-modal');
             }
         });
 
         // AI Settings modal close listener
-        document.getElementById('ai-settings-modal').addEventListener('click', (e) => {
+    document.getElementById('ai-settings-modal').addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                this.closeAISettingsModal();
+        this.closeModal('ai-settings-modal');
             }
         });
     }
@@ -267,21 +268,9 @@ class ModalManager {
 
     // AI Settings modal is handled by SettingsModal component
 
-    closeDistillationModal() {
-        document.getElementById('distillation-modal').style.display = 'none';
-    }
-
-    closeRawContentModal() {
-        document.getElementById('raw-content-modal').style.display = 'none';
-    }
-
-    closeLogsModal() {
-        document.getElementById('logs-modal').style.display = 'none';
-    }
-
-    closeAISettingsModal() {
-        const modal = document.getElementById('ai-settings-modal');
-        modal.style.display = 'none';
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
     }
 
     // Helper methods that need to be available to modal manager

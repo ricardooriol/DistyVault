@@ -45,6 +45,15 @@ class ApiClient {
         const item = await this.db.getDistillation(id);
         if (!item) throw new Error('Distillation not found');
         if (!item.rawContent || item.rawContent.trim().length < 10) {
+            // Try re-extracting if we have a source
+            if (item.sourceUrl) {
+                await this._processUrlPipeline(id, item.sourceUrl);
+                return { status: 'ok', reextracted: true };
+            }
+            if (item.sourceFile && item.sourceFile.blob instanceof Blob) {
+                await this._processFilePipeline(id, item.sourceFile.blob);
+                return { status: 'ok', reextracted: true };
+            }
             throw new Error('No saved raw text to retry; re-extraction required');
         }
     await this.db.updateDistillationStatus(id, 'distilling', 'Regenerating with AI');
@@ -96,7 +105,7 @@ class ApiClient {
 
     /** Process uploaded file: extract via API, then distill client-side */
     async processFile(file) {
-    const dist = this._createDistillation({ sourceType: 'file', sourceFile: { name: file.name, type: file.type, size: file.size }, title: file.name });
+        const dist = this._createDistillation({ sourceType: 'file', sourceFile: { name: file.name, type: file.type, size: file.size, blob: file }, title: file.name });
         await this.db.saveDistillation(dist);
         this._processFilePipeline(dist.id, file).catch(() => {});
         return { id: dist.id, status: 'queued' };
@@ -205,8 +214,14 @@ class ApiClient {
                 return;
             }
             const item = await this.db.getDistillation(id);
-            item.rawContent = extraction.text;
+            item.rawContent = extraction.text || '';
             item.title = extraction.title || item.title;
+            item.extractionMetadata = {
+                contentType: extraction.contentType,
+                extractionMethod: extraction.extractionMethod,
+                fallbackUsed: extraction.fallbackUsed,
+                meta: extraction.metadata || {}
+            };
             await this.db.saveDistillation(item);
             // Distill
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
@@ -230,8 +245,14 @@ class ApiClient {
             const payload = await this._handle(res);
             const extraction = payload.extraction || payload;
             const item = await this.db.getDistillation(id);
-            item.rawContent = extraction.text;
+            item.rawContent = extraction.text || '';
             item.title = extraction.title || item.title;
+            item.extractionMetadata = {
+                contentType: extraction.contentType,
+                extractionMethod: extraction.extractionMethod,
+                fallbackUsed: extraction.fallbackUsed,
+                meta: extraction.metadata || {}
+            };
             await this.db.saveDistillation(item);
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
             if (this._isCancelled(id)) { await this._markStopped(id); return; }

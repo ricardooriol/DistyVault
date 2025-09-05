@@ -1,13 +1,13 @@
 // Vercel-style API route: POST /api/process/file
 // Accepts multipart/form-data with field "file"
-const contentExtractor = require('../../src/server/processing/contentExtractor');
-
 // Simple multipart parsing using busboy
 const Busboy = require('busboy');
 
 module.exports = async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   if (req.method !== 'POST') {
-    res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
+    res.statusCode = 405;
+    res.end(JSON.stringify({ status: 'error', message: 'Method Not Allowed' }));
     return;
   }
 
@@ -35,7 +35,8 @@ module.exports = async (req, res) => {
     });
 
     if (!fileBuffer) {
-      res.status(400).json({ status: 'error', message: 'No file uploaded' });
+      res.statusCode = 400;
+      res.end(JSON.stringify({ status: 'error', message: 'No file uploaded' }));
       return;
     }
 
@@ -54,8 +55,10 @@ module.exports = async (req, res) => {
       metadata: { filename, mimeType, size: fileBuffer.length }
     };
 
-    res.status(200).json({ status: 'ok', extraction });
+  res.statusCode = 200;
+  res.end(JSON.stringify({ status: 'ok', extraction }));
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+  res.statusCode = 500;
+  res.end(JSON.stringify({ status: 'error', message: err?.message || 'Internal Server Error' }));
   }
 };
