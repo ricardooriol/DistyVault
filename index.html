@@ -354,35 +354,37 @@
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
     
     <!-- Core Services (must load first) -->
-    <script src="frontend/src/services/database.js"></script>
-    <script src="frontend/src/services/aiService.js"></script>
-    <script src="frontend/src/services/processor.js"></script>
+    <script src="src/services/database.js"></script>
+    <!-- Numbering post-processor for AI output -->
+    <script src="src/services/numberingProcessor.js"></script>
+    <script src="src/services/aiService.js"></script>
+    <script src="src/services/processor.js"></script>
     
     <!-- Core Modules -->
-    <script src="frontend/src/core/eventBus.js"></script>
-    <script src="frontend/src/core/apiClient.js"></script>
+    <script src="src/core/eventBus.js"></script>
+    <script src="src/core/apiClient.js"></script>
 
     <!-- Utility Modules -->
-    <script src="frontend/src/utils/viewportUtils.js"></script>
-    <script src="frontend/src/utils/dateUtils.js"></script>
-    <script src="frontend/src/utils/validationUtils.js"></script>
-    <script src="frontend/src/utils/domUtils.js"></script>
-    <script src="frontend/src/utils/errorUtils.js"></script>
+    <script src="src/utils/viewportUtils.js"></script>
+    <script src="src/utils/dateUtils.js"></script>
+    <script src="src/utils/validationUtils.js"></script>
+    <script src="src/utils/domUtils.js"></script>
+    <script src="src/utils/errorUtils.js"></script>
 
     <!-- Manager Modules -->
-    <script src="frontend/src/managers/downloadStateManager.js"></script>
-    <script src="frontend/src/managers/tooltipManager.js"></script>
-    <script src="frontend/src/managers/modalManager.js"></script>
-    <script src="frontend/src/managers/bulkActionsManager.js"></script>
+    <script src="src/managers/downloadStateManager.js"></script>
+    <script src="src/managers/tooltipManager.js"></script>
+    <script src="src/managers/modalManager.js"></script>
+    <script src="src/managers/bulkActionsManager.js"></script>
 
     <!-- UI Component Modules -->
-    <script src="frontend/src/components/knowledgeBaseTable.js"></script>
-    <script src="frontend/src/components/inputSection.js"></script>
-    <script src="frontend/src/components/statusSection.js"></script>
-    <script src="frontend/src/components/settingsModal.js"></script>
+    <script src="src/components/knowledgeBaseTable.js"></script>
+    <script src="src/components/inputSection.js"></script>
+    <script src="src/components/statusSection.js"></script>
+    <script src="src/components/settingsModal.js"></script>
 
     <!-- Main Application Controller -->
-    <script src="frontend/src/core/appController.js"></script>
+    <script src="src/core/appController.js"></script>
 
     <!-- Application Entry Point -->
     <script src="frontend/app.js"></script>

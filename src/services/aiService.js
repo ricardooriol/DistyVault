@@ -30,12 +30,14 @@ class AIService {
             if (!this.config.ollamaEndpoint || !this.config.ollamaModel) {
                 throw new Error('AI provider configuration is incomplete. Please configure Ollama settings.');
             }
-            return await this.distillWithOllama(content);
+            const raw = await this.distillWithOllama(content);
+            return (window.NumberingProcessor ? NumberingProcessor.fixNumberingAsHTML(raw) : raw);
         } else {
             if (!this.config.provider || !this.config.apiKey) {
                 throw new Error('AI provider configuration is incomplete. Please configure your AI provider and API key in Settings.');
             }
-            return await this.distillWithProvider(content);
+            const raw = await this.distillWithProvider(content);
+            return (window.NumberingProcessor ? NumberingProcessor.fixNumberingAsHTML(raw) : raw);
         }
     }
 
@@ -99,7 +101,7 @@ class AIService {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: this.config.model || 'gpt-3.5-turbo',
+                    model: this.config.model || 'gpt-4o',
                     messages: [
                         {
                             role: 'user',
@@ -133,7 +135,7 @@ class AIService {
                     'anthropic-version': '2023-06-01'
                 },
                 body: JSON.stringify({
-                    model: this.config.model || 'claude-3-sonnet-20240229',
+                    model: this.config.model || 'claude-3-5-haiku-latest',
                     max_tokens: 2000,
                     messages: [
                         {
@@ -159,7 +161,7 @@ class AIService {
 
     async distillWithGemini(prompt) {
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.config.model || 'gemini-pro'}:generateContent?key=${this.config.apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.config.model || 'gemini-2.5-flash'}:generateContent?key=${this.config.apiKey}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
