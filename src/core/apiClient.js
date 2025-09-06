@@ -9,9 +9,21 @@ class ApiClient {
         this.base = '/api';
         this.db = new Database();
         this.ai = new AIService();
-    // Prefer client-only mode to avoid 404 noise unless explicitly enabled
-    try { this.serverEnabled = !!(typeof window !== 'undefined' && window.DV_USE_SERVER); } catch { this.serverEnabled = false; }
-    this.cancellations = new Map(); // id -> { cancelled: boolean }
+        // Prefer client-only mode to avoid 404 noise unless explicitly enabled
+        try { this.serverEnabled = !!(typeof window !== 'undefined' && window.DV_USE_SERVER); } catch { this.serverEnabled = false; }
+        this.cancellations = new Map(); // id -> { cancelled: boolean }
+        // Concurrency control (default 1)
+        this.concurrentLimit = 1;
+        this.activeTasks = 0;
+        this.taskQueue = [];
+        try {
+            const raw = localStorage.getItem('ai-provider-settings');
+            if (raw) {
+                const cfg = JSON.parse(raw);
+                const n = parseInt(cfg?.concurrentProcessing);
+                if (Number.isFinite(n) && n >= 1 && n <= 10) this.concurrentLimit = n;
+            }
+        } catch {}
     }
 
     // Helper
@@ -236,7 +248,7 @@ class ApiClient {
     const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: this._titleFromUrl(url) });
         await this.db.saveDistillation(dist);
         // Run pipeline asynchronously
-        this._processUrlPipeline(dist.id, url).catch(() => {});
+    this._runWithLimit(() => this._processUrlPipeline(dist.id, url)).catch(() => {});
         return { id: dist.id, status: 'queued' };
     }
 
@@ -244,7 +256,7 @@ class ApiClient {
     async processFile(file) {
         const dist = this._createDistillation({ sourceType: 'file', sourceFile: { name: file.name, type: file.type, size: file.size, blob: file }, title: file.name });
         await this.db.saveDistillation(dist);
-        this._processFilePipeline(dist.id, file).catch(() => {});
+    this._runWithLimit(() => this._processFilePipeline(dist.id, file)).catch(() => {});
         return { id: dist.id, status: 'queued' };
     }
 
@@ -261,10 +273,11 @@ class ApiClient {
         };
     }
 
-    /** Save AI settings locally and also mirror into AIService config */
+    /** Save AI settings locally (persist all fields including API key) and mirror into AIService */
     async saveAiSettings(settings) {
-        localStorage.setItem('ai-provider-settings', JSON.stringify({ ...settings, online: { ...settings.online, apiKey: '' } }));
-        // Mirror minimal config for AIService
+        // Persist full settings including apiKey for session persistence
+        localStorage.setItem('ai-provider-settings', JSON.stringify(settings));
+        // Mirror config for AIService
         const aiCfg = {
             mode: 'online',
             provider: settings.online?.provider || '',
@@ -274,6 +287,9 @@ class ApiClient {
             ollamaModel: settings.offline?.model || ''
         };
         this.ai.saveConfig(aiCfg);
+        // Update concurrency limit immediately
+        const n = parseInt(settings?.concurrentProcessing);
+        if (Number.isFinite(n) && n >= 1 && n <= 10) this.concurrentLimit = n; else this.concurrentLimit = 1;
         return { status: 'ok' };
     }
 
@@ -693,6 +709,33 @@ class ApiClient {
     _isCancelled(id) { return this.cancellations.get(id)?.cancelled; }
     async _markStopped(id) { await this.db.updateDistillationStatus(id, 'stopped', 'Processing stopped by user'); }
     _safeFilename(name) { return String(name).replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').toLowerCase() || 'distillation'; }
+
+    // Concurrency gate: run fn when a slot becomes available
+    async _runWithLimit(fn) {
+        return new Promise((resolve) => {
+            const task = async () => {
+                this.activeTasks++;
+                try { resolve(await fn()); }
+                finally {
+                    this.activeTasks--;
+                    this._drainQueue();
+                }
+            };
+            if (this.activeTasks < this.concurrentLimit) {
+                // run immediately
+                void task();
+            } else {
+                this.taskQueue.push(task);
+            }
+        });
+    }
+
+    _drainQueue() {
+        while (this.activeTasks < this.concurrentLimit && this.taskQueue.length > 0) {
+            const next = this.taskQueue.shift();
+            if (next) void next();
+        }
+    }
 
     async _ensurePdfLibs() {
         if (window.jspdf && window.html2canvas) return;

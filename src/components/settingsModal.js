@@ -26,30 +26,9 @@ class SettingsModal {
      * Initialize the settings modal component
      */
     init() {
-        // Clear any problematic stored settings that might cause provider to default to something other than empty
-        this.clearProblematicSettings();
-
         this.loadSettings().then(settings => {
             this.settings = settings;
         });
-    }
-
-    /**
-     * Clear any stored settings that might cause the provider to not default to empty
-     */
-    clearProblematicSettings() {
-        try {
-            const stored = localStorage.getItem('ai-provider-settings');
-            if (stored) {
-                const settings = JSON.parse(stored);
-                if (settings.online && settings.online.provider && settings.online.provider !== '') {
-                    settings.online.provider = '';
-                    localStorage.setItem('ai-provider-settings', JSON.stringify(settings));
-                }
-            }
-        } catch (error) {
-            console.error('Error clearing problematic settings:', error);
-        }
     }
 
     /**
@@ -62,13 +41,6 @@ class SettingsModal {
             this.resetModalScroll(modal);
             
             modal.style.display = 'flex';
-
-            // FORCE reset provider to empty before loading settings
-            const providerSelect = DomUtils.getElementById('provider-select');
-            if (providerSelect) {
-                providerSelect.value = '';
-                providerSelect.selectedIndex = 0;
-            }
 
             await this.loadSettingsUI();
         }
@@ -118,28 +90,10 @@ class SettingsModal {
      */
     async loadSettings() {
         try {
-            // Load from AI service first (has in-memory API keys)
-            const result = await this.app.apiClient.getAiSettings();
-            if (result) {
-                // FORCE provider to be empty if not explicitly set
-                const settings = result;
-                if (!settings.online || !settings.online.provider) {
-                    settings.online = settings.online || {};
-                    settings.online.provider = '';
-                }
-                return settings;
-            }
-
-            // Fallback to localStorage
+            // Load from localStorage (persisted settings including API key)
             const stored = localStorage.getItem('ai-provider-settings');
             if (stored) {
-                const settings = JSON.parse(stored);
-                // FORCE provider to be empty if not explicitly set
-                if (!settings.online || !settings.online.provider) {
-                    settings.online = settings.online || {};
-                    settings.online.provider = '';
-                }
-                return settings;
+                return JSON.parse(stored);
             }
         } catch (error) {
             console.error('Error loading AI settings:', error);
@@ -176,15 +130,11 @@ class SettingsModal {
         try {
             this.settings = { ...settings, lastUpdated: new Date().toISOString() };
 
-            // Save to AI service (in-memory for API keys)
+            // Save to ApiClient (mirrors to AI service and updates concurrency)
             await this.app.apiClient.saveAiSettings(this.settings);
 
-            // Save non-sensitive settings to localStorage for UI persistence
-            const localSettings = { ...this.settings };
-            if (localSettings.online && localSettings.online.apiKey) {
-                localSettings.online.apiKey = ''; // Don't store API key locally
-            }
-            localStorage.setItem('ai-provider-settings', JSON.stringify(localSettings));
+            // Persist full settings including API key locally for session persistence
+            localStorage.setItem('ai-provider-settings', JSON.stringify(this.settings));
             return true;
         } catch (error) {
             console.error('Error saving AI settings:', error);
@@ -257,15 +207,7 @@ class SettingsModal {
         const apiKey = DomUtils.getElementById('api-key');
 
         if (providerSelect) {
-            // ALWAYS start with empty provider to show "Select a provider"
-            // Only use saved provider if it's explicitly set and valid
-            let providerValue = '';
-
-            if (settings.online.provider &&
-                ['openai', 'anthropic', 'google', 'grok', 'deepseek'].includes(settings.online.provider)) {
-                providerValue = settings.online.provider;
-            }
-
+            const providerValue = settings.online.provider || '';
             providerSelect.value = providerValue;
             providerSelect.selectedIndex = providerValue ?
                 Array.from(providerSelect.options).findIndex(opt => opt.value === providerValue) : 0;
@@ -277,15 +219,12 @@ class SettingsModal {
                 if (modelSelect) {
                     const savedModel = settings.online.model || 'gpt-3.5-turbo';
                     modelSelect.value = savedModel;
-                    
-                    // If the saved model is not available in the dropdown, select the first available option
                     if (modelSelect.selectedIndex === -1 && modelSelect.options.length > 0) {
                         modelSelect.selectedIndex = 0;
                     }
                 }
             }, 0);
         } else if (modelSelect) {
-            // If no provider is selected, still set the model value
             modelSelect.value = settings.online.model || 'gpt-3.5-turbo';
         }
 
@@ -296,7 +235,8 @@ class SettingsModal {
         // Load concurrent processing setting
         const concurrentProcessing = DomUtils.getElementById('concurrent-processing');
         if (concurrentProcessing) {
-            concurrentProcessing.value = settings.concurrentProcessing || 1;
+            const n = parseInt(settings.concurrentProcessing);
+            concurrentProcessing.value = Number.isFinite(n) && n >= 1 ? n : 1;
         }
 
         // Update API key help text
