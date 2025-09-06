@@ -201,21 +201,38 @@
             // Normalize item before save
             const item = { ...distillation };
             if (!item.createdAt) item.createdAt = new Date();
-            // Store Date objects directly in IDB; for LS store ISO strings
+
+            // Attempt IndexedDB first
             if (this.supportsIndexedDB) {
-                return this.withStore('readwrite', (store) => store.put(item));
-            } else {
-                const all = this._lsReadAll();
-                const idx = all.findIndex(i => i.id === item.id);
-                const toSave = { ...item };
-                // Convert Dates to ISO strings
-                ['createdAt','lastQueuedAt','completedAt','startTime','distillingStartTime'].forEach(k => {
-                    if (toSave[k] instanceof Date) toSave[k] = toSave[k].toISOString();
-                });
-                if (idx >= 0) all[idx] = toSave; else all.push(toSave);
-                this._lsWriteAll(all);
-                return true;
+                try {
+                    return await this.withStore('readwrite', (store) => store.put(item));
+                } catch (e1) {
+                    // Retry without pdfCache if present (some browsers have trouble storing large blobs)
+                    try {
+                        if (item.pdfCache) {
+                            const slim = { ...item };
+                            delete slim.pdfCache;
+                            await this.withStore('readwrite', (store) => store.put(slim));
+                            return true;
+                        }
+                    } catch (e2) {
+                        // Fall through to localStorage
+                    }
+                    // As a last resort, fall back to localStorage
+                }
             }
+
+            // LocalStorage fallback path
+            const all = this._lsReadAll();
+            const idx = all.findIndex(i => i.id === item.id);
+            const toSave = { ...item };
+            // Convert Dates to ISO strings
+            ['createdAt','lastQueuedAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+                if (toSave[k] instanceof Date) toSave[k] = toSave[k].toISOString();
+            });
+            if (idx >= 0) all[idx] = toSave; else all.push(toSave);
+            this._lsWriteAll(all);
+            return true;
         }
 
         async updateDistillationStatus(id, status, processingStep = '', errorMessage = null) {
@@ -289,52 +306,61 @@
 
         async getDistillation(id) {
             if (this.supportsIndexedDB) {
-                return this.withStore('readonly', (store) => {
-                    return new Promise((resolve, reject) => {
-                        const req = store.get(id);
-                        req.onsuccess = () => resolve(Database._ensureDates(req.result));
-                        req.onerror = () => reject(req.error || new Error('get failed'));
+                try {
+                    return await this.withStore('readonly', (store) => {
+                        return new Promise((resolve, reject) => {
+                            const req = store.get(id);
+                            req.onsuccess = () => resolve(Database._ensureDates(req.result));
+                            req.onerror = () => reject(req.error || new Error('get failed'));
+                        });
                     });
-                });
-            } else {
-                return this._lsReadAll().find(i => i.id === id) || null;
+                } catch (e) {
+                    // Fallback to LS on failure
+                }
             }
+            return this._lsReadAll().find(i => i.id === id) || null;
         }
 
         async getAllSummaries() {
             if (this.supportsIndexedDB) {
-                return this.withStore('readonly', (store) => {
-                    return new Promise((resolve, reject) => {
-                        const req = store.getAll();
-                        req.onsuccess = () => {
-                            const items = (req.result || []).map(Database._ensureDates);
-                            resolve(this._sortForUi(items));
-                        };
-                        req.onerror = () => reject(req.error || new Error('getAll failed'));
+                try {
+                    return await this.withStore('readonly', (store) => {
+                        return new Promise((resolve, reject) => {
+                            const req = store.getAll();
+                            req.onsuccess = () => {
+                                const items = (req.result || []).map(Database._ensureDates);
+                                resolve(this._sortForUi(items));
+                            };
+                            req.onerror = () => reject(req.error || new Error('getAll failed'));
+                        });
                     });
-                });
-            } else {
-                const items = this._lsReadAll();
-                return this._sortForUi(items);
+                } catch (e) {
+                    // Fallback to LS
+                }
             }
+            const items = this._lsReadAll();
+            return this._sortForUi(items);
         }
 
         async deleteDistillation(id) {
             if (this.supportsIndexedDB) {
-                return this.withStore('readwrite', (store) => {
-                    return new Promise((resolve, reject) => {
-                        const req = store.delete(id);
-                        req.onsuccess = () => resolve(true);
-                        req.onerror = () => reject(req.error || new Error('delete failed'));
+                try {
+                    return await this.withStore('readwrite', (store) => {
+                        return new Promise((resolve, reject) => {
+                            const req = store.delete(id);
+                            req.onsuccess = () => resolve(true);
+                            req.onerror = () => reject(req.error || new Error('delete failed'));
+                        });
                     });
-                });
-            } else {
-                const all = this._lsReadAll();
-                const next = all.filter(i => i.id !== id);
-                const changed = next.length !== all.length;
-                if (changed) this._lsWriteAll(next);
-                return changed;
+                } catch (e) {
+                    // Fall back to LS
+                }
             }
+            const all = this._lsReadAll();
+            const next = all.filter(i => i.id !== id);
+            const changed = next.length !== all.length;
+            if (changed) this._lsWriteAll(next);
+            return changed;
         }
 
     // Basic sort: prioritize active (pending/extracting/distilling) at top, then by createdAt desc

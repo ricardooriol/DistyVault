@@ -73,7 +73,10 @@ class ApiClient {
     try { await this.db.resetTiming(id); } catch {}
         try {
             const latest = await this.db.getDistillation(id);
-            if (latest) { latest.lastQueuedAt = new Date(); await this.db.saveDistillation(latest); }
+            if (latest) {
+                latest.lastQueuedAt = new Date();
+                try { await this.db.saveDistillation(latest); } catch {}
+            }
         } catch {}
         await this.db.addLog(id, 'Retry queued');
 
