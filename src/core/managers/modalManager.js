@@ -59,12 +59,9 @@ class ModalManager {
                 metaHtml += `<strong>Completed:</strong> ${this.formatDate(new Date(distillation.completedAt))}<br>`;
             }
 
-            if (distillation.processingTime) {
-                metaHtml += `<strong>Processing Time:</strong> ${this.formatTimeDisplay(distillation.processingTime)}<br>`;
-            } else if (distillation.elapsedTime) {
-                const minutes = Math.floor(distillation.elapsedTime / 60);
-                const seconds = Math.floor(distillation.elapsedTime % 60);
-                metaHtml += `<strong>Processing Time:</strong> ${minutes}m ${seconds}s<br>`;
+            const durationDisplay = DateUtils.calculateProcessingTimeDisplay(distillation);
+            if (durationDisplay) {
+                metaHtml += `<strong>Processing Time:</strong> ${durationDisplay}<br>`;
             }
 
             if (distillation.wordCount) {
@@ -148,15 +145,11 @@ class ModalManager {
                             <span class="log-message"><strong>Completed:</strong> ${new Date(distillation.completedAt).toLocaleString()}</span>
                         </div>
                     ` : ''}
-                    ${distillation.processingTime ? `
-                        <div class="log-entry log-info">
-                            <span class="log-message"><strong>Processing Time:</strong> ${this.formatTimeDisplay(distillation.processingTime)}</span>
+                    ${(() => { const d = DateUtils.calculateProcessingTimeDisplay(distillation); return d ? `
+                        <div class=\"log-entry log-info\">
+                            <span class=\"log-message\"><strong>Processing Time:</strong> ${d}</span>
                         </div>
-                    ` : distillation.elapsedTime ? `
-                        <div class="log-entry log-info">
-                            <span class="log-message"><strong>Processing Time:</strong> ${Math.floor(distillation.elapsedTime / 60)}m ${Math.floor(distillation.elapsedTime % 60)}s</span>
-                        </div>
-                    ` : ''}
+                    ` : '' })()}
                     ${distillation.wordCount ? `
                         <div class="log-entry log-info">
                             <span class="log-message"><strong>Word Count:</strong> ${distillation.wordCount} words</span>

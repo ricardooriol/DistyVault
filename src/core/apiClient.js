@@ -138,8 +138,8 @@ class ApiClient {
             </style></head><body>
                         <div class=\"title\">${escapeHtml(safeTitle)}</div>
                         <div class=\"meta\">
-                            <div class=\"meta-row\">${escapeHtml(new Date().toLocaleString())}</div>
                             ${!isDocument ? urlLine : ''}
+                            <div class=\"meta-row\">${escapeHtml(new Date().toLocaleString())}</div>
                         </div>
                         <hr class=\"divider\" />
             <div class=\"content\">${item.content}</div>
