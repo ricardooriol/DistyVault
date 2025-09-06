@@ -675,9 +675,18 @@ class ApiClient {
             } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
-            await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
-            try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
-            await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+            const msg = String(e?.message || e || '').toLowerCase();
+            const interrupted = (e && e.code === 'INTERRUPTED') || /load failed|failed to fetch|networkerror|network error|the network connection was lost/.test(msg);
+            if (interrupted) {
+                await this.db.updateDistillationStatus(id, 'pending', 'Re-queued after interruption');
+                try { const itWarn = await this.db.getDistillation(id); if (itWarn) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itWarn); } catch {}
+                await this.db.addLog(id, 'Processing interrupted; re-queued', 'warn', { message: e?.message || String(e) });
+                this._runWithLimit(async () => { await this._processUrlPipeline(id, url); }).catch(() => {});
+            } else {
+                await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+                try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
+                await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+            }
         }
     }
 
@@ -862,9 +871,18 @@ class ApiClient {
             } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
-            await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
-            try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
-            await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+            const msg = String(e?.message || e || '').toLowerCase();
+            const interrupted = (e && e.code === 'INTERRUPTED') || /load failed|failed to fetch|networkerror|network error|the network connection was lost/.test(msg);
+            if (interrupted) {
+                await this.db.updateDistillationStatus(id, 'pending', 'Re-queued after interruption');
+                try { const itWarn = await this.db.getDistillation(id); if (itWarn) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itWarn); } catch {}
+                await this.db.addLog(id, 'Processing interrupted; re-queued', 'warn', { message: e?.message || String(e) });
+                this._runWithLimit(async () => { await this._processFilePipeline(id, file); }).catch(() => {});
+            } else {
+                await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+                try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
+                await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+            }
         }
     }
 

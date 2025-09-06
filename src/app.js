@@ -20,6 +20,14 @@ window.addEventListener('unhandledrejection', function(event) {
         event.preventDefault();
         return;
     }
+    // Ignore Safari/iOS transient network aborts seen as TypeError: Load failed
+    try {
+        const msg = String(event?.reason?.message || event?.reason || '').toLowerCase();
+        if (/load failed|failed to fetch|networkerror|network error|the network connection was lost/.test(msg)) {
+            event.preventDefault();
+            return;
+        }
+    } catch {}
     
     // Log other unhandled rejections for debugging
     console.error('Unhandled promise rejection:', event.reason);

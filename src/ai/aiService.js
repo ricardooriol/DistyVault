@@ -247,6 +247,12 @@ class AIService {
             return result.candidates[0]?.content?.parts[0]?.text || 'No response from Gemini';
         } catch (error) {
             console.error('Gemini distillation error:', error);
+            try {
+                const msg = String(error && (error.message || error)).toLowerCase();
+                if (error instanceof TypeError && (/load failed|failed to fetch|networkerror|network error|the network connection was lost/.test(msg))) {
+                    error.code = 'INTERRUPTED';
+                }
+            } catch {}
             if (!error.provider) { error.provider = 'google'; error.model = this.config.model || 'gemini-2.5-flash'; }
             throw error;
         }
