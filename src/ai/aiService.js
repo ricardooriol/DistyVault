@@ -31,20 +31,45 @@ class AIService {
             if (!this.config.ollamaEndpoint || !this.config.ollamaModel) {
                 throw new Error('AI provider configuration is incomplete. Please configure Ollama settings.');
             }
-            if (context?.id) await this.database.addLog(context.id, 'Calling Ollama', 'info', { model: this.config.ollamaModel });
+            if (context?.id) await this.database.addLog(context.id, 'Calling Ollama', 'info', { model: this.config.ollamaModel, endpoint: this.config.ollamaEndpoint });
             const t0 = Date.now();
-            const raw = await this.distillWithOllama(content);
-            if (context?.id) await this.database.addLog(context.id, 'Received Ollama response', 'info', { ms: Date.now() - t0 });
-            return this.postProcessDistillation(raw);
+            try {
+                const raw = await this.distillWithOllama(content);
+                if (context?.id) await this.database.addLog(context.id, 'Received Ollama response', 'info', { ms: Date.now() - t0 });
+                return this.postProcessDistillation(raw);
+            } catch (e) {
+                if (context?.id) {
+                    await this.database.addLog(context.id, 'AI provider error', 'error', {
+                        provider: 'ollama',
+                        model: this.config.ollamaModel,
+                        endpoint: this.config.ollamaEndpoint,
+                        httpStatus: e?.status || e?.httpStatus,
+                        message: e?.message || String(e)
+                    });
+                }
+                throw e;
+            }
         } else {
             if (!this.config.provider || !this.config.apiKey) {
                 throw new Error('AI provider configuration is incomplete. Please configure your AI provider and API key in Settings.');
             }
             if (context?.id) await this.database.addLog(context.id, 'Calling AI provider', 'info', { provider: this.config.provider, model: this.config.model || 'auto' });
             const t0 = Date.now();
-            const raw = await this.distillWithProvider(content);
-            if (context?.id) await this.database.addLog(context.id, 'Received AI response', 'info', { ms: Date.now() - t0 });
-            return this.postProcessDistillation(raw);
+            try {
+                const raw = await this.distillWithProvider(content);
+                if (context?.id) await this.database.addLog(context.id, 'Received AI response', 'info', { ms: Date.now() - t0 });
+                return this.postProcessDistillation(raw);
+            } catch (e) {
+                if (context?.id) {
+                    await this.database.addLog(context.id, 'AI provider error', 'error', {
+                        provider: this.config.provider,
+                        model: this.config.model || 'auto',
+                        httpStatus: e?.status || e?.httpStatus,
+                        message: e?.message || String(e)
+                    });
+                }
+                throw e;
+            }
         }
     }
 
@@ -69,14 +94,24 @@ class AIService {
             });
 
             if (!response.ok) {
-                throw new Error(`Ollama request failed: ${response.status}`);
+                const err = new Error(`Ollama request failed: HTTP ${response.status}`);
+                err.status = response.status;
+                err.provider = 'ollama';
+                err.model = this.config.ollamaModel;
+                err.endpoint = this.config.ollamaEndpoint;
+                throw err;
             }
 
             const result = await response.json();
             return result.response || 'No response from Ollama';
         } catch (error) {
             console.error('Ollama distillation error:', error);
-            throw new Error(`Ollama processing failed: ${error.message}`);
+            if (!error.provider) {
+                error.provider = 'ollama';
+                error.model = this.config.ollamaModel;
+                error.endpoint = this.config.ollamaEndpoint;
+            }
+            throw error;
         }
     }
 
@@ -120,15 +155,21 @@ class AIService {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || `OpenAI API error: ${response.status}`);
+                let msg = `OpenAI API error: HTTP ${response.status}`;
+                try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                const err = new Error(msg);
+                err.status = response.status;
+                err.provider = 'openai';
+                err.model = this.config.model || 'gpt-4o';
+                throw err;
             }
 
             const result = await response.json();
             return result.choices[0]?.message?.content || 'No response from OpenAI';
         } catch (error) {
             console.error('OpenAI distillation error:', error);
-            throw new Error(`OpenAI processing failed: ${error.message}`);
+            if (!error.provider) { error.provider = 'openai'; error.model = this.config.model || 'gpt-4o'; }
+            throw error;
         }
     }
 
@@ -154,15 +195,21 @@ class AIService {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || `Anthropic API error: ${response.status}`);
+                let msg = `Anthropic API error: HTTP ${response.status}`;
+                try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                const err = new Error(msg);
+                err.status = response.status;
+                err.provider = 'anthropic';
+                err.model = this.config.model || 'claude-3-5-haiku-latest';
+                throw err;
             }
 
             const result = await response.json();
             return result.content[0]?.text || 'No response from Anthropic';
         } catch (error) {
             console.error('Anthropic distillation error:', error);
-            throw new Error(`Anthropic processing failed: ${error.message}`);
+            if (!error.provider) { error.provider = 'anthropic'; error.model = this.config.model || 'claude-3-5-haiku-latest'; }
+            throw error;
         }
     }
 
@@ -187,15 +234,21 @@ class AIService {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || `Gemini API error: ${response.status}`);
+                let msg = `Gemini API error: HTTP ${response.status}`;
+                try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                const err = new Error(msg);
+                err.status = response.status;
+                err.provider = 'google';
+                err.model = this.config.model || 'gemini-2.5-flash';
+                throw err;
             }
 
             const result = await response.json();
             return result.candidates[0]?.content?.parts[0]?.text || 'No response from Gemini';
         } catch (error) {
             console.error('Gemini distillation error:', error);
-            throw new Error(`Gemini processing failed: ${error.message}`);
+            if (!error.provider) { error.provider = 'google'; error.model = this.config.model || 'gemini-2.5-flash'; }
+            throw error;
         }
     }
 
