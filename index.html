@@ -82,7 +82,17 @@
             <!-- Knowledge Base Section -->
             <section class="knowledge-base-section">
                 <div class="knowledge-base-header">
-                    <h2 class="section-title">KNOWLEDGE BASE</h2>
+                    <div class="section-actions">
+                        <button class="bulk-action-btn" onclick="exportKnowledgeBase()" title="Export Knowledge Base">
+                            <span class="btn-icon">📦</span>
+                            <span class="btn-text">Export</span>
+                        </button>
+                        <input type="file" id="import-kb-input" hidden accept=".zip" />
+                        <button class="bulk-action-btn" onclick="triggerImportKnowledgeBase()" title="Import Knowledge Base">
+                            <span class="btn-icon">📤</span>
+                            <span class="btn-text">Import</span>
+                        </button>
+                    </div>
                     <div class="knowledge-base-controls">
                         <input type="text" id="search-input" placeholder="Search knowledge base..."
                             class="search-input">

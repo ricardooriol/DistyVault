@@ -64,6 +64,35 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Knowledge base functions
         window.refreshKnowledgeBase = () => app.loadKnowledgeBase();
+        window.exportKnowledgeBase = async () => {
+            try {
+                await app.apiClient.exportKnowledgeBase();
+                app.showTemporaryMessage('Export started', 'success');
+            } catch (e) {
+                console.error('Export failed', e);
+                app.showTemporaryMessage('Export failed', 'error');
+            }
+        };
+        window.triggerImportKnowledgeBase = () => {
+            const input = document.getElementById('import-kb-input');
+            if (!input) return;
+            input.value = '';
+            input.onchange = async (ev) => {
+                const file = ev.target.files && ev.target.files[0];
+                if (!file) return;
+                try {
+                    // Import clears existing only if user confirms
+                    const doClear = confirm('Importing a knowledge base. Clear existing items first?');
+                    await app.apiClient.importKnowledgeBase(file, { clearExisting: doClear });
+                    app.showTemporaryMessage('Import completed', 'success');
+                    await app.loadKnowledgeBase();
+                } catch (e) {
+                    console.error('Import failed', e);
+                    app.showTemporaryMessage('Import failed', 'error');
+                }
+            };
+            input.click();
+        };
         
         // Bulk actions functions
         window.toggleSelectAll = () => app.toggleSelectAll();

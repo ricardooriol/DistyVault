@@ -24,6 +24,8 @@ class ApiClient {
                 if (Number.isFinite(n) && n >= 1 && n <= 10) this.concurrentLimit = n;
             }
         } catch {}
+    // PDF cache render guard
+    this._pdfRenderInFlight = new Set();
     }
 
     // Helper
@@ -66,18 +68,18 @@ class ApiClient {
         // Path A: need re-extraction (no raw text)
         if (!item.rawContent || item.rawContent.trim().length < 10) {
             if (item.sourceUrl) {
-                await this._runWithLimit(() => this._processUrlPipeline(id, item.sourceUrl));
+                this._runWithLimit(() => this._processUrlPipeline(id, item.sourceUrl)).catch(() => {});
                 return { status: 'queued', reextracted: true };
             }
             if (item.sourceFile && item.sourceFile.blob instanceof Blob) {
-                await this._runWithLimit(() => this._processFilePipeline(id, item.sourceFile.blob));
+                this._runWithLimit(() => this._processFilePipeline(id, item.sourceFile.blob)).catch(() => {});
                 return { status: 'queued', reextracted: true };
             }
             throw new Error('No saved raw text to retry; re-extraction required');
         }
 
-        // Path B: distill from saved raw content, queued via limiter
-        await this._runWithLimit(async () => {
+        // Path B: distill from saved raw content, queued via limiter (fire-and-forget)
+        this._runWithLimit(async () => {
             const latest = await this.db.getDistillation(id);
             if (!latest) return; // deleted while queued
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
@@ -88,8 +90,10 @@ class ApiClient {
             const distilled = await this.ai.distillContent(raw, { id });
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, raw, 0, wordCount);
+            // Prepare PDF cache in the background for smooth downloads
+            try { await this._ensurePdfCache(id); } catch {}
             await this.db.addLog(id, 'AI distillation completed', 'info', { wordCount });
-        });
+        }).catch(() => {});
         return { status: 'queued' };
     }
 
@@ -105,97 +109,163 @@ class ApiClient {
     async downloadPdf(id) {
         const item = await this.db.getDistillation(id);
         if (!item || !item.content) throw new Error('Nothing to download');
-        // Lazy-load jsPDF and html2canvas from CDN
-        await this._ensurePdfLibs();
-        // Build a styled HTML in an offscreen iframe to ensure fonts and layout
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '900px';
-        iframe.style.height = '1200px';
-        document.body.appendChild(iframe);
-        const doc = iframe.contentDocument;
-        const safeTitle = (item.title || 'Distillation');
-    const isDocument = (item.sourceType === 'file');
-    const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const sourceUrl = !isDocument && item.sourceUrl ? String(item.sourceUrl) : '';
-    const urlLine = sourceUrl ? `<div class=\"meta-row\"><span class=\"label\">URL:</span> <a href=\"${escapeHtml(sourceUrl)}\" target=\"_blank\">${escapeHtml(sourceUrl)}</a></div>` : '';
-        doc.open();
-        doc.write(`<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>${safeTitle}</title>
-            <style>
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111; background: #fff; margin: 40px; line-height: 1.6; }
-            h1,h2,h3 { margin: 0.6em 0 0.3em; font-weight: 700; }
-            h1 { font-size: 24pt; }
-            h2 { font-size: 18pt; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-            h3 { font-size: 14pt; }
-            p, li { font-size: 11pt; }
-            strong { font-weight: 700; }
-            .title { font-size: 24pt; font-weight: 800; margin-bottom: 6px; }
-            .meta { color: #555; font-size: 10pt; margin-bottom: 10px; }
-            .meta .meta-row { margin: 2px 0; }
-            .meta .label { color: #777; font-weight: 600; margin-right: 6px; }
-            .meta a { color: #0a66c2; text-decoration: none; }
-            .meta a:hover { text-decoration: underline; }
-            .divider { height: 2px; background: linear-gradient(90deg, #e5e7eb, #cbd5e1, #e5e7eb); border: 0; margin: 14px 0 20px; }
-            .content { font-size: 11pt; }
-            .content ol { padding-left: 1.2em; }
-            .content li { margin: 6px 0; }
-            .content b, .content strong { font-weight: 700; }
-            .footer { margin-top: 24px; color: #888; font-size: 9pt; text-align: right; }
-            </style></head><body>
-                        <div class=\"title\">${escapeHtml(safeTitle)}</div>
-                        <div class=\"meta\">
-                            ${!isDocument ? urlLine : ''}
-                            <div class=\"meta-row\">${escapeHtml(new Date().toLocaleString())}</div>
-                        </div>
-                        <hr class=\"divider\" />
-            <div class=\"content\">${item.content}</div>
-                        <hr class=\"divider\" />
-            <div class=\"footer\">Generated by DistyVault</div>
-        </body></html>`);
-        doc.close();
-        // Wait for fonts/layout to settle
-        await new Promise(r => setTimeout(r, 50));
-        const target = doc.body;
-    const opt = { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900, logging: false };
-        const canvas = await window.html2canvas(target, opt);
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pageWidth - 80; // margins
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-        let y = 40;
-        let remainingHeight = imgHeight;
-        let position = y;
-        // Add pages if content exceeds one page
-        const pageImgHeight = pageHeight - 80; // 40 top/bottom margins
-        let srcY = 0;
-        const pxPerPt = canvas.height / imgHeight; // map rendered image height in pt to canvas px
-        while (remainingHeight > 0) {
-            const sliceHeightPt = Math.min(pageImgHeight, remainingHeight);
-            const sliceHeightPx = Math.floor(sliceHeightPt * pxPerPt);
-            const sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = canvas.width;
-            sliceCanvas.height = sliceHeightPx;
-            const ctx = sliceCanvas.getContext('2d');
-            ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-            const sliceImg = sliceCanvas.toDataURL('image/png');
-            pdf.addImage(sliceImg, 'PNG', 40, position, imgWidth, sliceHeightPt);
-            remainingHeight -= sliceHeightPt;
-            srcY += sliceHeightPx;
-            if (remainingHeight > 0) {
-                pdf.addPage();
-                position = y;
-            }
+        // Fast path: use cached PDF if available
+        const cached = await this._getCachedPdf(id);
+        if (cached) {
+            const headers = new Headers({ 'Content-Disposition': `attachment; filename="${this._safeFilename((item.title||'distillation'))}.pdf"` });
+            return { blob: cached, headers, status: 200 };
         }
-    // Removed top clickable URL overlay per request; URL is shown only in the meta section
-    document.body.removeChild(iframe);
-        const blob = pdf.output('blob');
+        // Build, cache, and return
+        const blob = await this._renderPdfBlobForItem(item);
+        try { await this._setCachedPdf(id, blob); } catch {}
         const headers = new Headers({ 'Content-Disposition': `attachment; filename="${this._safeFilename((item.title||'distillation'))}.pdf"` });
         return { blob, headers, status: 200 };
+    }
+
+    /** Export the entire knowledge base as a portable ZIP (schema + NDJSON + binaries) */
+    async exportKnowledgeBase(options = {}) {
+        const opts = { includeBlobs: true, filename: null, ...options };
+        await this._ensureJSZip();
+        const jszip = new window.JSZip();
+        const items = await this.db.getAllSummaries();
+
+        // Schema (static for current DB)
+        const schema = {
+            name: 'DistyVaultDB',
+            store: 'distillations',
+            version: 1,
+            indexes: ['status', 'createdAt'],
+            exportedAt: new Date().toISOString()
+        };
+        jszip.file('schema.json', JSON.stringify(schema, null, 2));
+
+        // Prepare NDJSON and binaries
+        const lines = [];
+        const binaries = new Map(); // ref -> { blob, type }
+
+        const toIso = (v) => (v instanceof Date ? v.toISOString() : v);
+
+        for (const item of items) {
+            // Shallow clone then normalize dates
+            const rec = JSON.parse(JSON.stringify(item, (k, v) => {
+                if (v instanceof Date) return v.toISOString();
+                return v;
+            }));
+
+            // Drop non-portable/transient caches
+            if (rec.pdfCache) delete rec.pdfCache;
+
+            // Ensure critical date fields are ISO strings
+            ['createdAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+                if (item[k] instanceof Date) rec[k] = toIso(item[k]);
+            });
+
+            // Replace Blob with a portable reference
+            try {
+                const sf = item?.sourceFile;
+                const blob = sf?.blob;
+                if (opts.includeBlobs && blob instanceof Blob) {
+                    const buf = await blob.arrayBuffer();
+                    const ref = await this._sha256Hex(buf);
+                    binaries.set(ref, { buf, type: blob.type || 'application/octet-stream' });
+                    rec.sourceFile = {
+                        name: sf?.name || 'file',
+                        type: sf?.type || blob.type || 'application/octet-stream',
+                        size: sf?.size || blob.size || buf.byteLength,
+                        blob: { __blobRef: ref, type: blob.type || 'application/octet-stream' }
+                    };
+                }
+            } catch {}
+
+            lines.push(JSON.stringify(rec));
+        }
+
+        jszip.file('data/distillations.ndjson', lines.join('\n'));
+        for (const [ref, entry] of binaries.entries()) {
+            jszip.file(`binaries/${ref}`, entry.buf);
+        }
+
+        const blob = await jszip.generateAsync({ type: 'blob' });
+        if (opts.returnBlob) return blob;
+
+        // Trigger browser download
+        const filename = opts.filename || `distyvault-export-${this._nowStamp()}.zip`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+        return { status: 'ok', filename };
+    }
+
+    /** Import a portable ZIP generated by exportKnowledgeBase() */
+    async importKnowledgeBase(fileOrBlob, options = {}) {
+        const opts = { clearExisting: false, ...options };
+        await this._ensureJSZip();
+        const jszip = new window.JSZip();
+        const zip = await jszip.loadAsync(fileOrBlob);
+
+        // Optional: clear current data
+        if (opts.clearExisting) {
+            try {
+                const existing = await this.db.getAllSummaries();
+                for (const it of existing) { try { await this.db.deleteDistillation(it.id); } catch {} }
+            } catch {}
+        }
+
+        // Read schema (not strictly necessary but validates package)
+        const schemaEntry = zip.file('schema.json');
+        if (!schemaEntry) throw new Error('Invalid package: missing schema.json');
+        const schemaTxt = await schemaEntry.async('string');
+        try { JSON.parse(schemaTxt); } catch { throw new Error('Invalid schema.json'); }
+
+        // Read data
+        const dataEntry = zip.file('data/distillations.ndjson');
+        if (!dataEntry) throw new Error('Invalid package: missing data/distillations.ndjson');
+        const ndjson = await dataEntry.async('string');
+        const lines = ndjson.split(/\r?\n/).filter(Boolean);
+
+        const parseDate = (s) => {
+            const d = new Date(s);
+            return isNaN(d) ? s : d;
+        };
+
+        for (const line of lines) {
+            let rec;
+            try { rec = JSON.parse(line); } catch { continue; }
+
+            // Rehydrate dates
+            ['createdAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+                if (rec[k] && typeof rec[k] === 'string') rec[k] = parseDate(rec[k]);
+            });
+
+            // Rehydrate blob if present
+            try {
+                const sf = rec?.sourceFile;
+                const blobRef = sf?.blob?.__blobRef;
+                const blobType = sf?.blob?.type || sf?.type || 'application/octet-stream';
+                if (blobRef && zip.file(`binaries/${blobRef}`)) {
+                    const binBuf = await zip.file(`binaries/${blobRef}`).async('arraybuffer');
+                    rec.sourceFile = {
+                        name: sf?.name || 'file',
+                        type: blobType,
+                        size: sf?.size || (binBuf?.byteLength || 0),
+                        blob: new Blob([binBuf], { type: blobType })
+                    };
+                }
+            } catch {}
+
+            await this.db.saveDistillation(rec);
+            // If item already completed, warm PDF cache in background
+            if (rec.status === 'completed') {
+                try { await this._ensurePdfCache(rec.id); } catch {}
+            }
+        }
+
+        return { status: 'ok', imported: lines.length };
     }
 
     /** Bulk download: sequentially trigger PDF downloads for given ids */
@@ -240,12 +310,18 @@ class ApiClient {
             try {
                 const item = await this.db.getDistillation(id);
                 if (!item || !item.content) continue; // skip items without content
-                const res = await this.downloadPdf(id);
+                // Prefer cached blob for smoothness
+                let blob = await this._getCachedPdf(id);
+                if (!blob) {
+                    // Render now (may be slower but we yield between items)
+                    blob = await this._renderPdfBlobForItem(item);
+                    try { await this._setCachedPdf(id, blob); } catch {}
+                }
                 const filename = `${this._safeFilename(item?.title || `distillation-${id}`)}.pdf`;
-                zip.file(filename, res.blob);
+                zip.file(filename, blob);
                 manifest.push({ id, title: item?.title || '', filename, createdAt: item?.createdAt, sourceUrl: item?.sourceUrl || null });
                 completed++;
-                await new Promise(r => setTimeout(r, 10)); // yield to UI
+                await new Promise(r => setTimeout(r, 0)); // yield to UI
             } catch {
                 // skip and continue
             }
@@ -288,9 +364,11 @@ class ApiClient {
             try {
                 const videos = await this._expandYouTubePlaylist(url);
                 if (Array.isArray(videos) && videos.length > 0) {
+                    // Emit small toast if available
+                    try { window.app?.showTemporaryMessage(`Queueing ${videos.length} videos from playlist`, 'info'); } catch {}
                     for (const v of videos) {
                         try { await this.processUrl(v); } catch {}
-                        await new Promise(r => setTimeout(r, 50));
+                        await new Promise(r => setTimeout(r, 20));
                     }
                     return { status: 'spawned', count: videos.length };
                 }
@@ -303,7 +381,9 @@ class ApiClient {
     // Create tracking distillation for non-playlist URLs
     // Use a neutral placeholder so the table doesn't display URL path fragments like 'watch'
     const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: 'Processing...' });
-        await this.db.saveDistillation(dist);
+    await this.db.saveDistillation(dist);
+    // Optimistic UI: push immediately if eventBus exists
+    try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
         // Run pipeline asynchronously
         this._runWithLimit(() => this._processUrlPipeline(dist.id, url)).catch(() => {});
         return { id: dist.id, status: 'queued' };
@@ -411,6 +491,7 @@ class ApiClient {
             if (cancelled) { await this._markStopped(id); return; }
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', 'Extracting content...');
+            try { const item = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item); } catch {}
             await this.db.addLog(id, 'Extraction started', 'info', { url });
 
             // Special handling: YouTube playlist should expand into individual video items
@@ -424,6 +505,7 @@ class ApiClient {
                             await new Promise(r => setTimeout(r, 100));
                         }
                         await this.db.deleteDistillation(id);
+                        try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_DELETED, { id }); } catch {}
                         return; // Stop processing the playlist item itself
                     }
                 } catch (e) {
@@ -470,14 +552,19 @@ class ApiClient {
             await this.db.saveDistillation(item);
             // Distill
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
+            try { const it2 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2); } catch {}
             await this.db.addLog(id, 'AI distillation started', 'info');
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
             const distilled = await this.ai.distillContent(item.rawContent, { id });
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
+            // Prepare PDF cache in the background for smooth downloads
+            try { await this._ensurePdfCache(id); } catch {}
+            try { const it3 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3); } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+            try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
             await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
         }
     }
@@ -610,6 +697,7 @@ class ApiClient {
             if (cancelled) { await this._markStopped(id); return; }
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', `Extracting content from ${file.name}...`);
+            try { const item = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item); } catch {}
             await this.db.addLog(id, 'Extraction started', 'info', { file: { name: file.name, type: file.type, size: file.size } });
             let extraction;
             if (this.serverEnabled) {
@@ -642,13 +730,18 @@ class ApiClient {
             };
             await this.db.saveDistillation(item);
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
+            try { const it2 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2); } catch {}
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
             const distilled = await this.ai.distillContent(item.rawContent, { id });
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
+            // Prepare PDF cache in the background for smooth downloads
+            try { await this._ensurePdfCache(id); } catch {}
+            try { const it3 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3); } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+            try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
             await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
         }
     }
@@ -828,6 +921,155 @@ class ApiClient {
             const next = this.taskQueue.shift();
             if (next) void next();
         }
+    }
+
+    // ----------
+    // PDF helpers
+    // ----------
+    async _renderPdfBlobForItem(item) {
+        await this._ensurePdfLibs();
+        // Build a styled HTML in an offscreen iframe to ensure fonts and layout
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '900px';
+        iframe.style.height = '1200px';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentDocument;
+        const safeTitle = (item.title || 'Distillation');
+        const isDocument = (item.sourceType === 'file');
+        const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const sourceUrl = !isDocument && item.sourceUrl ? String(item.sourceUrl) : '';
+        const urlLine = sourceUrl ? `<div class="meta-row"><span class="label">URL:</span> <a href="${escapeHtml(sourceUrl)}" target="_blank">${escapeHtml(sourceUrl)}</a></div>` : '';
+        doc.open();
+        doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${safeTitle}</title>
+            <style>
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111; background: #fff; margin: 40px; line-height: 1.6; }
+            h1,h2,h3 { margin: 0.6em 0 0.3em; font-weight: 700; }
+            h1 { font-size: 24pt; }
+            h2 { font-size: 18pt; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+            h3 { font-size: 14pt; }
+            p, li { font-size: 11pt; }
+            strong { font-weight: 700; }
+            .title { font-size: 24pt; font-weight: 800; margin-bottom: 6px; }
+            .meta { color: #555; font-size: 10pt; margin-bottom: 10px; }
+            .meta .meta-row { margin: 2px 0; }
+            .meta .label { color: #777; font-weight: 600; margin-right: 6px; }
+            .meta a { color: #0a66c2; text-decoration: none; }
+            .meta a:hover { text-decoration: underline; }
+            .divider { height: 2px; background: linear-gradient(90deg, #e5e7eb, #cbd5e1, #e5e7eb); border: 0; margin: 14px 0 20px; }
+            .content { font-size: 11pt; }
+            .content ol { padding-left: 1.2em; }
+            .content li { margin: 6px 0; }
+            .content b, .content strong { font-weight: 700; }
+            .footer { margin-top: 24px; color: #888; font-size: 9pt; text-align: right; }
+            </style></head><body>
+                        <div class="title">${escapeHtml(safeTitle)}</div>
+                        <div class="meta">
+                            ${!isDocument ? urlLine : ''}
+                            <div class="meta-row">${escapeHtml(new Date().toLocaleString())}</div>
+                        </div>
+                        <hr class="divider" />
+            <div class="content">${item.content}</div>
+                        <hr class="divider" />
+            <div class="footer">Generated by DistyVault</div>
+        </body></html>`);
+        doc.close();
+        await new Promise(r => setTimeout(r, 30));
+        const target = doc.body;
+        const opt = { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900, logging: false };
+        const canvas = await window.html2canvas(target, opt);
+        const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth - 80;
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        let y = 40;
+        let remainingHeight = imgHeight;
+        let position = y;
+        const pageImgHeight = pageHeight - 80;
+        let srcY = 0;
+        const pxPerPt = canvas.height / imgHeight;
+        while (remainingHeight > 0) {
+            const sliceHeightPt = Math.min(pageImgHeight, remainingHeight);
+            const sliceHeightPx = Math.floor(sliceHeightPt * pxPerPt);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = sliceHeightPx;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+            const sliceImg = sliceCanvas.toDataURL('image/png');
+            pdf.addImage(sliceImg, 'PNG', 40, position, imgWidth, sliceHeightPt);
+            remainingHeight -= sliceHeightPt;
+            srcY += sliceHeightPx;
+            if (remainingHeight > 0) {
+                pdf.addPage();
+                position = y;
+            }
+            // Yield a frame to keep UI responsive on very long documents
+            await new Promise(r => setTimeout(r, 0));
+        }
+        document.body.removeChild(iframe);
+        return pdf.output('blob');
+    }
+
+    async _getCachedPdf(id) {
+        try {
+            if (!this.db.supportsIndexedDB) return null;
+            const item = await this.db.getDistillation(id);
+            const cache = item && item.pdfCache;
+            if (cache && cache.blob instanceof Blob) return cache.blob;
+            return null;
+        } catch { return null; }
+    }
+
+    async _setCachedPdf(id, blob) {
+        try {
+            if (!this.db.supportsIndexedDB) return false;
+            const item = await this.db.getDistillation(id);
+            if (!item) return false;
+            item.pdfCache = { blob, generatedAt: new Date(), title: item.title || '' };
+            await this.db.saveDistillation(item);
+            return true;
+        } catch { return false; }
+    }
+
+    _idle(callback) {
+        if (typeof window.requestIdleCallback === 'function') {
+            return window.requestIdleCallback(() => callback());
+        }
+        return setTimeout(() => callback(), 50);
+    }
+
+    async _ensurePdfCache(id) {
+        if (!this.db.supportsIndexedDB) return;
+        if (this._pdfRenderInFlight.has(id)) return;
+        const item = await this.db.getDistillation(id);
+        if (!item || !item.content) return;
+        const has = item.pdfCache && item.pdfCache.blob instanceof Blob && (item.pdfCache.title === (item.title || ''));
+        if (has) return;
+        this._pdfRenderInFlight.add(id);
+        this._idle(async () => {
+            try {
+                const blob = await this._renderPdfBlobForItem(item);
+                await this._setCachedPdf(id, blob);
+            } catch {}
+            finally { this._pdfRenderInFlight.delete(id); }
+        });
+    }
+
+    async _sha256Hex(buf) {
+        const digest = await crypto.subtle.digest('SHA-256', buf);
+        const bytes = new Uint8Array(digest);
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    _nowStamp() {
+        const d = new Date();
+        const z = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
     }
 
     async _ensurePdfLibs() {

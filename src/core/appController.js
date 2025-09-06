@@ -455,6 +455,9 @@ class DistyVaultApp {
             // Set download state
             this.downloadStateManager.setDownloadState(buttonId, 'downloading');
 
+            // Attempt to prewarm cache just in case it's not ready yet
+            try { await this.apiClient._ensurePdfCache(id); } catch {}
+
             const result = await this.apiClient.downloadPdf(id);
 
             // Create download
