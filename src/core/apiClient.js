@@ -306,10 +306,20 @@ class ApiClient {
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', 'Extracting content...');
             await this.db.addLog(id, 'Extraction started', 'info', { url });
-            // Extract
-            const extractRes = await fetch(`${this.base}/process/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-            const payload = await this._handle(extractRes);
-            const extraction = payload.extraction || payload;
+            // Extract via API; on 404 or network failure, fallback to client-side extractor
+            let extraction;
+            try {
+                const extractRes = await fetch(`${this.base}/process/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+                if (extractRes.status === 404) {
+                    throw Object.assign(new Error('Serverless API not available (404). Using client fallback.'), { status: 404 });
+                }
+                const payload = await this._handle(extractRes);
+                extraction = payload.extraction || payload;
+            } catch (e) {
+                const status = e?.status || 0;
+                await this.db.addLog(id, 'Serverless API unavailable, using client-side extractor', 'warn', { status, message: e?.message });
+                extraction = await this._extractUrlClient(url);
+            }
             if (extraction.contentType === 'youtube-playlist' && extraction.metadata?.videos?.length) {
                 // Spawn items for each video and delete tracking
                 for (const v of extraction.metadata.videos) {
@@ -342,6 +352,56 @@ class ApiClient {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
             await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
         }
+    }
+
+    /**
+     * Client-side URL extraction using a CORS-friendly proxy (no backend needed)
+     * - Attempts to fetch simplified HTML via https://r.jina.ai/<URL>
+     * - Parses and extracts main content heuristically in the browser
+     */
+    async _extractUrlClient(url) {
+        // Normalize URL
+        let target = String(url || '').trim();
+        if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
+        const proxyUrl = `https://r.jina.ai/${encodeURI(target)}`;
+        const res = await fetch(proxyUrl, { method: 'GET' });
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(`Client extractor failed: HTTP ${res.status}${text ? ' - ' + text.slice(0, 200) : ''}`);
+        }
+        const html = await res.text();
+
+        // Parse HTML and extract content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const title = (doc.querySelector('title')?.textContent || target).trim();
+
+        // Remove noisy nodes
+        const removeSelectors = 'script,style,nav,footer,header,aside,iframe,object,embed,form';
+        doc.querySelectorAll(removeSelectors).forEach(n => n.remove());
+
+        // Try main/article/content containers
+        const mainSelectors = ['main', 'article', '[role="main"]', '.content', '.post', '.entry', '#content', '.main'];
+        let container = null;
+        for (const sel of mainSelectors) {
+            const el = doc.querySelector(sel);
+            if (el && el.textContent && el.textContent.trim().length > 200) { container = el; break; }
+        }
+        if (!container) container = doc.body || doc.documentElement;
+
+        // Basic cleaning and normalization
+        const text = (container?.textContent || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+        const metaDesc = (doc.querySelector('meta[name="description"]')?.getAttribute('content') || '').trim();
+        const content = text && text.length >= 100 ? text : metaDesc;
+
+        return {
+            text: content || (text || `This page at ${target} appears to have limited extractable text.`),
+            title,
+            contentType: 'webpage',
+            extractionMethod: 'client-proxy',
+            fallbackUsed: true,
+            metadata: { url: target }
+        };
     }
 
     async _processFilePipeline(id, file) {
