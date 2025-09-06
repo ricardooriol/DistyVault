@@ -227,7 +227,10 @@
 
             // Track key timestamps
             if ((status === 'extracting' || status === 'processing') && !item.startTime) item.startTime = new Date();
-            if (status === 'distilling') item.distillingStartTime = new Date();
+            if (status === 'distilling') {
+                if (!item.startTime) item.startTime = new Date();
+                item.distillingStartTime = new Date();
+            }
             if (status === 'error' || status === 'stopped' || status === 'failed' || status === 'cancelled') item.completedAt = new Date();
 
             // Update elapsedTime if possible
@@ -275,7 +278,8 @@
         async resetTiming(id) {
             const item = await this.getDistillation(id);
             if (!item) return false;
-            item.startTime = new Date();
+            // Clear start time so queued items don't accumulate wait time
+            item.startTime = null;
             item.distillingStartTime = null;
             item.completedAt = null;
             item.elapsedTime = 0;
