@@ -339,6 +339,24 @@ class ApiClient {
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', 'Extracting content...');
             await this.db.addLog(id, 'Extraction started', 'info', { url });
+
+            // Special handling: YouTube playlist should expand into individual video items
+            if (this._isYouTubePlaylist(url)) {
+                try {
+                    const videos = await this._expandYouTubePlaylist(url);
+                    if (Array.isArray(videos) && videos.length > 0) {
+                        await this.db.addLog(id, 'YouTube playlist detected; enqueueing videos', 'info', { count: videos.length });
+                        for (const v of videos) {
+                            try { await this.processUrl(v); } catch {}
+                            await new Promise(r => setTimeout(r, 100));
+                        }
+                        await this.db.deleteDistillation(id);
+                        return; // Stop processing the playlist item itself
+                    }
+                } catch (e) {
+                    await this.db.addLog(id, 'Failed to expand YouTube playlist; continuing with generic extraction', 'warn', { message: e?.message || String(e) });
+                }
+            }
             // Extract: use client extractor by default to avoid 404 logs; opt-in server with window.DV_USE_SERVER
             let extraction;
             if (this.serverEnabled) {
@@ -389,6 +407,42 @@ class ApiClient {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
             await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
         }
+    }
+
+    // ---------
+    // YouTube helpers
+    // ---------
+    _isYouTubeUrl(u) {
+        try { const h = new URL(u).hostname; return /youtube\.com|youtu\.be/i.test(h); } catch { return false; }
+    }
+    _isYouTubePlaylist(u) {
+        if (!this._isYouTubeUrl(u)) return false;
+        const s = String(u);
+        const hasList = /[?&]list=/.test(s);
+        const isDirectVideo = /(watch\?v=|youtu\.be\/|\/embed\/)/i.test(s);
+        return hasList && !isDirectVideo; // treat pure playlist links only
+    }
+    _extractYouTubePlaylistId(u) {
+        const m = String(u).match(/[?&]list=([a-zA-Z0-9_-]+)/);
+        return m ? m[1] : null;
+    }
+    async _expandYouTubePlaylist(playlistUrl) {
+        const id = this._extractYouTubePlaylistId(playlistUrl);
+        if (!id) return [];
+        // Use CORS-friendly proxy to fetch playlist page content
+        const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
+        const proxy = `https://r.jina.ai/${target}`;
+        const res = await fetch(proxy, { method: 'GET' });
+        if (!res.ok) return [];
+        const html = await res.text();
+        // Extract video IDs via robust patterns
+        const idMatches = [];
+        const m1 = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g) || [];
+        for (const m of m1) { const mm = m.match(/"videoId":"([a-zA-Z0-9_-]{11})"/); if (mm) idMatches.push(mm[1]); }
+        const m2 = html.match(/watch\?v=([a-zA-Z0-9_-]{11})/g) || [];
+        for (const m of m2) { const mm = m.match(/watch\?v=([a-zA-Z0-9_-]{11})/); if (mm) idMatches.push(mm[1]); }
+        const unique = Array.from(new Set(idMatches));
+        return unique.map(v => `https://www.youtube.com/watch?v=${v}`);
     }
 
     /**
