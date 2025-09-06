@@ -359,7 +359,14 @@
     
     <!-- SQL.js Library -->
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
-    
+
+    <!-- Utility Modules -->
+    <script src="src/utils/domUtils.js"></script>
+    <script src="src/utils/dateUtils.js"></script>
+    <script src="src/utils/validationUtils.js"></script>
+    <script src="src/utils/errorUtils.js"></script>
+    <script src="src/utils/viewportUtils.js"></script>
+
     <!-- Core Services -->
     <script src="src/core/eventBus.js"></script>
     <script src="src/core/database.js"></script>
@@ -371,23 +378,21 @@
     <script src="src/core/managers/modalManager.js"></script>
     <script src="src/core/managers/bulkActionsManager.js"></script>
 
+    <!-- Processors (client-side) -->
+    <script src="src/processors/numberingProcessor.js"></script>
+    <script src="src/processors/processor.js"></script>
+
     <!-- AI Services and Providers -->
-    <script src="src/ai/aiService.js"></script>
-    <script src="src/ai/aiProvider.js"></script>
-    <script src="src/ai/aiProviderFactory.js"></script>
-    <script src="src/ai/aiSettingsManager.js"></script>
+    <script src="src/ai/aiProvider.js"></script> <!-- Base class first -->
     <script src="src/ai/providers/openAI.js"></script>
     <script src="src/ai/providers/anthropic.js"></script>
     <script src="src/ai/providers/google.js"></script>
     <script src="src/ai/providers/ollama.js"></script>
     <script src="src/ai/providers/grok.js"></script>
     <script src="src/ai/providers/deepseek.js"></script>
-
-    <!-- Processors -->
-    <script src="src/processors/numberingProcessor.js"></script>
-    <script src="src/processors/processor.js"></script>
-    <script src="src/processors/contentExtractor.js"></script>
-    <script src="src/processors/youtubeTranscriptExtractor.js"></script>
+    <script src="src/ai/aiProviderFactory.js"></script> <!-- Factory that uses implementations -->
+    <script src="src/ai/aiSettingsManager.js"></script>
+    <script src="src/ai/aiService.js"></script> <!-- Service that uses factory -->
 
     <!-- UI Components -->
     <script src="src/components/inputSection.js"></script>
@@ -399,7 +404,7 @@
     <script src="src/core/appController.js"></script>
 
     <!-- Application Entry Point -->
-    <script src="app.js"></script>
+    <script src="src/app.js"></script>
 </body>
 
 </html>

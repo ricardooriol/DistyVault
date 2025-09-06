@@ -2,8 +2,6 @@
  * Google Gemini AI Provider
  * Handles communication with Google's Gemini API using @google/genai
  */
-const AIProvider = require('../aiProvider');
-
 class GoogleProvider extends AIProvider {
     constructor(config = {}) {
         super(config);
@@ -25,8 +23,8 @@ class GoogleProvider extends AIProvider {
      */
     initializeGenAI() {
         try {
-            const { GoogleGenerativeAI } = require('@google/generative-ai');
-            this.ai = new GoogleGenerativeAI(this.apiKey);
+            // const { GoogleGenerativeAI } = require('@google/generative-ai');
+            // this.ai = new GoogleGenerativeAI(this.apiKey);
         } catch (error) {
             console.warn('Google GenAI library not found. Please install it with: npm install @google/generative-ai');
             this.ai = null;

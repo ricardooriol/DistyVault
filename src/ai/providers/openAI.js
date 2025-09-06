@@ -2,9 +2,6 @@
  * OpenAI AI Provider
  * Handles communication with OpenAI's API
  */
-const AIProvider = require('../aiProvider');
-const axios = require('axios');
-
 class OpenAIProvider extends AIProvider {
     constructor(config = {}) {
         super(config);

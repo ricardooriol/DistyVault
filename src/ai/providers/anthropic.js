@@ -2,9 +2,6 @@
  * Anthropic Claude AI Provider
  * Handles communication with Anthropic's Claude API
  */
-const AIProvider = require('../aiProvider');
-const axios = require('axios');
-
 class AnthropicProvider extends AIProvider {
     constructor(config = {}) {
         super(config);

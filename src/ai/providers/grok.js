@@ -2,9 +2,6 @@
  * Grok AI Provider
  * Handles communication with xAI's Grok API
  */
-const AIProvider = require('../aiProvider');
-const axios = require('axios');
-
 class GrokProvider extends AIProvider {
     constructor(config = {}) {
         super(config);

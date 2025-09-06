@@ -2,9 +2,6 @@
  * Deepseek AI Provider
  * Handles communication with Deepseek's API
  */
-const AIProvider = require('../aiProvider');
-const axios = require('axios');
-
 class DeepseekProvider extends AIProvider {
     constructor(config = {}) {
         super(config);

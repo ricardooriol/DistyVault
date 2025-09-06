@@ -3,8 +3,6 @@
  * Handles in-memory storage and management of AI provider configurations
  * Note: Settings are not persisted to disk for security reasons
  */
-const crypto = require('crypto');
-
 // Shared settings storage across all instances
 let sharedSettings = null;
 
@@ -226,4 +224,4 @@ class AISettingsManager {
     }
 }
 
-module.exports = AISettingsManager;
+// module.exports = AISettingsManager;
