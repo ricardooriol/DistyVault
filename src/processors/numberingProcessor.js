@@ -1038,4 +1038,9 @@ class NumberingProcessor {
     }
 }
 
-module.exports = NumberingProcessor;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = NumberingProcessor;
+} else if (typeof window !== 'undefined') {
+    window.NumberingProcessor = NumberingProcessor;
+}

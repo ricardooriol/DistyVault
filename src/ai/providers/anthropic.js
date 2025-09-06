@@ -274,4 +274,9 @@ class AnthropicProvider extends AIProvider {
     }
 }
 
-module.exports = AnthropicProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AnthropicProvider;
+} else if (typeof window !== 'undefined') {
+    window.AnthropicProvider = AnthropicProvider;
+}

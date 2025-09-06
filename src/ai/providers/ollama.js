@@ -267,4 +267,9 @@ class OllamaProvider extends AIProvider {
     }
 }
 
-module.exports = OllamaProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = OllamaProvider;
+} else if (typeof window !== 'undefined') {
+    window.OllamaProvider = OllamaProvider;
+}

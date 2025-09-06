@@ -221,4 +221,9 @@ class DeepseekProvider extends AIProvider {
     }
 }
 
-module.exports = DeepseekProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DeepseekProvider;
+} else if (typeof window !== 'undefined') {
+    window.DeepseekProvider = DeepseekProvider;
+}

@@ -315,4 +315,9 @@ ${text}`;
     }
 }
 
-module.exports = AIProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AIProvider;
+} else if (typeof window !== 'undefined') {
+    window.AIProvider = AIProvider;
+}

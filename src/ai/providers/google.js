@@ -367,4 +367,9 @@ class GoogleProvider extends AIProvider {
     }
 }
 
-module.exports = GoogleProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = GoogleProvider;
+} else if (typeof window !== 'undefined') {
+    window.GoogleProvider = GoogleProvider;
+}

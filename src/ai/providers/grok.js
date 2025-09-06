@@ -223,4 +223,9 @@ class GrokProvider extends AIProvider {
     }
 }
 
-module.exports = GrokProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = GrokProvider;
+} else if (typeof window !== 'undefined') {
+    window.GrokProvider = GrokProvider;
+}

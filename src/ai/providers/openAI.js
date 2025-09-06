@@ -224,4 +224,9 @@ class OpenAIProvider extends AIProvider {
     }
 }
 
-module.exports = OpenAIProvider;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = OpenAIProvider;
+} else if (typeof window !== 'undefined') {
+    window.OpenAIProvider = OpenAIProvider;
+}

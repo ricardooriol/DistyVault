@@ -204,4 +204,9 @@ class AIProviderFactory {
     }
 }
 
-module.exports = AIProviderFactory;
+// Support both CommonJS and browser global
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AIProviderFactory;
+} else if (typeof window !== 'undefined') {
+    window.AIProviderFactory = AIProviderFactory;
+}
