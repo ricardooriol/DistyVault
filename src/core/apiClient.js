@@ -54,34 +54,43 @@ class ApiClient {
     /** Delete summary */
     async deleteSummary(id) { return this.db.deleteDistillation(id); }
 
-    /** Retry distillation using saved rawContent only (no re-scrape) */
+    /** Retry distillation: enqueue work and respect concurrency limit */
     async retryDistillation(id) {
         const item = await this.db.getDistillation(id);
         if (!item) throw new Error('Distillation not found');
+
+        // Mark as queued for retry so UI shows correct state
+        await this.db.updateDistillationStatus(id, 'pending', 'Queued for retry');
+        await this.db.addLog(id, 'Retry queued');
+
+        // Path A: need re-extraction (no raw text)
         if (!item.rawContent || item.rawContent.trim().length < 10) {
-            // Try re-extracting if we have a source
             if (item.sourceUrl) {
-                await this._processUrlPipeline(id, item.sourceUrl);
-                return { status: 'ok', reextracted: true };
+                await this._runWithLimit(() => this._processUrlPipeline(id, item.sourceUrl));
+                return { status: 'queued', reextracted: true };
             }
             if (item.sourceFile && item.sourceFile.blob instanceof Blob) {
-                await this._processFilePipeline(id, item.sourceFile.blob);
-                return { status: 'ok', reextracted: true };
+                await this._runWithLimit(() => this._processFilePipeline(id, item.sourceFile.blob));
+                return { status: 'queued', reextracted: true };
             }
             throw new Error('No saved raw text to retry; re-extraction required');
         }
-        // Reset timers to ensure Duration restarts on retry
-        await this.db.resetTiming(id);
-        await this.db.addLog(id, 'Retry initiated');
-    await this.db.updateDistillationStatus(id, 'distilling', 'Regenerating with AI');
-        const raw = item.rawContent;
-        const cancelled = this._isCancelled(id);
-        if (cancelled) { await this._markStopped(id); return { status: 'stopped' }; }
-        const distilled = await this.ai.distillContent(raw);
-        const wordCount = (distilled || '').split(/\s+/).length;
-        await this.db.updateDistillationContent(id, distilled, raw, 0, wordCount);
-        await this.db.addLog(id, 'AI distillation completed', 'info', { wordCount });
-        return { status: 'ok' };
+
+        // Path B: distill from saved raw content, queued via limiter
+        await this._runWithLimit(async () => {
+            const latest = await this.db.getDistillation(id);
+            if (!latest) return; // deleted while queued
+            if (this._isCancelled(id)) { await this._markStopped(id); return; }
+            await this.db.resetTiming(id);
+            await this.db.updateDistillationStatus(id, 'distilling', 'Regenerating with AI');
+            await this.db.addLog(id, 'Retry started');
+            const raw = latest.rawContent || '';
+            const distilled = await this.ai.distillContent(raw, { id });
+            const wordCount = (distilled || '').split(/\s+/).length;
+            await this.db.updateDistillationContent(id, distilled, raw, 0, wordCount);
+            await this.db.addLog(id, 'AI distillation completed', 'info', { wordCount });
+        });
+        return { status: 'queued' };
     }
 
     /** Stop background processing */

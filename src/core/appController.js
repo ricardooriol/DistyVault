@@ -387,14 +387,16 @@ class DistyVaultApp {
             this.eventBus.emit(EventBus.Events.PROCESSING_STARTED, { id });
 
         } catch (error) {
-            console.error('Error retrying distillation:', error);
-
-            if (!silent) {
-                this.showTemporaryMessage('Failed to retry', 'error');
+            // Gracefully handle already-deleted items
+            if (error && /not found/i.test(String(error.message || ''))) {
+                if (!silent) this.showTemporaryMessage('Item no longer exists', 'warning');
+                return;
             }
-
-            this.eventBus.emit(EventBus.Events.ERROR_OCCURRED, {
-                message: 'Failed to retry distillation',
+            console.error('Error retrying distillation:', error);
+            if (!silent) this.showTemporaryMessage('Failed to retry', 'error');
+            // Avoid spamming global error bus for expected cases
+            this.eventBus.emit(EventBus.Events.WARNING_OCCURRED, {
+                message: 'Retry encountered an issue',
                 error
             });
         }

@@ -381,14 +381,15 @@ class BulkActionsManager {
             // Show initial message
             this.app.showTemporaryMessage(`Retrying ${selectedIds.length} selected items...`, 'info');
 
-            // Process selected items from bottom to top (reverse order) with delay to ensure proper sequencing
-            const idsToRetry = [...selectedIds].reverse();
+            // Process from top to bottom in UI order for intuitive queueing
+            const idsToRetry = [...selectedIds];
             for (let i = 0; i < idsToRetry.length; i++) {
                 const id = idsToRetry[i];
-                // Add small delay between retries to ensure bottom-to-top processing order
-                if (i > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                // Skip IDs that no longer exist
+                const exists = this.app.knowledgeBase.some(it => it.id === id);
+                if (!exists) continue;
+                // Add small delay to avoid UI jank
+                if (i > 0) await new Promise(resolve => setTimeout(resolve, 50));
                 await this.app.retryDistillation(id, true); // Silent mode for bulk operations
             }
 
@@ -426,14 +427,11 @@ class BulkActionsManager {
             // Show initial message
             this.app.showTemporaryMessage(`Retrying all ${allItems.length} items...`, 'info');
 
-            // Process items from bottom to top (reverse order) with delay to ensure proper sequencing
-            const itemsToRetry = [...allItems].reverse();
+            // Process from top to bottom for intuitive queueing
+            const itemsToRetry = [...allItems];
             for (let i = 0; i < itemsToRetry.length; i++) {
                 const item = itemsToRetry[i];
-                // Add small delay between retries to ensure bottom-to-top processing order
-                if (i > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                if (i > 0) await new Promise(resolve => setTimeout(resolve, 50));
                 await this.app.retryDistillation(item.id, true); // Silent mode for bulk operations
             }
 
@@ -471,14 +469,11 @@ class BulkActionsManager {
             // Show initial message
             this.app.showTemporaryMessage(`Retrying ${failedItems.length} failed items...`, 'info');
 
-            // Process failed items from bottom to top (reverse order) with delay to ensure proper sequencing
-            const itemsToRetry = [...failedItems].reverse();
+            // Process from top to bottom for intuitive queueing
+            const itemsToRetry = [...failedItems];
             for (let i = 0; i < itemsToRetry.length; i++) {
                 const item = itemsToRetry[i];
-                // Add small delay between retries to ensure bottom-to-top processing order
-                if (i > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                if (i > 0) await new Promise(resolve => setTimeout(resolve, 50));
                 await this.app.retryDistillation(item.id, true); // Silent mode for bulk operations
             }
 
