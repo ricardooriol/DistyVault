@@ -28,7 +28,7 @@ class DateUtils {
         // Centralized time calculation to ensure consistency
         if (item.processingTime && item.status === 'completed') {
             return this.formatTimeDisplay(item.processingTime);
-        } else if (item.status === 'pending') {
+    } else if (item.status === 'pending' || item.status === 'queued') {
             return 'Waiting...';
         } else if (['extracting', 'distilling'].includes(item.status) && item.startTime) {
             try {

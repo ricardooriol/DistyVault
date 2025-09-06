@@ -62,17 +62,24 @@ class ApiClient {
         if (!item) throw new Error('Distillation not found');
 
         // Mark as queued for retry so UI shows correct state
-        await this.db.updateDistillationStatus(id, 'pending', 'Queued for retry');
+    await this.db.updateDistillationStatus(id, 'pending', 'Queued for retry');
+    // Clear timing so duration shows "Waiting..." until it actually starts
+    try { await this.db.resetTiming(id); } catch {}
         await this.db.addLog(id, 'Retry queued');
 
         // Path A: need re-extraction (no raw text)
         if (!item.rawContent || item.rawContent.trim().length < 10) {
             if (item.sourceUrl) {
-                this._runWithLimit(() => this._processUrlPipeline(id, item.sourceUrl)).catch(() => {});
+                // Ensure item remains queued visually until its turn
+                this._runWithLimit(async () => {
+                    await this._processUrlPipeline(id, item.sourceUrl);
+                }).catch(() => {});
                 return { status: 'queued', reextracted: true };
             }
             if (item.sourceFile && item.sourceFile.blob instanceof Blob) {
-                this._runWithLimit(() => this._processFilePipeline(id, item.sourceFile.blob)).catch(() => {});
+                this._runWithLimit(async () => {
+                    await this._processFilePipeline(id, item.sourceFile.blob);
+                }).catch(() => {});
                 return { status: 'queued', reextracted: true };
             }
             throw new Error('No saved raw text to retry; re-extraction required');
@@ -83,6 +90,7 @@ class ApiClient {
             const latest = await this.db.getDistillation(id);
             if (!latest) return; // deleted while queued
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
+            // Flip to active only when our slot actually starts
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'distilling', 'Regenerating with AI');
             await this.db.addLog(id, 'Retry started');
@@ -385,13 +393,13 @@ class ApiClient {
     // Optimistic UI: push immediately if eventBus exists
     try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
         // Run pipeline asynchronously
-        this._runWithLimit(() => this._processUrlPipeline(dist.id, url)).catch(() => {});
+    this._runWithLimit(() => this._processUrlPipeline(dist.id, url)).catch(() => {});
         return { id: dist.id, status: 'queued' };
     }
 
     /** Process uploaded file: extract via API, then distill client-side */
     async processFile(file) {
-        const dist = this._createDistillation({ sourceType: 'file', sourceFile: { name: file.name, type: file.type, size: file.size, blob: file }, title: file.name });
+    const dist = this._createDistillation({ sourceType: 'file', sourceFile: { name: file.name, type: file.type, size: file.size, blob: file }, title: file.name });
         await this.db.saveDistillation(dist);
     this._runWithLimit(() => this._processFilePipeline(dist.id, file)).catch(() => {});
         return { id: dist.id, status: 'queued' };
@@ -477,7 +485,7 @@ class ApiClient {
             completedAt: null,
             processingTime: 0,
             elapsedTime: 0,
-            startTime: new Date(),
+            startTime: null,
             distillingStartTime: null,
             wordCount: 0,
             error: null,

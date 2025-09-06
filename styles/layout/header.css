@@ -46,4 +46,16 @@
     .header-actions {
         justify-content: center;
     }
+
+    .header {
+        padding: 1rem 0;
+    }
+
+    .header .logo {
+        font-size: 1.6rem;
+    }
+
+    .tagline {
+        font-size: 0.95rem;
+    }
 }

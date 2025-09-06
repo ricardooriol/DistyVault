@@ -384,7 +384,6 @@ class DistyVaultApp {
             }
 
             this.forceStatusUpdate();
-            this.eventBus.emit(EventBus.Events.PROCESSING_STARTED, { id });
 
         } catch (error) {
             // Gracefully handle already-deleted items

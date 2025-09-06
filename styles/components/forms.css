@@ -83,6 +83,30 @@
 }
 
 /* Additional responsive adjustments */
+@media (max-width: 768px) {
+    .input-row {
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .main-input-field {
+        width: 100%;
+        text-align: left;
+    }
+
+    .input-row .file-upload-btn,
+    .input-row .dropzone-btn,
+    .input-row .distill-btn {
+        flex: 1 1 100%;
+        min-width: 0;
+        height: 48px;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+}
+
 @media (max-width: 480px) {
     .input-row {
         gap: 0.75rem;
@@ -270,6 +294,7 @@ input:checked+.toggle-slider:before {
     padding: 0.5rem 0.25rem;
     font-size: 0.9rem;
     color: var(--text-primary);
+    appearance: textfield;
     -moz-appearance: textfield; /* Firefox */
 }
 
