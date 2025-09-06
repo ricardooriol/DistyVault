@@ -53,8 +53,11 @@ class ApiClient {
     /** Get single summary */
     async getSummary(id) { return this.db.getDistillation(id); }
 
-    /** Delete summary */
-    async deleteSummary(id) { return this.db.deleteDistillation(id); }
+    /** Delete summary: also mark as cancelled to prevent queued tasks from running */
+    async deleteSummary(id) {
+        try { this.cancellations.set(id, { cancelled: true, deleted: true }); } catch {}
+        return this.db.deleteDistillation(id);
+    }
 
     /** Retry distillation: enqueue work and respect concurrency limit */
     async retryDistillation(id) {
@@ -241,7 +244,10 @@ class ApiClient {
             return isNaN(d) ? s : d;
         };
 
-        for (const line of lines) {
+    // Collect items that should restart after import, maintaining file order (top-to-bottom)
+    const toRestart = [];
+
+    for (const line of lines) {
             let rec;
             try { rec = JSON.parse(line); } catch { continue; }
 
@@ -266,14 +272,68 @@ class ApiClient {
                 }
             } catch {}
 
+            // Persist record first
             await this.db.saveDistillation(rec);
-            // If item already completed, warm PDF cache in background
-            if (rec.status === 'completed') {
+
+            // Post-save handling by status
+            const status = (rec.status || '').toLowerCase();
+            if (status === 'completed') {
+                // Warm PDF cache for snappy downloads
                 try { await this._ensurePdfCache(rec.id); } catch {}
+            } else if (status === 'error' || status === 'failed' || status === 'stopped' || status === 'cancelled') {
+                // Leave as-is; do not auto-restart failed/stopped items
+            } else {
+                // For any active or waiting state, normalize to 'pending' and queue to restart after import
+                try {
+                    const fresh = await this.db.getDistillation(rec.id);
+                    if (fresh) {
+                        fresh.status = 'pending';
+                        fresh.processingStep = 'Queued after import';
+                        // Clear timing so timers start when slot begins
+                        fresh.startTime = null;
+                        fresh.distillingStartTime = null;
+                        fresh.completedAt = null;
+                        fresh.elapsedTime = 0;
+                        fresh.processingTime = 0;
+                        await this.db.saveDistillation(fresh);
+                        toRestart.push({ id: fresh.id });
+                    }
+                } catch {}
             }
         }
 
-        return { status: 'ok', imported: lines.length };
+        // Restart queued items sequentially in the same order as they appeared in the file
+        for (const { id } of toRestart) {
+            try {
+                const item = await this.db.getDistillation(id);
+                if (!item) continue;
+                // Prefer original source when available; otherwise distill from saved raw content
+                if (item.sourceUrl) {
+                    this._runWithLimit(async () => { await this._processUrlPipeline(id, item.sourceUrl); }).catch(() => {});
+                } else if (item.sourceFile && item.sourceFile.blob instanceof Blob) {
+                    this._runWithLimit(async () => { await this._processFilePipeline(id, item.sourceFile.blob); }).catch(() => {});
+                } else if (item.rawContent && item.rawContent.trim().length > 0) {
+                    this._runWithLimit(async () => {
+                        // Guard against deletion/cancellation
+                        const latest = await this.db.getDistillation(id);
+                        if (!latest || this._isCancelled(id)) return;
+                        await this.db.updateDistillationStatus(id, 'distilling', 'Processing after import');
+                        await this.db.addLog(id, 'Processing started after import', 'info');
+                        const raw = latest.rawContent || '';
+                        const distilled = await this.ai.distillContent(raw, { id });
+                        const wordCount = (distilled || '').split(/\s+/).length;
+                        await this.db.updateDistillationContent(id, distilled, raw, 0, wordCount);
+                        try { await this._ensurePdfCache(id); } catch {}
+                        await this.db.addLog(id, 'Processing completed after import', 'info', { wordCount });
+                    }).catch(() => {});
+                } else {
+                    // Nothing to do; log for visibility
+                    await this.db.addLog(id, 'Cannot restart after import: missing source and raw content', 'warn');
+                }
+            } catch {}
+        }
+
+        return { status: 'ok', imported: lines.length, restarted: toRestart.length };
     }
 
     /** Bulk download: sequentially trigger PDF downloads for given ids */
@@ -360,6 +420,8 @@ class ApiClient {
 
     /** Bulk delete */
     async bulkDelete(ids) {
+        // Mark all as cancelled first to neutralize queued tasks
+        for (const id of ids) { try { this.cancellations.set(id, { cancelled: true, deleted: true }); } catch {} }
         const results = await Promise.all(ids.map(id => this.db.deleteDistillation(id)));
         const deletedCount = results.filter(Boolean).length;
         return { deletedCount };
@@ -499,7 +561,10 @@ class ApiClient {
             if (cancelled) { await this._markStopped(id); return; }
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', 'Extracting content...');
-            try { const item = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item); } catch {}
+            try {
+                const item = await this.db.getDistillation(id);
+                if (item) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item);
+            } catch {}
             await this.db.addLog(id, 'Extraction started', 'info', { url });
 
             // Special handling: YouTube playlist should expand into individual video items
@@ -549,6 +614,7 @@ class ApiClient {
             }
             await this.db.addLog(id, 'Extraction completed', 'info', { contentType: extraction.contentType });
             const item = await this.db.getDistillation(id);
+            if (!item) return; // item deleted while extracting; abort quietly
             item.rawContent = extraction.text || '';
             item.title = extraction.title || item.title;
             item.extractionMetadata = {
@@ -560,7 +626,10 @@ class ApiClient {
             await this.db.saveDistillation(item);
             // Distill
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
-            try { const it2 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2); } catch {}
+            try {
+                const it2 = await this.db.getDistillation(id);
+                if (it2) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2);
+            } catch {}
             await this.db.addLog(id, 'AI distillation started', 'info');
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
             const distilled = await this.ai.distillContent(item.rawContent, { id });
@@ -568,7 +637,10 @@ class ApiClient {
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
             // Prepare PDF cache in the background for smooth downloads
             try { await this._ensurePdfCache(id); } catch {}
-            try { const it3 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3); } catch {}
+            try {
+                const it3 = await this.db.getDistillation(id);
+                if (it3) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3);
+            } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
@@ -705,7 +777,10 @@ class ApiClient {
             if (cancelled) { await this._markStopped(id); return; }
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', `Extracting content from ${file.name}...`);
-            try { const item = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item); } catch {}
+            try {
+                const item = await this.db.getDistillation(id);
+                if (item) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, item);
+            } catch {}
             await this.db.addLog(id, 'Extraction started', 'info', { file: { name: file.name, type: file.type, size: file.size } });
             let extraction;
             if (this.serverEnabled) {
@@ -728,6 +803,7 @@ class ApiClient {
             }
             await this.db.addLog(id, 'Extraction completed', 'info', { contentType: extraction.contentType });
             const item = await this.db.getDistillation(id);
+            if (!item) return; // item deleted while extracting; abort quietly
             item.rawContent = extraction.text || '';
             item.title = extraction.title || item.title;
             item.extractionMetadata = {
@@ -738,14 +814,20 @@ class ApiClient {
             };
             await this.db.saveDistillation(item);
             await this.db.updateDistillationStatus(id, 'distilling', 'Processing with AI...');
-            try { const it2 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2); } catch {}
+            try {
+                const it2 = await this.db.getDistillation(id);
+                if (it2) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2);
+            } catch {}
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
             const distilled = await this.ai.distillContent(item.rawContent, { id });
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
             // Prepare PDF cache in the background for smooth downloads
             try { await this._ensurePdfCache(id); } catch {}
-            try { const it3 = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3); } catch {}
+            try {
+                const it3 = await this.db.getDistillation(id);
+                if (it3) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it3);
+            } catch {}
             await this.db.addLog(id, 'Processing completed successfully', 'info', { wordCount });
         } catch (e) {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');

@@ -713,7 +713,10 @@ class DistyVaultApp {
                 // Create meta information
                 const createdDate = new Date(distillation.createdAt).toLocaleDateString();
                 const wordCount = distillation.wordCount || 0;
-                const processingTime = distillation.processingTime ? `${distillation.processingTime.toFixed(1)}s` : 'N/A';
+                // Align Processing Time with table's Duration logic
+                const processingTime = (window.DateUtils && typeof window.DateUtils.calculateProcessingTimeDisplay === 'function')
+                    ? (window.DateUtils.calculateProcessingTimeDisplay(distillation) || 'N/A')
+                    : (distillation.processingTime ? `${distillation.processingTime.toFixed(1)}s` : 'N/A');
 
                 meta.innerHTML = `
                     <div class="meta-item">
