@@ -200,41 +200,13 @@ class BulkActionsManager {
                 startTime: Date.now()
             });
 
-            // Request a ZIP file from the backend endpoint
-            const result = await this.app.apiClient.bulkDownload(selectedIds, {
-                signal: abortController.signal
-            });
+            // Trigger sequential per-item downloads via ApiClient; no combined ZIP/extra file
+            const result = await this.app.apiClient.bulkDownload(selectedIds, { signal: abortController.signal });
 
-            // Handle the ZIP file download
-            const blob = result.blob;
-            const contentDisposition = result.headers.get('Content-Disposition');
-            let filename = `distyvault-download.zip`; // Default filename
-
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-
-            // Wait a moment to ensure download has started before resetting state
+            // Reset state after a short delay to let browser start downloads
             setTimeout(() => {
                 this.app.downloadStateManager.setDownloadState(buttonId, 'idle');
-            }, 1000);
-
-            // Clean up after a delay
-            setTimeout(() => {
-                window.URL.revokeObjectURL(url);
-                a.remove();
-            }, 100);
+            }, 500);
 
         } catch (error) {
             // Check if the download was cancelled

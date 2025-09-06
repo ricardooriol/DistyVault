@@ -8,6 +8,11 @@ class AIProvider {
         this.name = this.constructor.name;
     }
 
+    // Debug helpers (enable by setting window.DV_DEBUG = true)
+    _isDebug() { try { return !!(typeof window !== 'undefined' && window.DV_DEBUG); } catch { return false; } }
+    _log(...args) { if (this._isDebug()) console.debug(...args); }
+    _warn(...args) { if (this._isDebug()) console.warn(...args); }
+
     /**
      * Generate a distilled analysis from the given text
      * @param {string} text - The text to distill
@@ -31,7 +36,7 @@ class AIProvider {
         }
 
         try {
-            console.log(`[${this.name}] Starting bulletproof HTML numbering processing...`);
+            this._log(`[${this.name}] Starting bulletproof HTML numbering processing...`);
 
             // Step 1: Apply the bulletproof HTML numbering processor
             let processedDistillation = NumberingProcessor.fixNumberingAsHTML(rawDistillation);
@@ -40,7 +45,7 @@ class AIProvider {
             const isValidHTML = NumberingProcessor.validateHTMLFormat(processedDistillation);
 
             if (!isValidHTML) {
-                console.warn(`[${this.name}] HTML validation failed, applying force format with HTML...`);
+                this._warn(`[${this.name}] HTML validation failed, applying force format with HTML...`);
                 // Nuclear option: force perfect format with HTML output
                 processedDistillation = NumberingProcessor.forceFormat(rawDistillation, true);
                 
@@ -59,7 +64,7 @@ class AIProvider {
             const isHTMLFormatted = processedDistillation.includes('<strong>') && processedDistillation.includes('<p>');
 
             if (processedDistillation !== rawDistillation) {
-                console.log(`[${this.name}] HTML numbering processing completed:`, {
+                this._log(`[${this.name}] HTML numbering processing completed:`, {
                     originalHadNumbering: originalStats.hasNumbering,
                     originalPoints: originalStats.totalPoints,
                     originalSequential: originalStats.isSequential,
@@ -188,7 +193,7 @@ class AIProvider {
         // Truncate if too long (most APIs have limits)
         const maxLength = this.getMaxInputLength();
         if (cleaned.length > maxLength) {
-            console.warn(`Text truncated from ${cleaned.length} to ${maxLength} characters`);
+            this._warn(`Text truncated from ${cleaned.length} to ${maxLength} characters`);
             cleaned = cleaned.substring(0, maxLength) + '...';
         }
 

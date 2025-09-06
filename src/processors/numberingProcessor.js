@@ -13,6 +13,12 @@
  */
 
 class NumberingProcessor {
+    // Toggle debug logging: set window.DV_DEBUG = true to enable
+    static get DEBUG() {
+        try { return !!(typeof window !== 'undefined' && window.DV_DEBUG); } catch { return false; }
+    }
+    static _log(...args) { if (NumberingProcessor.DEBUG) console.debug(...args); }
+    static _warn(...args) { if (NumberingProcessor.DEBUG) console.warn(...args); }
     /**
      * Fix numbering issues and format as HTML - BULLETPROOF VERSION
      * @param {string} text - The text to process
@@ -32,13 +38,13 @@ class NumberingProcessor {
 
             // Step 3: Validate HTML format
             if (!this.validateHTMLFormat(htmlContent)) {
-                console.warn('NumberingProcessor: HTML validation failed, applying force format with HTML');
+                NumberingProcessor._warn('NumberingProcessor: HTML validation failed, applying force format with HTML');
                 // Try force format with HTML output
                 htmlContent = this.forceFormat(text, true);
                 
                 // Final validation
                 if (!this.validateHTMLFormat(htmlContent)) {
-                    console.warn('NumberingProcessor: Force format HTML also failed, using emergency HTML format');
+                    NumberingProcessor._warn('NumberingProcessor: Force format HTML also failed, using emergency HTML format');
                     htmlContent = this.emergencyHTMLFormat(text);
                 }
             }
@@ -46,7 +52,7 @@ class NumberingProcessor {
             return htmlContent;
 
         } catch (error) {
-            console.warn('NumberingProcessor: Error in fixNumberingAsHTML, applying emergency format:', error.message);
+            NumberingProcessor._warn('NumberingProcessor: Error in fixNumberingAsHTML, applying emergency format:', error.message);
             return this.emergencyHTMLFormat(text);
         }
     }
@@ -87,7 +93,7 @@ class NumberingProcessor {
 
             // Step 2: Check if text has mixed or problematic numbering
             if (this.hasMixedOrProblematicNumbering(cleanedText)) {
-                console.log('Detected mixed/problematic numbering, applying force format');
+                NumberingProcessor._log('Detected mixed/problematic numbering, applying force format');
                 return this.forceFormat(cleanedText);
             }
 
@@ -106,7 +112,7 @@ class NumberingProcessor {
             return this.finalValidation(perfectFormat);
 
         } catch (error) {
-            console.warn('NumberingProcessor: Error in fixNumbering, applying emergency format:', error.message);
+            NumberingProcessor._warn('NumberingProcessor: Error in fixNumbering, applying emergency format:', error.message);
             return this.emergencyFormat(text);
         }
     }
@@ -176,7 +182,7 @@ class NumberingProcessor {
         // This catches cases like "sentence. 2. next sentence" or "sentence.2. next sentence"
         const inlineNumbers = (text.match(/\.\s*\d+\./g) || []);
         if (inlineNumbers.length > 0) {
-            console.log('Detected inline numbering:', inlineNumbers);
+            NumberingProcessor._log('Detected inline numbering:', inlineNumbers);
             return true; // Inline numbering detected
         }
 
@@ -650,7 +656,7 @@ class NumberingProcessor {
             return htmlPoints.join('\n\n<br>\n\n');
             
         } catch (error) {
-            console.warn('NumberingProcessor: Error in formatAsHTML, returning escaped text:', error.message);
+            NumberingProcessor._warn('NumberingProcessor: Error in formatAsHTML, returning escaped text:', error.message);
             return `<p>${this.escapeHTML(text)}</p>`;
         }
     }
@@ -697,7 +703,7 @@ class NumberingProcessor {
             const strongCloseTags = (html.match(/<\/strong>/g) || []).length;
             
             if (strongOpenTags !== strongCloseTags) {
-                console.warn('NumberingProcessor: Unmatched strong tags detected');
+                NumberingProcessor._warn('NumberingProcessor: Unmatched strong tags detected');
                 return false;
             }
 
@@ -706,26 +712,26 @@ class NumberingProcessor {
             const pCloseTags = (html.match(/<\/p>/g) || []).length;
             
             if (pOpenTags !== pCloseTags) {
-                console.warn('NumberingProcessor: Unmatched p tags detected');
+                NumberingProcessor._warn('NumberingProcessor: Unmatched p tags detected');
                 return false;
             }
 
             // Enhanced security validation - check for dangerous content
             if (!this.isHTMLSafe(html)) {
-                console.warn('NumberingProcessor: Unsafe HTML content detected');
+                NumberingProcessor._warn('NumberingProcessor: Unsafe HTML content detected');
                 return false;
             }
 
             // Check for proper numbering structure
             if (!this.hasValidNumberingStructure(html)) {
-                console.warn('NumberingProcessor: Invalid numbering structure in HTML');
+                NumberingProcessor._warn('NumberingProcessor: Invalid numbering structure in HTML');
                 return false;
             }
 
             return true;
             
         } catch (error) {
-            console.warn('NumberingProcessor: Error validating HTML format:', error.message);
+            NumberingProcessor._warn('NumberingProcessor: Error validating HTML format:', error.message);
             return false;
         }
     }
@@ -795,7 +801,7 @@ class NumberingProcessor {
         for (const tagMatch of tagMatches) {
             const tagName = tagMatch.match(/<\/?(\w+)/)[1].toLowerCase();
             if (!allowedTags.includes(tagName)) {
-                console.warn(`NumberingProcessor: Disallowed tag detected: ${tagName}`);
+                NumberingProcessor._warn(`NumberingProcessor: Disallowed tag detected: ${tagName}`);
                 return false;
             }
         }
@@ -910,7 +916,7 @@ class NumberingProcessor {
         const hasInlineNumbers = /\.\s*\d+\./g.test(text);
         
         if (hasInlineNumbers) {
-            console.log('Detected inline numbering, using inline splitting approach');
+            NumberingProcessor._log('Detected inline numbering, using inline splitting approach');
             
             // For inline numbering, split by number patterns that appear after sentence endings
             const parts = text.split(/(\d+\.\s+)/);
