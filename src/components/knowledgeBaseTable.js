@@ -21,6 +21,40 @@ class KnowledgeBaseTable {
      */
     init() {
         this.setupEventListeners();
+
+        // Subscribe to granular update events to avoid full table re-renders
+        if (this.app && this.app.eventBus) {
+            this.app.eventBus.on(EventBus.Events.ITEM_UPDATED, (item) => {
+                // Update local cache
+                const idx = this.knowledgeBase.findIndex(i => i.id === item.id);
+                if (idx !== -1) this.knowledgeBase[idx] = item;
+                this.updateSingleRow(item);
+            }, this);
+
+            this.app.eventBus.on(EventBus.Events.ITEM_ADDED, (item) => {
+                // Update local cache and re-render to keep sort order consistent
+                const exists = this.knowledgeBase.find(i => i.id === item.id);
+                if (!exists) this.knowledgeBase.push(item);
+                this.renderKnowledgeBase();
+            }, this);
+
+            this.app.eventBus.on(EventBus.Events.ITEM_DELETED, (item) => {
+                // Remove from local cache and DOM
+                this.knowledgeBase = this.knowledgeBase.filter(i => i.id !== item.id);
+                const row = document.querySelector(`tr[data-id="${item.id}"]`);
+                if (row) row.remove();
+
+                // If no rows remain, render empty state
+                const tbody = DomUtils.getElementById('knowledge-base-tbody');
+                const hasRows = tbody && tbody.querySelector('tr');
+                if (!hasRows) {
+                    this.renderKnowledgeBase();
+                } else {
+                    // Update bulk actions/header if still has content
+                    this.restoreCheckboxStates();
+                }
+            }, this);
+        }
     }
 
     /**
@@ -420,8 +454,29 @@ class KnowledgeBaseTable {
             this.updateRowCellsSelectively(row, item);
         } else {
             // Replace the entire row for non-processing items
+            const checkbox = row.querySelector('.row-checkbox');
+            const wasChecked = checkbox ? checkbox.checked : false;
+            const dropdown = row.querySelector('.action-dropdown');
+            const wasDropdownOpen = dropdown ? dropdown.classList.contains('show') : false;
+
             const newRowHtml = this.createTableRow(item);
             row.outerHTML = newRowHtml;
+
+            // Restore checkbox state and dropdown if they were set
+            const newRow = document.querySelector(`tr[data-id="${item.id}"]`);
+            if (newRow) {
+                const newCheckbox = newRow.querySelector('.row-checkbox');
+                if (newCheckbox) newCheckbox.checked = wasChecked;
+
+                if (wasDropdownOpen) {
+                    const newDropdown = newRow.querySelector('.action-dropdown');
+                    if (newDropdown) {
+                        newDropdown.classList.add('show');
+                        this.positionDropdown(newDropdown);
+                        this.addDropdownEventListeners();
+                    }
+                }
+            }
         }
     }
 
@@ -432,7 +487,7 @@ class KnowledgeBaseTable {
         const statusConfig = this.getStatusConfig(item.status);
         const statusClass = statusConfig.class;
         const statusText = statusConfig.text;
-        const statusDisplay = `<span class="status-icon">${statusConfig.icon}</span>${statusText}`;
+    const statusDisplay = `<span class="status-icon">${statusConfig.icon}</span><span class="status-text">${statusText}</span>`;
 
         // Update status cell
         const statusCell = row.querySelector('.status-cell');
@@ -442,17 +497,28 @@ class KnowledgeBaseTable {
         }
 
         // Update title cell if it changed
-        const titleCell = row.querySelector('.title-cell');
+        const titleCell = row.querySelector('.name-cell');
         if (titleCell && item.title) {
-            const truncatedTitle = item.title.length > 50 ? item.title.substring(0, 50) + '...' : item.title;
-            titleCell.textContent = truncatedTitle;
-            titleCell.setAttribute('data-tooltip', item.title);
+            const fullName = this.extractItemName(item);
+            const truncated = fullName.length > 100 ? fullName.substring(0, 97) + '...' : fullName;
+            titleCell.textContent = truncated;
+            titleCell.setAttribute('data-tooltip', fullName);
         }
 
-        // Update actions cell
+        // Update actions cell (preserve open state if currently open)
         const actionsCell = row.querySelector('.actions-cell');
         if (actionsCell) {
+            const existingDropdown = actionsCell.querySelector('.action-dropdown');
+            const wasOpen = existingDropdown ? existingDropdown.classList.contains('show') : false;
             actionsCell.innerHTML = this.createActionsDropdown(item);
+            if (wasOpen) {
+                const newDropdown = actionsCell.querySelector('.action-dropdown');
+                if (newDropdown) {
+                    newDropdown.classList.add('show');
+                    this.positionDropdown(newDropdown);
+                    this.addDropdownEventListeners();
+                }
+            }
         }
     }
 
@@ -467,6 +533,11 @@ class KnowledgeBaseTable {
         const emptyState = tbody.querySelector('.empty-state-cell');
         if (emptyState) {
             tbody.innerHTML = newRowHtml;
+            // Ensure table header is visible when adding first row
+            const tableHead = document.querySelector('#knowledge-base-table thead');
+            if (tableHead) {
+                tableHead.style.display = 'table-header-group';
+            }
         } else {
             // Add to the beginning of the table
             tbody.insertAdjacentHTML('afterbegin', newRowHtml);

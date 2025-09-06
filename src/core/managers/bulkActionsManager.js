@@ -183,8 +183,8 @@ class BulkActionsManager {
             return;
         }
 
-        // If only one item is selected, use single download logic but with bulk button state management
-        if (selectedIds.length === 1) {
+    // If only one item is selected, use single download logic but with bulk button state management
+    if (selectedIds.length === 1) {
             this.downloadSingleFromBulk(selectedIds[0]);
             return;
         }
@@ -200,13 +200,13 @@ class BulkActionsManager {
                 startTime: Date.now()
             });
 
-            // Trigger sequential per-item downloads via ApiClient; no combined ZIP/extra file
-            const result = await this.app.apiClient.bulkDownload(selectedIds, { signal: abortController.signal });
+            // Multiple selections: request a single ZIP from the client
+            const result = await this.app.apiClient.bulkDownload(selectedIds, { zip: true, signal: abortController.signal });
 
-            // Reset state after a short delay to let browser start downloads
+            // Reset state after a short delay to let browser start the ZIP download
             setTimeout(() => {
                 this.app.downloadStateManager.setDownloadState(buttonId, 'idle');
-            }, 500);
+            }, 800);
 
         } catch (error) {
             // Check if the download was cancelled

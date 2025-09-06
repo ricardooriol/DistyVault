@@ -190,7 +190,11 @@ class ApiClient {
     }
 
     /** Bulk download: sequentially trigger PDF downloads for given ids */
-    async bulkDownload(ids) {
+    async bulkDownload(ids, options = {}) {
+        // If requested, package into a single ZIP
+        if (options && options.zip === true) {
+            return this._bulkDownloadAsZip(ids, options);
+        }
         let count = 0;
         for (const id of ids) {
             try {
@@ -215,6 +219,50 @@ class ApiClient {
         }
         // Indicate to caller that downloads were triggered individually; no combined blob to download
         return { skipDownload: true, status: 200, completed: count, total: ids.length };
+    }
+
+    /** Generate a ZIP containing PDFs for the given ids (client-only) */
+    async _bulkDownloadAsZip(ids, options = {}) {
+        await this._ensureJSZip();
+        const zip = new window.JSZip();
+        let completed = 0;
+        const manifest = [];
+        for (const id of ids) {
+            try {
+                const item = await this.db.getDistillation(id);
+                if (!item || !item.content) continue; // skip items without content
+                const res = await this.downloadPdf(id);
+                const filename = `${this._safeFilename(item?.title || `distillation-${id}`)}.pdf`;
+                zip.file(filename, res.blob);
+                manifest.push({ id, title: item?.title || '', filename, createdAt: item?.createdAt, sourceUrl: item?.sourceUrl || null });
+                completed++;
+                await new Promise(r => setTimeout(r, 10)); // yield to UI
+            } catch {
+                // skip and continue
+            }
+        }
+        zip.file('manifest.json', new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const zipName = `distyvault-${stamp}.zip`;
+        const url = window.URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = zipName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        }, 1000);
+        return { status: 200, downloaded: true, filename: zipName, completed, total: ids.length };
+    }
+
+    async _ensureJSZip() {
+        if (window.JSZip) return;
+        await this._loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        if (!window.JSZip) throw new Error('Failed to load JSZip');
     }
 
     /** Bulk delete */
@@ -243,8 +291,9 @@ class ApiClient {
                 throw new Error(e?.message || 'Failed to expand YouTube playlist');
             }
         }
-        // Create tracking distillation for non-playlist URLs
-        const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: this._titleFromUrl(url) });
+    // Create tracking distillation for non-playlist URLs
+    // Use a neutral placeholder so the table doesn't display URL path fragments like 'watch'
+    const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: 'Processing...' });
         await this.db.saveDistillation(dist);
         // Run pipeline asynchronously
         this._runWithLimit(() => this._processUrlPipeline(dist.id, url)).catch(() => {});
@@ -497,6 +546,26 @@ class ApiClient {
         }
         // Clean common suffixes like " - YouTube" or site names
         title = title.replace(/\s*[|\-]\s*(YouTube|YouTube Music|Medium|Substack|Blog|News).*$/i, '').trim();
+        // If it's a YouTube video and the title looks generic, attempt to fetch via oEmbed for accuracy
+        if (this._isYouTubeUrl(target) && !this._isYouTubePlaylist(target)) {
+            const looksGeneric = !title || /^(watch|youtube)$/i.test(title);
+            if (looksGeneric) {
+                try {
+                    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target)}&format=json`;
+                    let oRes = await fetch(oembedUrl);
+                    if (!oRes.ok) {
+                        // Fallback via CORS-friendly proxy
+                        const proxy = `https://r.jina.ai/${oembedUrl}`;
+                        oRes = await fetch(proxy);
+                    }
+                    if (oRes.ok) {
+                        const txt = await oRes.text();
+                        const data = JSON.parse(txt);
+                        if (data && data.title) title = String(data.title).trim();
+                    }
+                } catch {}
+            }
+        }
 
         // Remove noisy nodes
         const removeSelectors = 'script,style,nav,footer,header,aside,iframe,object,embed,form';

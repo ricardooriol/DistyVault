@@ -179,12 +179,12 @@ class DistyVaultApp {
             const itemsToCheck = [...this.knowledgeBase];
             let needsReSort = false;
 
-            itemsToCheck.forEach(oldItem => {
+        itemsToCheck.forEach(oldItem => {
                 const newItem = latestData.find(item => item.id === oldItem.id);
                 if (newItem && this.hasItemChanged(oldItem, newItem)) {
-                    if (oldItem.status !== newItem.status) {
-                        needsReSort = true;
-                    }
+            // Do NOT trigger full re-sort/rerender on mere status/title changes.
+            // Our table sorts by createdAt to preserve queue order, so only
+            // additions/removals require a re-sort. Status changes are handled via ITEM_UPDATED.
 
                     // Update item and emit event
                     const index = this.knowledgeBase.findIndex(item => item.id === oldItem.id);
@@ -352,16 +352,11 @@ class DistyVaultApp {
             this.eventBus.emit(EventBus.Events.ITEM_DELETED, { id });
             this.eventBus.emit(EventBus.Events.KNOWLEDGE_BASE_UPDATED, this.knowledgeBase);
 
-            // Update UI
+            // Update UI (row removal handled by table's ITEM_DELETED listener)
             const row = document.querySelector(`tr[data-id="${id}"]`);
             if (row) {
                 row.remove();
             }
-                
-                // Re-render table to update bulk actions bar visibility
-                if (this.knowledgeBaseTable) {
-                    this.knowledgeBaseTable.renderKnowledgeBase();
-                }
 
             this.showTemporaryMessage('Item deleted successfully', 'success');
 
