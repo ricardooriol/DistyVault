@@ -71,6 +71,10 @@ class ApiClient {
     await this.db.updateDistillationStatus(id, 'pending', 'Queued for retry');
     // Clear timing so duration shows "Waiting..." until it actually starts
     try { await this.db.resetTiming(id); } catch {}
+        try {
+            const latest = await this.db.getDistillation(id);
+            if (latest) { latest.lastQueuedAt = new Date(); await this.db.saveDistillation(latest); }
+        } catch {}
         await this.db.addLog(id, 'Retry queued');
 
         // Path A: need re-extraction (no raw text)
@@ -169,7 +173,7 @@ class ApiClient {
             if (rec.pdfCache) delete rec.pdfCache;
 
             // Ensure critical date fields are ISO strings
-            ['createdAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+            ['createdAt','lastQueuedAt','completedAt','startTime','distillingStartTime'].forEach(k => {
                 if (item[k] instanceof Date) rec[k] = toIso(item[k]);
             });
 
@@ -275,7 +279,7 @@ class ApiClient {
             try { rec = JSON.parse(line); } catch { continue; }
 
             // Rehydrate dates
-            ['createdAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+            ['createdAt','lastQueuedAt','completedAt','startTime','distillingStartTime'].forEach(k => {
                 if (rec[k] && typeof rec[k] === 'string') rec[k] = parseDate(rec[k]);
             });
 
@@ -307,7 +311,7 @@ class ApiClient {
                 // Leave as-is; do not auto-restart failed/stopped items
             } else {
                 // For any active or waiting state, normalize to 'pending' and queue to restart after import
-                try {
+        try {
                     const fresh = await this.db.getDistillation(rec.id);
                     if (fresh) {
                         fresh.status = 'pending';
@@ -318,6 +322,7 @@ class ApiClient {
                         fresh.completedAt = null;
                         fresh.elapsedTime = 0;
                         fresh.processingTime = 0;
+            fresh.lastQueuedAt = new Date();
                         await this.db.saveDistillation(fresh);
                         toRestart.push({ id: fresh.id });
                     }
@@ -567,6 +572,7 @@ class ApiClient {
             processingStep: 'Queued for processing',
             rawContent: '',
             createdAt: new Date(),
+            lastQueuedAt: new Date(),
             completedAt: null,
             processingTime: 0,
             elapsedTime: 0,

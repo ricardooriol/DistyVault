@@ -164,7 +164,7 @@
         // ========
         static _ensureDates(item) {
             if (!item || typeof item !== 'object') return item;
-            const dateFields = ['createdAt', 'completedAt', 'startTime', 'distillingStartTime'];
+            const dateFields = ['createdAt', 'lastQueuedAt', 'completedAt', 'startTime', 'distillingStartTime'];
             for (const f of dateFields) {
                 if (item[f] && typeof item[f] === 'string') {
                     const d = new Date(item[f]);
@@ -209,7 +209,7 @@
                 const idx = all.findIndex(i => i.id === item.id);
                 const toSave = { ...item };
                 // Convert Dates to ISO strings
-                ['createdAt','completedAt','startTime','distillingStartTime'].forEach(k => {
+                ['createdAt','lastQueuedAt','completedAt','startTime','distillingStartTime'].forEach(k => {
                     if (toSave[k] instanceof Date) toSave[k] = toSave[k].toISOString();
                 });
                 if (idx >= 0) all[idx] = toSave; else all.push(toSave);

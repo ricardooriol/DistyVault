@@ -126,14 +126,19 @@ class KnowledgeBaseTable {
     }
 
     /**
-     * Sort knowledge base items by queued time (createdAt) descending - oldest first
+     * Sort knowledge base items:
+     * - Primary: lastQueuedAt ascending (oldest queued first)
+     * - Fallback: createdAt ascending
+     * This pushes newly retried items (with fresh lastQueuedAt) to the bottom.
      */
     sortKnowledgeBaseItems(items) {
         return items.sort((a, b) => {
-            // Sort by createdAt (oldest first) to maintain queue order
-            const aTime = new Date(a.createdAt || 0);
-            const bTime = new Date(b.createdAt || 0);
-            return aTime - bTime;
+            const aQ = new Date(a.lastQueuedAt || a.createdAt || 0);
+            const bQ = new Date(b.lastQueuedAt || b.createdAt || 0);
+            if (aQ.getTime() !== bQ.getTime()) return aQ - bQ;
+            const aC = new Date(a.createdAt || 0);
+            const bC = new Date(b.createdAt || 0);
+            return aC - bC;
         });
     }
 
