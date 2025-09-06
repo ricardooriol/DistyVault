@@ -360,33 +360,38 @@
     <!-- SQL.js Library -->
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
     
-    <!-- Core Services (must load first) -->
-    <script src="src/services/database.js"></script>
-    <!-- Numbering post-processor for AI output -->
-    <script src="src/services/numberingProcessor.js"></script>
-    <script src="src/services/aiService.js"></script>
-    <script src="src/services/processor.js"></script>
-    
-    <!-- Core Modules -->
+    <!-- Core Services -->
     <script src="src/core/eventBus.js"></script>
+    <script src="src/core/database.js"></script>
     <script src="src/core/apiClient.js"></script>
 
-    <!-- Utility Modules -->
-    <script src="src/utils/viewportUtils.js"></script>
-    <script src="src/utils/dateUtils.js"></script>
-    <script src="src/utils/validationUtils.js"></script>
-    <script src="src/utils/domUtils.js"></script>
-    <script src="src/utils/errorUtils.js"></script>
+    <!-- Managers -->
+    <script src="src/core/managers/downloadStateManager.js"></script>
+    <script src="src/core/managers/tooltipManager.js"></script>
+    <script src="src/core/managers/modalManager.js"></script>
+    <script src="src/core/managers/bulkActionsManager.js"></script>
 
-    <!-- Manager Modules -->
-    <script src="src/managers/downloadStateManager.js"></script>
-    <script src="src/managers/tooltipManager.js"></script>
-    <script src="src/managers/modalManager.js"></script>
-    <script src="src/managers/bulkActionsManager.js"></script>
+    <!-- AI Services and Providers -->
+    <script src="src/ai/aiService.js"></script>
+    <script src="src/ai/aiProvider.js"></script>
+    <script src="src/ai/aiProviderFactory.js"></script>
+    <script src="src/ai/aiSettingsManager.js"></script>
+    <script src="src/ai/providers/openAI.js"></script>
+    <script src="src/ai/providers/anthropic.js"></script>
+    <script src="src/ai/providers/google.js"></script>
+    <script src="src/ai/providers/ollama.js"></script>
+    <script src="src/ai/providers/grok.js"></script>
+    <script src="src/ai/providers/deepseek.js"></script>
 
-    <!-- UI Component Modules -->
-    <script src="src/components/knowledgeBaseTable.js"></script>
+    <!-- Processors -->
+    <script src="src/processors/numberingProcessor.js"></script>
+    <script src="src/processors/processor.js"></script>
+    <script src="src/processors/contentExtractor.js"></script>
+    <script src="src/processors/youtubeTranscriptExtractor.js"></script>
+
+    <!-- UI Components -->
     <script src="src/components/inputSection.js"></script>
+    <script src="src/components/knowledgeBaseTable.js"></script>
     <script src="src/components/statusSection.js"></script>
     <script src="src/components/settingsModal.js"></script>
 

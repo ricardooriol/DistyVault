@@ -1,4 +1,4 @@
-// Vercel-style API route: POST /api/process/file
+// Vercel-style API route: POST /src/apis/file
 // Accepts multipart/form-data with field "file"
 // Simple multipart parsing using busboy
 const Busboy = require('busboy');

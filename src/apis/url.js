@@ -1,6 +1,6 @@
-// Vercel-style API route: /api/process/url
+// Vercel-style API route: /src/apis/url
 // POST with JSON body { url } or GET with query ?url=
-const contentExtractor = require('../../src/server/processing/contentExtractor');
+const contentExtractor = require('../processors/contentExtractor');
 
 async function parseJsonBody(req) {
   return new Promise((resolve) => {

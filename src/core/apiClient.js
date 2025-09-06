@@ -1,6 +1,6 @@
 /**
  * ApiClient - Browser orchestrator
- * - Uses serverless /api/process/* only for extraction (URL, file, YouTube)
+ * - Uses serverless /src/apis/* only for extraction (URL, file, YouTube)
  * - Persists via IndexedDB (sql.js kept client-side)
  * - Distills via AIService (online providers only)
  */
