@@ -578,19 +578,67 @@ class ApiClient {
             const data = await readAsArrayBuffer(file);
             const pdfjsLib = window['pdfjsLib'];
             if (!pdfjsLib || !pdfjsLib.getDocument) throw new Error('PDF.js failed to load');
-            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
-            const pdf = await loadingTask.promise;
+            const docOptsBase = {
+                data: new Uint8Array(data),
+                cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+                cMapPacked: true,
+                standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/'
+            };
+            const loadPdf = async () => (await pdfjsLib.getDocument(docOptsBase).promise);
+            const pdf = await loadPdf();
             const maxPages = Math.min(pdf.numPages, 50); // cap to avoid heavy work
-            let text = '';
-            for (let i = 1; i <= maxPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                const strings = (content.items || []).map(it => it.str).filter(Boolean);
-                text += strings.join(' ') + '\n\n';
+
+            const buildPageText = async (page, opts = {}) => {
+                const content = await page.getTextContent({ normalizeWhitespace: true, includeMarkedContent: true, ...opts });
+                const items = content.items || [];
+                if (!items.length) return '';
+                // Reconstruct lines using y/x positions
+                let out = '';
+                let lastY = null;
+                let lastX = null;
+                for (const it of items) {
+                    const str = (it.str || '').trim();
+                    if (!str) continue;
+                    const tr = it.transform || [1, 0, 0, 1, 0, 0];
+                    const x = tr[4];
+                    const y = tr[5];
+                    if (lastY === null) {
+                        out += str;
+                        lastY = y; lastX = x;
+                        continue;
+                    }
+                    const deltaY = Math.abs(y - lastY);
+                    const deltaX = Math.abs(x - lastX);
+                    if (deltaY > 5) {
+                        out += '\n';
+                    } else if (deltaX > 2) {
+                        out += ' ';
+                    }
+                    out += str;
+                    lastY = y; lastX = x;
+                    if (it.hasEOL) out += '\n';
+                }
+                return out;
+            };
+
+            const assemble = async (opts) => {
+                let buf = '';
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const pageText = await buildPageText(page, opts);
+                    if (pageText) buf += pageText + '\n\n';
+                }
+                return buf;
+            };
+
+            let text = (await assemble({ disableCombineTextItems: false })) || '';
+            if (!text.trim()) {
+                // Retry with combine disabled (more granular items)
+                text = (await assemble({ disableCombineTextItems: true })) || '';
             }
-            text = text.replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+            text = text.replace(/[ \t\u00A0]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
             if (!text) text = 'No text could be extracted from this PDF.';
-            return { text, title, contentType: 'pdf', extractionMethod: 'pdfjs', fallbackUsed: true, metadata: meta };
+            return { text, title, contentType: 'pdf', extractionMethod: text ? 'pdfjs-heuristic' : 'pdfjs-empty', fallbackUsed: true, metadata: meta };
         }
 
         // 3) DOCX via mammoth
@@ -616,7 +664,7 @@ class ApiClient {
     async _ensurePdfJs() {
         if (window['pdfjsLib'] && window['pdfjsLib'].getDocument) return;
         await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-        // Configure worker
+        // Configure worker and ancillary assets
         if (window['pdfjsLib'] && window['pdfjsLib'].GlobalWorkerOptions) {
             window['pdfjsLib'].GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
