@@ -502,11 +502,25 @@ class ApiClient {
             await this.db.resetTiming(id);
             await this.db.updateDistillationStatus(id, 'extracting', `Extracting content from ${file.name}...`);
             await this.db.addLog(id, 'Extraction started', 'info', { file: { name: file.name, type: file.type, size: file.size } });
-            const form = new FormData();
-            form.append('file', file, file.name);
-            const res = await fetch(`${this.base}/process/file`, { method: 'POST', body: form });
-            const payload = await this._handle(res);
-            const extraction = payload.extraction || payload;
+            let extraction;
+            if (this.serverEnabled) {
+                try {
+                    const form = new FormData();
+                    form.append('file', file, file.name);
+                    const res = await fetch(`${this.base}/process/file`, { method: 'POST', body: form });
+                    if (res.status === 404) {
+                        throw Object.assign(new Error('Serverless API not available (404). Using client fallback.'), { status: 404 });
+                    }
+                    const payload = await this._handle(res);
+                    extraction = payload.extraction || payload;
+                } catch (e) {
+                    const status = e?.status || 0;
+                    await this.db.addLog(id, 'Serverless file API unavailable, using client-side extractor', 'warn', { status, message: e?.message });
+                    extraction = await this._extractFileClient(file);
+                }
+            } else {
+                extraction = await this._extractFileClient(file);
+            }
             await this.db.addLog(id, 'Extraction completed', 'info', { contentType: extraction.contentType });
             const item = await this.db.getDistillation(id);
             item.rawContent = extraction.text || '';
@@ -528,6 +542,95 @@ class ApiClient {
             await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
             await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
         }
+    }
+
+    /**
+     * Client-side file extraction (no backend): supports text, PDF, DOCX, HTML/Markdown
+     */
+    async _extractFileClient(file) {
+        const name = file?.name || 'document';
+        const type = (file?.type || '').toLowerCase();
+        const lowerName = String(name).toLowerCase();
+        const meta = { name, size: file?.size || 0, type: type || 'unknown' };
+        const title = this._stripExtension(name);
+
+        // Helper: read file
+        const readAsText = (blob) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('Failed to read file as text')); r.readAsText(blob); });
+        const readAsArrayBuffer = (blob) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('Failed to read file as arrayBuffer')); r.readAsArrayBuffer(blob); });
+
+        // 1) Plain text-like
+        if (type.startsWith('text/') || /\.(txt|md|csv|tsv|log|json|xml|html?)$/i.test(lowerName)) {
+            const raw = await readAsText(file);
+            let text = String(raw || '');
+            let method = 'file-reader-text';
+            let contentType = 'text';
+            // Basic HTML to text
+            if (/\.html?$/i.test(lowerName) || type.includes('html')) {
+                try { const doc = new DOMParser().parseFromString(text, 'text/html'); text = (doc.body?.textContent || '').replace(/\s+/g, ' ').trim(); method = 'domparser-html-to-text'; contentType = 'html'; }
+                catch {}
+            }
+            return { text, title, contentType, extractionMethod: method, fallbackUsed: true, metadata: meta };
+        }
+
+        // 2) PDF via pdf.js
+        if (type === 'application/pdf' || /\.pdf$/i.test(lowerName)) {
+            await this._ensurePdfJs();
+            const data = await readAsArrayBuffer(file);
+            const pdfjsLib = window['pdfjsLib'];
+            if (!pdfjsLib || !pdfjsLib.getDocument) throw new Error('PDF.js failed to load');
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
+            const pdf = await loadingTask.promise;
+            const maxPages = Math.min(pdf.numPages, 50); // cap to avoid heavy work
+            let text = '';
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const strings = (content.items || []).map(it => it.str).filter(Boolean);
+                text += strings.join(' ') + '\n\n';
+            }
+            text = text.replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+            if (!text) text = 'No text could be extracted from this PDF.';
+            return { text, title, contentType: 'pdf', extractionMethod: 'pdfjs', fallbackUsed: true, metadata: meta };
+        }
+
+        // 3) DOCX via mammoth
+        if (type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || /\.docx$/i.test(lowerName)) {
+            await this._ensureMammoth();
+            const data = await readAsArrayBuffer(file);
+            const mammoth = window['mammoth'];
+            if (!mammoth || !mammoth.extractRawText) throw new Error('Mammoth failed to load');
+            const result = await mammoth.extractRawText({ arrayBuffer: data });
+            const text = (result?.value || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+            return { text: text || 'No text could be extracted from this DOCX.', title, contentType: 'docx', extractionMethod: 'mammoth', fallbackUsed: true, metadata: meta };
+        }
+
+        // 4) Fallback: try text
+        try {
+            const raw = await readAsText(file);
+            return { text: String(raw || ''), title, contentType: type || 'file', extractionMethod: 'file-reader-fallback', fallbackUsed: true, metadata: meta };
+        } catch {}
+
+        throw new Error(`Unsupported file type: ${type || 'unknown'}`);
+    }
+
+    async _ensurePdfJs() {
+        if (window['pdfjsLib'] && window['pdfjsLib'].getDocument) return;
+        await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+        // Configure worker
+        if (window['pdfjsLib'] && window['pdfjsLib'].GlobalWorkerOptions) {
+            window['pdfjsLib'].GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    }
+
+    async _ensureMammoth() {
+        if (window['mammoth'] && (window['mammoth'].extractRawText || window['mammoth'].convertToHtml)) return;
+        await this._loadScript('https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js');
+    }
+
+    _stripExtension(name) {
+        return String(name || '')
+            .replace(/\.[^/.]+$/, '')
+            .trim() || 'Document';
     }
 
     _detectUrlType(url) {
