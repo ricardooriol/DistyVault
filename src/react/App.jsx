@@ -31,7 +31,7 @@ function TopBar({ onOpenSettings, theme, setTheme }) {
     <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 bg-white/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/logos/logo.png" alt="logo" className="h-7 w-7" />
+          <img src="logos/logo.png" alt="logo" className="h-7 w-7" />
           <div className="font-semibold text-zinc-900 dark:text-zinc-100">DistyVault</div>
           <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Gather • Distill • Control</span>
         </div>
@@ -399,6 +399,7 @@ function App() {
   const [toast, setToast] = useState('');
   const [contentItem, setContentItem] = useState(null);
   const [logsItem, setLogsItem] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Load and poll
   useEffect(() => {
