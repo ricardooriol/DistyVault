@@ -61,14 +61,16 @@ function TopBar({ onOpenSettings, theme, setTheme }) {
 }
 
 function ThemeToggle({ value, onChange }) {
+  const cycle = () => {
+    const order = ['light','system','dark'];
+    const i = order.indexOf(value);
+    const next = order[(i+1)%order.length];
+    onChange(next);
+  };
   return (
-    <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-900">
-      {['light','system','dark'].map(opt => (
-        <button key={opt} onClick={() => onChange(opt)} className={
-          'px-2.5 py-1.5 text-sm rounded ' + (value === opt ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-300')
-        }>{opt}</button>
-      ))}
-    </div>
+    <button onClick={cycle} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-2.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800" title={`Theme: ${value}`} aria-label="Toggle theme">
+      {value === 'light' ? Icon.sun() : value === 'dark' ? Icon.moon() : Icon.laptop()}
+    </button>
   );
 }
 
@@ -179,39 +181,35 @@ function CommandBar({ counts, actions, query, setQuery, type, setType, view, set
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           <div className="flex-1 flex items-center gap-2">
             <div className="relative flex-1">
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm" />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm" />
             </div>
-            <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-950">
+            <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-950">
               {['all','url','youtube','file'].map(opt => (
                 <button key={opt} onClick={() => setType(opt)} className={(type===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
               ))}
             </div>
-            <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-950">
+            <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-950">
               {['table','cards'].map(opt => (
                 <button key={opt} onClick={() => setView(opt)} className={(view===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
               ))}
             </div>
-            <button onClick={actions.refresh} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm inline-flex items-center gap-2">{Icon.refresh()} Refresh</button>
+            <div className="relative">
+              <details className="group">
+                <summary className="list-none cursor-pointer rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-sm inline-flex items-center gap-2 select-none">Actions ▾</summary>
+                <div className="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm">
+                  <button onClick={actions.refresh} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.refresh()} Refresh</button>
+                  <button onClick={actions.export} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.download()} Export</button>
+                  <label className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2 cursor-pointer">
+                    <span>Import</span>
+                    <input type="file" accept=".zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) actions.import(f); e.target.value = ''; }} />
+                  </label>
+                </div>
+              </details>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={actions.export} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm inline-flex items-center gap-2">{Icon.download()} Export</button>
-            <label className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm cursor-pointer inline-flex items-center gap-2">
-              <span>Import</span>
-              <input type="file" accept=".zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) actions.import(f); e.target.value = ''; }} />
-            </label>
-          </div>
+          <div className="hidden" />
         </div>
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-zinc-500 dark:text-zinc-400">{counts.selected} selected</div>
-          <div className="flex items-center gap-2">
-            <button onClick={actions.selectAll} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Select all</button>
-            <button onClick={actions.retry} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Retry</button>
-            <button onClick={actions.retryAll} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry all</button>
-            <button onClick={actions.retryFailed} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry failed</button>
-            <button onClick={actions.bulkDownload} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Download</button>
-            <button onClick={actions.bulkDelete} disabled={!counts.selected} className={(counts.selected ? 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700' : 'opacity-50 cursor-not-allowed ') + ' rounded-lg border px-3 py-2 text-sm'}>Delete</button>
-          </div>
-        </div>
+        {/* Selection hint moved to sticky dock when needed */}
       </div>
     </div>
   );
@@ -222,6 +220,40 @@ function StatusToast({ message }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900/90 text-white px-4 py-2 text-sm shadow-lg">
       {message}
+    </div>
+  );
+}
+
+function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, onSelectAll }) {
+  if (!count) return null;
+  const allSelected = count === total && total > 0;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 md:bottom-4">
+      <div className="mx-auto max-w-3xl px-3 md:px-0">
+        <div className="pointer-events-auto w-full md:w-auto rounded-t-2xl md:rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-zinc-900/85 backdrop-blur shadow-soft">
+          <div className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2">
+            <div className="text-sm text-zinc-700 dark:text-zinc-200">
+              <span className="font-medium">{count}</span> selected
+              {!allSelected && total > 0 && (
+                <button onClick={onSelectAll} className="ml-2 underline text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white">Select all</button>
+              )}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Retry selected">
+                {Icon.refresh()} <span className="hidden sm:inline">Retry</span>
+              </button>
+              <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Download PDFs">
+                {Icon.download()} <span className="hidden sm:inline">Download</span>
+              </button>
+              <button onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 px-3 py-1.5 text-sm hover:bg-red-50/60 dark:hover:bg-red-900/20" title="Delete selected">
+                {Icon.delete()} <span className="hidden sm:inline">Delete</span>
+              </button>
+              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
+              <button onClick={onClear} className="rounded-md px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white" title="Clear selection">Deselect</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -539,6 +571,7 @@ function App() {
 
   // Actions
   const toggle = (id) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next); };
+  const clearSelection = () => setSelected(new Set());
   const selectAll = () => { setSelected(new Set(filtered.map(x => x.id))); };
   const refresh = async () => { const data = await api.getSummaries(); setItems(sortItems(data)); };
   const exportKB = async () => { await api.exportKnowledgeBase(); flash('Export started'); };
@@ -559,6 +592,13 @@ function App() {
   const retry = async (id) => { await api.retryDistillation(id); flash('Retry queued'); };
 
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
+
+  // ESC clears selection
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') clearSelection(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Stats
   const total = items.length;
@@ -616,6 +656,15 @@ function App() {
       <LogsModal open={!!logsItem} onClose={() => setLogsItem(null)} item={logsItem} />
       <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} api={api} />
       <StatusToast message={toast} />
+      <SelectionDock
+        count={selected.size}
+        total={filtered.length}
+        onClear={clearSelection}
+        onRetry={bulkRetry}
+        onDownload={bulkDownload}
+        onDelete={bulkDelete}
+        onSelectAll={selectAll}
+      />
     </div>
   );
 }
