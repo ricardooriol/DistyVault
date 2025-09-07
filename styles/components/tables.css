@@ -28,7 +28,7 @@
 .knowledge-base-table th:nth-child(5) { width: 15%; } /* Status */
 .knowledge-base-table th:nth-child(6) { width: 10%; } /* Time */
 .knowledge-base-table th:nth-child(7) { width: 15%; } /* Date */
-.knowledge-base-table th:nth-child(8) { width: 100px; } /* Actions */
+.knowledge-base-table th:nth-child(8) { width: 64px; } /* Actions narrower */
 
 .knowledge-base-table td:nth-child(1) { width: 40px; } /* Checkbox */
 .knowledge-base-table td:nth-child(2) { width: 22%; max-width: 0; min-width: 0; } /* Name */
@@ -37,7 +37,7 @@
 .knowledge-base-table td:nth-child(5) { width: 15%; } /* Status */
 .knowledge-base-table td:nth-child(6) { width: 10%; } /* Time */
 .knowledge-base-table td:nth-child(7) { width: 15%; } /* Date */
-.knowledge-base-table td:nth-child(8) { width: 100px; } /* Actions */
+.knowledge-base-table td:nth-child(8) { width: 64px; } /* Actions narrower */
 
 .knowledge-base-table th {
     background: var(--bg-tertiary);
@@ -199,12 +199,12 @@
 }
 
 .actions-cell {
-    text-align: center;
-    padding: 0.75rem 1rem !important;
+    text-align: right;
+    padding: 0.5rem 0.5rem !important;
     position: relative;
     vertical-align: middle;
-    min-width: 200px;
-    width: auto;
+    min-width: 64px;
+    width: 64px;
 }
 
 .table-actions {
@@ -292,7 +292,7 @@
     .knowledge-base-table th:nth-child(5) { width: 12%; } /* Status */
     .knowledge-base-table th:nth-child(6) { width: 10%; } /* Duration */
     .knowledge-base-table th:nth-child(7) { width: 15%; } /* Date */
-    .knowledge-base-table th:nth-child(8) { width: 80px; } /* Actions */
+    .knowledge-base-table th:nth-child(8) { width: 56px; } /* Actions */
 
     .knowledge-base-table td:nth-child(1) { width: 30px; } /* Checkbox */
     .knowledge-base-table td:nth-child(2) { width: 25%; max-width: 0; min-width: 0; } /* Name */
@@ -301,7 +301,7 @@
     .knowledge-base-table td:nth-child(5) { width: 12%; } /* Status */
     .knowledge-base-table td:nth-child(6) { width: 10%; } /* Duration */
     .knowledge-base-table td:nth-child(7) { width: 15%; } /* Date */
-    .knowledge-base-table td:nth-child(8) { width: 80px; } /* Actions */
+    .knowledge-base-table td:nth-child(8) { width: 56px; } /* Actions */
 
     .table-actions {
         gap: 0.25rem;
@@ -324,9 +324,9 @@
     }
 
     .actions-cell {
-        min-width: 80px;
-        text-align: center;
-        padding: 0.75rem 0.5rem !important;
+        min-width: 56px;
+        text-align: right;
+        padding: 0.5rem 0.25rem !important;
     }
 }
 

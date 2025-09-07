@@ -1,66 +1,30 @@
-# 💠 DistyVault - Gather, distill and control your knowledge 💠
+## DistyVault
 
----
+DistyVault is a local-first web app to capture URLs, YouTube videos/playlists, and documents, distill them with AI, and manage the results in a simple knowledge base.
 
-## What is DistyVault?
+### Highlights
+- Runs fully in the browser with a small local HTTP server for static files.
+- Process with local models (Ollama) or cloud providers (OpenAI, Anthropic, Google, Grok, DeepSeek).
+- Clean UI: capture, track status, view logs, export PDFs, and bulk actions.
 
-DistyVault is a powerful knowledge distillation platform that transforms diverse content sources into structured, actionable documents using advanced AI. You have complete control over your data processing, being able to choose between **local AI processing** for maximum privacy or **online AI providers** for enhanced capabilities. The application runs locally on your machine, but you decide where the AI processing happens.
+### Quick start
+1) Install dependencies (optional; app mostly loads via CDN). You can serve the folder with any static server. A simple option is included:
+	- macOS/Linux: use the provided npm script to serve with Python
+2) Start a local server on port 8000
+3) Open http://localhost:8000
 
-### Core Purpose
+### Usage
+- Paste a URL or upload a file to queue processing.
+- Open Settings to choose Online (provider + model) or Offline (Ollama endpoint/model).
+- Use the table to monitor status, open content, view logs, download PDFs, retry, or delete.
 
-DistyVault distills complex information from various sources into clear, numbered insights that help you:
+### Configuration
+- AI settings are stored locally in the browser (LocalStorage) and mirrored in-memory in the app.
+- Online providers require an API key; nothing is sent to a backend by default.
 
-- **Connect scattered information** across different content types
-- **Fill knowledge gaps** with AI-powered analysis and research
-- **Build a searchable knowledge base** of distilled insights
-- **Choose your privacy level** - use local AI models or online providers based on your needs
+### Development
+- The React UI is loaded via UMD + Babel and lives in `styles/react/App.jsx`.
+- Legacy vanilla JS components remain in `src/` and are still loaded for core logic and APIs.
 
----
-
-## Key Features
-
-- **🔒 Privacy Control** - Choose between local AI processing (private) or online providers (enhanced capabilities)
-- **🤖 Multi-AI Support** - Works with OpenAI, Anthropic, Google, Grok, DeepSeek, and Ollama
-- **📚 Universal Content Processing** - YouTube videos/playlists, web pages and documents
-- **⚡ Real-time Processing** - Live status updates and progress tracking
-- **💾 Local Knowledge Base** - Client-side storage with sql.js + IndexedDB
-- **📊 Bulk Operations** - Process multiple items, bulk download, and batch management
-- **🎨 Modern Interface** - Clean, intuitive browser-based UI
-
----
-
-## Future Enhancements
-
-- **Web Search**: Real time web search to complement processing for all AI providers (only available in Gemini models at the moment)
-- **Additional AI Providers**: Integration with more AI providers
-- **Export Formats**: Markdown, JSON, XML, and custom templates
-- **Automation**: Scheduled processing, webhooks, and workflow triggers
-- **App**: Native applications for Windows, MacOS, Linux, iOS and Android
-
----
-
-## License
-
-```
-MIT License
-
-Copyright (c) 2024 DistyVault
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+### License
+MIT
