@@ -363,7 +363,7 @@
             return changed;
         }
 
-    // Basic sort: prioritize active (pending/extracting/distilling) at top, then by createdAt desc
+    // Basic sort: prioritize active (pending/extracting/distilling) at top, then by lastQueuedAt/createdAt asc
         _sortForUi(items) {
             const statusRank = {
         pending: 0,
@@ -381,9 +381,12 @@
                 const ar = statusRank[a.status] ?? 99;
                 const br = statusRank[b.status] ?? 99;
                 if (ar !== br) return ar - br;
+                const aq = new Date(a.lastQueuedAt || a.createdAt || 0).getTime();
+                const bq = new Date(b.lastQueuedAt || b.createdAt || 0).getTime();
+                if (aq !== bq) return aq - bq; // oldest first
                 const ad = new Date(a.createdAt || 0).getTime();
                 const bd = new Date(b.createdAt || 0).getTime();
-                return bd - ad;
+                return ad - bd; // oldest first
             });
         }
     }

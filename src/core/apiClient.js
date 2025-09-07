@@ -402,9 +402,8 @@ class ApiClient {
     /** Generate a ZIP containing PDFs for the given ids (client-only) */
     async _bulkDownloadAsZip(ids, options = {}) {
         await this._ensureJSZip();
-        const zip = new window.JSZip();
-        let completed = 0;
-        const manifest = [];
+    const zip = new window.JSZip();
+    let completed = 0;
         for (const id of ids) {
             try {
                 const item = await this.db.getDistillation(id);
@@ -418,14 +417,12 @@ class ApiClient {
                 }
                 const filename = `${this._safeFilename(item?.title || `distillation-${id}`)}.pdf`;
                 zip.file(filename, blob);
-                manifest.push({ id, title: item?.title || '', filename, createdAt: item?.createdAt, sourceUrl: item?.sourceUrl || null });
                 completed++;
                 await new Promise(r => setTimeout(r, 0)); // yield to UI
             } catch {
                 // skip and continue
             }
         }
-        zip.file('manifest.json', new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
         const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const zipName = `distyvault-${stamp}.zip`;
