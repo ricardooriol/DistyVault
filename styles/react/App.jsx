@@ -56,6 +56,28 @@ function ThemeSelect({ value, onChange }) {
   );
 }
 
+// Icon-only theme menu
+function ThemeMenu({ value, onChange }) {
+  const icon = value === 'light' ? Icon.sun() : value === 'dark' ? Icon.moon() : Icon.laptop();
+  const Item = ({ v, label, icon }) => (
+    <button onClick={() => onChange(v)} className={(value===v? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'w-full text-left px-3 py-2 rounded inline-flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800'}>
+      {icon} <span>{label}</span>
+    </button>
+  );
+  return (
+    <details className="relative">
+      <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Theme" aria-label="Theme">
+        {icon}
+      </summary>
+      <div className="absolute right-0 mt-2 w-40 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm z-10">
+        <Item v="system" label="System" icon={Icon.laptop()} />
+        <Item v="light" label="Light" icon={Icon.sun()} />
+        <Item v="dark" label="Dark" icon={Icon.moon()} />
+      </div>
+    </details>
+  );
+}
+
 function TopBar({ onOpenSettings, theme, setTheme }) {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-b from-white/80 to-white/60 dark:from-zinc-950/80 dark:to-zinc-950/60 backdrop-blur">
@@ -66,8 +88,8 @@ function TopBar({ onOpenSettings, theme, setTheme }) {
           <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Capture. Distill. Control.</span>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeSelect value={theme} onChange={setTheme} />
-          <button onClick={onOpenSettings} className="inline-flex items-center justify-center rounded-md border border-zinc-300 dark:border-zinc-700 w-10 h-10 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Settings" aria-label="Settings">{Icon.settings()}</button>
+          <ThemeMenu value={theme} onChange={setTheme} />
+          <button onClick={onOpenSettings} className="inline-flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Settings" aria-label="Settings">{Icon.settings()}</button>
         </div>
       </div>
     </header>
@@ -130,15 +152,15 @@ function CapturePanel({ api, onQueued }) {
         >
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
             <div className="relative flex-[2] min-w-0">
-              <span className="pointer-events-none absolute left-3 top-2.5 text-zinc-400">{Icon.link()}</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">{Icon.link()}</span>
               <input
                 value={url}
                 onChange={e => { setUrl(e.target.value); if (file) setFile(null); }}
-                placeholder="Paste a URL… (YouTube, article, blog)"
+                placeholder="Paste any URL"
                 className="w-full pl-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
-            <div className="flex flex-1 items-stretch gap-2 justify-end">
+            <div className="flex-1 grid grid-cols-2 gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -146,10 +168,8 @@ function CapturePanel({ api, onQueued }) {
                 className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
               />
-              <button onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" aria-label="Choose or drop file">
-                {Icon.file()} Choose or drop file
-              </button>
-              <button onClick={submit} disabled={!canSubmit || busy} className={(canSubmit && !busy ? 'bg-brand text-white hover:opacity-95' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 cursor-not-allowed') + ' rounded-lg px-6 md:px-7 py-2.5 text-sm font-medium min-w-[140px] md:min-w-[160px]'}>
+              <button onClick={() => fileInputRef.current?.click()} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-2" aria-label="Choose or drop file">{Icon.file()} Choose or drop file</button>
+              <button onClick={submit} disabled={!canSubmit || busy} className={(canSubmit && !busy ? 'bg-brand text-white hover:opacity-95' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 cursor-not-allowed') + ' w-full rounded-lg px-6 md:px-7 py-2.5 text-sm font-medium'}>
                 {busy ? 'Queueing…' : 'Distill'}
               </button>
             </div>
@@ -318,12 +338,12 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
                 </td>
                 <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{formatDuration(it)}</td>
                 <td className="px-1 py-2 text-sm">
-                  <div className="relative flex items-center">
+                  <div className="relative flex items-center justify-end w-full">
                     <details>
-                      <summary className="list-none inline-flex items-center justify-center w-8 h-8 rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Actions" aria-label="Row actions">
+                      <summary className="list-none inline-flex items-center justify-center w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Actions" aria-label="Row actions">
                         {Icon.dots()}
                       </summary>
-                      <div className="absolute left-0 mt-2 w-40 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm z-10">
+                      <div className="absolute right-0 mt-2 w-40 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm z-10">
                         <button onClick={() => open('content', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View content">{Icon.eye()} View</button>
                         <button onClick={() => open('logs', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View logs">{Icon.logs()} Logs</button>
                         <button onClick={() => download(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="Download PDF">{Icon.pdf()} PDF</button>
@@ -470,7 +490,6 @@ function SettingsSheet({ open, onClose, api }) {
                 <button key={m} onClick={() => setSettings({ ...settings, mode: m })} className={(settings.mode === m ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded-full text-sm capitalize'}>{m}</button>
               ))}
             </div>
-            <div className="mt-2 text-xs text-zinc-500">Cloud for best quality; offline requires local Ollama.</div>
           </div>
 
           {settings.mode === 'offline' ? (
@@ -529,11 +548,8 @@ function SettingsSheet({ open, onClose, api }) {
                   <label className="text-sm">API key</label>
                   <div className="mt-1 flex items-center gap-2">
                     <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="sk-…" />
-                    <button onClick={() => setShowKey(s => !s)} className="rounded-md border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800" title={showKey? 'Hide key':'Show key'}>
-                      {Icon.eye()}
-                    </button>
+                    <button onClick={() => setShowKey(s => !s)} className="rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center" title={showKey? 'Hide key':'Show key'}>{Icon.eye()}</button>
                   </div>
-                  <div className="mt-1 text-xs text-zinc-500">Keys are stored locally in this browser.</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -545,15 +561,14 @@ function SettingsSheet({ open, onClose, api }) {
           <div>
             <label className="text-sm">Simultaneous processing</label>
             <div className="mt-1 inline-flex items-center gap-2">
-              <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
+              <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
               <div className="min-w-[2.5rem] text-center text-sm text-zinc-800 dark:text-zinc-100">{settings.concurrentProcessing || 1}</div>
-              <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>
-              <span className="text-xs text-zinc-500">1–10</span>
+              <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="text-sm text-zinc-500">Tuned for speed and reliability.</div>
+            <div />
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
               <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-md px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save changes'}</button>
@@ -756,9 +771,9 @@ function App() {
                   <button key={opt.k} onClick={() => setType(opt.k)} className={(type===opt.k ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{opt.label}</button>
                 ))}
               </div>
-              <div className="relative">
+        <div className="relative">
                 <details className="group">
-                  <summary className="list-none cursor-pointer inline-flex items-center justify-center w-10 h-10 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Actions" aria-label="Actions">
+          <summary className="list-none cursor-pointer inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Actions" aria-label="Actions">
                     {Icon.dots()}
                   </summary>
                   <div className="dv-menu absolute right-0 mt-2 w-48 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm">
