@@ -35,6 +35,12 @@ window.addEventListener('unhandledrejection', function(event) {
 
 // Ensure all required modules are loaded before initialization
 document.addEventListener('DOMContentLoaded', function() {
+    try {
+        if (window && window.DV_DISABLE_LEGACY_UI) {
+            // Skip initializing legacy UI when React UI is active
+            return;
+        }
+    } catch {}
     // Verify critical dependencies are available
     const requiredClasses = [
         'EventBus', 'ApiClient', 'DistyVaultApp',
