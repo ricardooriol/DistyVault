@@ -1,9 +1,10 @@
 /*
-  DistyVault React One-Pager
+  DistyVault React One-Pager (Redesigned)
   - Zero-build: React 18 UMD + Babel standalone
   - Tailwind Play CDN for styling
   - Uses existing ApiClient for all functionality
   - Light/Dark/System theme toggle persisted in localStorage
+  - Premium, responsive UX with stats, command bar, table/cards views, sticky bulk dock, and a settings drawer
 */
 
 const { useEffect, useMemo, useRef, useState } = React;
@@ -26,20 +27,33 @@ const useTheme = () => {
   return { theme, setTheme };
 };
 
+// Simple inline icons (SVG) for a crisp look
+const Icon = {
+  settings: (cls='') => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}><path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.03-3.5a6.99 6.99 0 0 0-.1-.99l2.06-1.6a.75.75 0 0 0 .18-.96l-1.95-3.38a.75.75 0 0 0-.9-.34l-2.43.98a6.96 6.96 0 0 0-1.7-.99l-.37-2.57A.75.75 0 0 0 12.08 1h-3.9a.75.75 0 0 0-.74.64L6.99 4.2c-.61.24-1.18.56-1.7.94l-2.42-.98a.75.75 0 0 0-.9.35L-.01 8.9c-.17.31-.08.7.19.92l2.06 1.7a6.99 6.99 0 0 0 0 1.93L.18 15.1a.75.75 0 0 0-.19.92l1.96 3.38c.2.35.61.5.98.36l2.42-.97c.52.38 1.09.7 1.7.94l.44 2.56c.07.36.39.63.75.63h3.9c.37 0 .68-.27.74-.63l.44-2.56c.6-.23 1.17-.55 1.7-.93l2.42.97c.37.15.78-.01.97-.36l1.96-3.38a.75.75 0 0 0-.19-.92l-2.05-1.68c.07-.33.1-.66.1-1Z"/></svg>
+  ),
+  sun: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><circle cx="12" cy="12" r="4" strokeWidth="1.8"/><path strokeWidth="1.8" d="M12 2v2m0 16v2M4.93 4.93 6.34 6.34m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07 6.34 17.66m11.32-11.32 1.41-1.41"/></svg>),
+  moon: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>),
+  laptop: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><rect x="3" y="4" width="18" height="12" rx="2" strokeWidth="1.8"/><path strokeWidth="1.8" d="M2 20h20"/></svg>),
+  download: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M12 3v12m0 0 4-4m-4 4-4-4"/><path strokeWidth="1.8" d="M20 21H4"/></svg>),
+  refresh: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M21 12a9 9 0 1 1-9-9"/><path strokeWidth="1.8" d="M21 3v6h-6"/></svg>),
+  delete: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m1 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 4v8m6-8v8"/></svg>),
+  file: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path strokeWidth="1.8" d="M14 2v6h6"/></svg>),
+  link: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83A5 5 0 1 0 12 4.34"/><path strokeWidth="1.8" d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83A5 5 0 1 0 12 19.66"/></svg>),
+};
+
 function TopBar({ onOpenSettings, theme, setTheme }) {
   return (
-    <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 bg-white/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800">
+    <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-b from-white/80 to-white/60 dark:from-zinc-950/80 dark:to-zinc-950/60 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src="logos/logo.png" alt="logo" className="h-7 w-7" />
           <div className="font-semibold text-zinc-900 dark:text-zinc-100">DistyVault</div>
-          <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Gather • Distill • Control</span>
+          <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Capture. Distill. Control.</span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle value={theme} onChange={setTheme} />
-          <button onClick={onOpenSettings} className="inline-flex items-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-            <span>Settings</span>
-          </button>
+          <button onClick={onOpenSettings} className="inline-flex items-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"><span className="sr-only">Settings</span>{Icon.settings()}</button>
         </div>
       </div>
     </header>
@@ -58,7 +72,22 @@ function ThemeToggle({ value, onChange }) {
   );
 }
 
-function InputCard({ api, onQueued }) {
+function StatBadge({ label, value, tone='zinc' }) {
+  const toneMap = {
+    zinc: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-100 border-zinc-200 dark:border-zinc-700',
+    blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200/60 dark:border-blue-800',
+    green: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200/60 dark:border-green-800',
+    red: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200/60 dark:border-red-800',
+  };
+  return (
+    <div className={"rounded-xl border px-4 py-3 shadow-soft "+toneMap[tone]}>
+      <div className="text-xs uppercase tracking-wide opacity-70">{label}</div>
+      <div className="text-2xl font-semibold mt-1">{value}</div>
+    </div>
+  );
+}
+
+function CapturePanel({ api, onQueued }) {
   const [url, setUrl] = useState('');
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
@@ -88,81 +117,100 @@ function InputCard({ api, onQueued }) {
   };
 
   return (
-    <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 mt-6">
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            value={url}
-            onChange={e => { setUrl(e.target.value); if (file) setFile(null); }}
-            placeholder="Paste a URL… (YouTube, article, docs)"
-            className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-brand"
-          />
-          <div className="flex items-stretch gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt"
-              className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
-            />
-            <button onClick={() => fileInputRef.current?.click()} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Choose file</button>
-            <button onClick={submit} disabled={!canSubmit || busy} className={(canSubmit && !busy ? 'bg-brand text-white hover:opacity-95' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 cursor-not-allowed') + ' rounded-md px-4 py-2 text-sm font-medium'}>
-              {busy ? 'Queueing…' : 'Distill'}
-            </button>
+    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-5">
+          <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-2">Smart Capture</div>
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute left-3 top-2.5 text-zinc-400">{Icon.link()}</span>
+              <input
+                value={url}
+                onChange={e => { setUrl(e.target.value); if (file) setFile(null); }}
+                placeholder="Paste a URL… (YouTube, article, blog)"
+                className="w-full pl-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-brand"
+              />
+            </div>
+            <div className="flex items-stretch gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
+              />
+              <button onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.file()} Choose file</button>
+              <button onClick={submit} disabled={!canSubmit || busy} className={(canSubmit && !busy ? 'bg-brand text-white hover:opacity-95' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 cursor-not-allowed') + ' rounded-lg px-4 py-2.5 text-sm font-medium'}>
+                {busy ? 'Queueing…' : 'Distill'}
+              </button>
+            </div>
           </div>
-        </div>
-        <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
-          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
-          className={(dragOver ? 'border-brand/50 bg-brand/5' : 'border-dashed') + ' mt-4 rounded-md border p-4 text-center text-sm text-zinc-500 dark:text-zinc-400'}
-        >
-          Drop a document here to distill
-        </div>
-        {(file) && (
-          <div className="mt-3 flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm">
-            <div className="truncate text-zinc-700 dark:text-zinc-200">📄 {file.name}</div>
-            <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
+            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
+            className={(dragOver ? 'border-brand/50 bg-brand/5' : 'border-dashed') + ' mt-4 rounded-lg border p-4 text-center text-sm text-zinc-500 dark:text-zinc-400'}
+          >
+            Drag & drop a document here to distill
           </div>
-        )}
+          {(file) && (
+            <div className="mt-3 flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm">
+              <div className="truncate text-zinc-700 dark:text-zinc-200">📄 {file.name}</div>
+              <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <StatBadge label="Total" value={<ValueAnim v={undefined} />} tone="zinc" />
+          <StatBadge label="In Progress" value={<ValueAnim v={undefined} />} tone="blue" />
+          <StatBadge label="Errors" value={<ValueAnim v={undefined} />} tone="red" />
+        </div>
       </div>
     </section>
   );
 }
 
-function Toolbar({ counts, actions, query, setQuery, type, setType }) {
+function ValueAnim({ v }) { return <span>{v ?? '—'}</span>; }
+
+function CommandBar({ counts, actions, query, setQuery, type, setType, view, setView }) {
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 flex flex-col gap-3">
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={actions.selectAll} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Select all</button>
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <div className="flex-1 flex items-center gap-2">
+            <div className="relative flex-1">
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm" />
+            </div>
+            <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-950">
+              {['all','url','youtube','file'].map(opt => (
+                <button key={opt} onClick={() => setType(opt)} className={(type===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
+              ))}
+            </div>
+            <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-950">
+              {['table','cards'].map(opt => (
+                <button key={opt} onClick={() => setView(opt)} className={(view===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
+              ))}
+            </div>
+            <button onClick={actions.refresh} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm inline-flex items-center gap-2">{Icon.refresh()} Refresh</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={actions.export} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm inline-flex items-center gap-2">{Icon.download()} Export</button>
+            <label className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm cursor-pointer inline-flex items-center gap-2">
+              <span>Import</span>
+              <input type="file" accept=".zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) actions.import(f); e.target.value = ''; }} />
+            </label>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
           <div className="text-sm text-zinc-500 dark:text-zinc-400">{counts.selected} selected</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={actions.retry} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Retry</button>
-          <button onClick={actions.retryAll} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry all</button>
-          <button onClick={actions.retryFailed} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry failed</button>
-          <button onClick={actions.bulkDownload} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Download</button>
-          <button onClick={actions.bulkDelete} disabled={!counts.selected} className={(counts.selected ? 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700' : 'opacity-50 cursor-not-allowed ') + ' rounded-md border px-3 py-2 text-sm'}>Delete</button>
-        </div>
-      </div>
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex-1 flex items-center gap-2">
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full sm:w-auto flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
-          <select value={type} onChange={e => setType(e.target.value)} className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm">
-            <option value="all">All types</option>
-            <option value="url">Web Page</option>
-            <option value="youtube">YouTube</option>
-            <option value="file">Document</option>
-          </select>
-          <button onClick={actions.refresh} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Refresh</button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={actions.export} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Export</button>
-          <label className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm cursor-pointer">
-            Import
-            <input type="file" accept=".zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) actions.import(f); e.target.value = ''; }} />
-          </label>
+          <div className="flex items-center gap-2">
+            <button onClick={actions.selectAll} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Select all</button>
+            <button onClick={actions.retry} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Retry</button>
+            <button onClick={actions.retryAll} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry all</button>
+            <button onClick={actions.retryFailed} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Retry failed</button>
+            <button onClick={actions.bulkDownload} disabled={!counts.selected} className={(counts.selected ? '' : 'opacity-50 cursor-not-allowed ') + 'rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm'}>Download</button>
+            <button onClick={actions.bulkDelete} disabled={!counts.selected} className={(counts.selected ? 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700' : 'opacity-50 cursor-not-allowed ') + ' rounded-lg border px-3 py-2 text-sm'}>Delete</button>
+          </div>
         </div>
       </div>
     </div>
@@ -208,13 +256,13 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry }) 
                 <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{it.sourceType || '—'}</td>
                 <td className="px-4 py-3 text-sm">
                   <span className={
-                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs ' +
+                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
                     (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                      it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
                      it.status === 'distilling' || it.status === 'extracting' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
                      it.status === 'pending' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300')
                   }>
-                    {it.status}
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {it.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{formatDuration(it)}</td>
@@ -240,6 +288,51 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry }) 
   );
 }
 
+function KBCardList({ items, selected, toggle, open, download, del, stop, retry }) {
+  return (
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4 grid grid-cols-1 md:hidden gap-3">
+      {items.map(it => (
+        <div key={it.id} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2 min-w-0">
+              <input type="checkbox" className="mt-1" checked={selected.has(it.id)} onChange={() => toggle(it.id)} />
+              <div className="min-w-0">
+                <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{it.title || 'Untitled'}</div>
+                <div className="text-xs text-zinc-500 truncate">{it.sourceUrl || (it.sourceFile?.name || '—')}</div>
+              </div>
+            </div>
+            <span className={
+              'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
+              (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+               it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+               it.status === 'distilling' || it.status === 'extracting' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+               it.status === 'pending' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300')
+            }>
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {it.status}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 text-xs text-zinc-600 dark:text-zinc-300">
+            <div>Duration: {formatDuration(it)}</div>
+            <div className="text-right">{new Date(it.createdAt).toLocaleString()}</div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button onClick={() => open('content', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">View</button>
+            <button onClick={() => open('logs', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">Logs</button>
+            <button onClick={() => download(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">PDF</button>
+            {(it.status === 'extracting' || it.status === 'distilling') && (
+              <button onClick={() => stop(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1 text-sm">Stop</button>
+            )}
+            {(it.status === 'error' || it.status === 'stopped') && (
+              <button onClick={() => retry(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">Retry</button>
+            )}
+            <button onClick={() => del(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1 text-sm ml-auto">Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
@@ -251,6 +344,23 @@ function Modal({ open, onClose, title, children, wide }) {
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">✕</button>
         </div>
         <div className="p-4 max-h-[70vh] overflow-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Drawer({ open, onClose, title, children, side='right', width='max-w-xl' }) {
+  if (!open) return null;
+  const sideClass = side === 'right' ? 'right-0 translate-x-0' : 'left-0 -translate-x-0';
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className={`absolute top-0 ${side==='right'?'right-0':'left-0'} h-full w-full sm:w-[520px] ${width} bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col`}>
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">✕</button>
+        </div>
+        <div className="p-4 overflow-auto">{children}</div>
       </div>
     </div>
   );
@@ -273,7 +383,7 @@ function SettingsSheet({ open, onClose, api }) {
 
   if (!open) return null;
   return (
-    <Modal open={open} onClose={onClose} title="Settings" wide>
+    <Drawer open={open} onClose={onClose} title="Settings">
       {!settings ? (
         <div className="text-sm text-zinc-500">Loading…</div>
       ) : (
@@ -332,13 +442,13 @@ function SettingsSheet({ open, onClose, api }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
             <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
             <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-md px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save'}</button>
           </div>
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -395,16 +505,18 @@ function App() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
+  const [view, setView] = useState('table');
   const [selected, setSelected] = useState(new Set());
   const [toast, setToast] = useState('');
   const [contentItem, setContentItem] = useState(null);
   const [logsItem, setLogsItem] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
   // Load and poll
   useEffect(() => {
     let mounted = true;
-    const load = async () => { const data = await api.getSummaries(); if (mounted) setItems(sortItems(data)); };
+    const load = async () => { const data = await api.getSummaries(); if (mounted) { setItems(sortItems(data)); setInitialLoaded(true); } };
     load();
     const interval = setInterval(async () => {
       try { const data = await api.getSummaries(); if (!mounted) return; setItems(prev => reconcile(prev, data)); } catch {}
@@ -448,25 +560,58 @@ function App() {
 
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
 
+  // Stats
+  const total = items.length;
+  const inProgress = items.filter(it => ['pending','extracting','distilling'].includes(String(it.status||'').toLowerCase())).length;
+  const errors = items.filter(it => String(it.status||'').toLowerCase()==='error').length;
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-950">
       <TopBar onOpenSettings={() => setShowSettings(true)} theme={theme} setTheme={setTheme} />
-      <InputCard api={api} onQueued={() => refresh()} />
-      <Toolbar
+      <CapturePanel api={api} onQueued={() => refresh()} />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
+        <div className="grid grid-cols-3 gap-3">
+          <StatBadge label="Total" value={total} tone="zinc" />
+          <StatBadge label="In Progress" value={inProgress} tone="blue" />
+          <StatBadge label="Errors" value={errors} tone="red" />
+        </div>
+      </div>
+
+      <CommandBar
         counts={{ selected: selected.size }}
         actions={{ selectAll, retry: bulkRetry, retryAll: bulkRetryAll, retryFailed: bulkRetryFailed, bulkDelete, bulkDownload, refresh, export: exportKB, import: importKB }}
         query={query} setQuery={setQuery} type={type} setType={setType}
+        view={view} setView={setView}
       />
-      <KBTable
-        items={filtered}
-        selected={selected}
-        toggle={toggle}
-        open={openItem}
-        download={download}
-        del={del}
-        stop={stop}
-        retry={retry}
-      />
+
+      {/* Desktop table */}
+      {view === 'table' && (
+        <KBTable
+          items={filtered}
+          selected={selected}
+          toggle={toggle}
+          open={openItem}
+          download={download}
+          del={del}
+          stop={stop}
+          retry={retry}
+        />
+      )}
+      {/* Mobile card list */}
+      {view === 'cards' && (
+        <KBCardList
+          items={filtered}
+          selected={selected}
+          toggle={toggle}
+          open={openItem}
+          download={download}
+          del={del}
+          stop={stop}
+          retry={retry}
+        />
+      )}
+
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
       <LogsModal open={!!logsItem} onClose={() => setLogsItem(null)} item={logsItem} />
       <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} api={api} />
