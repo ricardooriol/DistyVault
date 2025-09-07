@@ -40,12 +40,17 @@ const Icon = {
   delete: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m1 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 4v8m6-8v8"/></svg>),
   file: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path strokeWidth="1.8" d="M14 2v6h6"/></svg>),
   link: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83A5 5 0 1 0 12 4.34"/><path strokeWidth="1.8" d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83A5 5 0 1 0 12 19.66"/></svg>),
+  dots: (cls='') => (<svg viewBox="0 0 24 24" fill="currentColor" className={"h-5 w-5 "+cls}><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>),
+  upload: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M12 21V9"/><path strokeWidth="1.8" d="m7 14 5-5 5 5"/><path strokeWidth="1.8" d="M4 21h16"/></svg>),
+  eye: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3" strokeWidth="1.8"/></svg>),
+  logs: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><rect x="3" y="4" width="18" height="16" rx="2" strokeWidth="1.8"/><path strokeWidth="1.8" d="M7 8h10M7 12h10M7 16h6"/></svg>),
+  pdf: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path strokeWidth="1.8" d="M14 2v6h6"/><path strokeWidth="1.8" d="M8.5 14H10a1.5 1.5 0 0 0 0-3H8.5v3Zm5 0h-2v-3h2a1.5 1.5 0 1 1 0 3Zm1.5-3H17a1 1 0 0 1 0 2h-2v-2Z"/></svg>),
 };
 
 function TopBar({ onOpenSettings, theme, setTheme }) {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-b from-white/80 to-white/60 dark:from-zinc-950/80 dark:to-zinc-950/60 backdrop-blur">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src="logos/logo.png" alt="logo" className="h-7 w-7" />
           <div className="font-semibold text-zinc-900 dark:text-zinc-100">DistyVault</div>
@@ -53,7 +58,7 @@ function TopBar({ onOpenSettings, theme, setTheme }) {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle value={theme} onChange={setTheme} />
-          <button onClick={onOpenSettings} className="inline-flex items-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"><span className="sr-only">Settings</span>{Icon.settings()}</button>
+          <button onClick={onOpenSettings} className="inline-flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Settings" aria-label="Settings">{Icon.settings()}</button>
         </div>
       </div>
     </header>
@@ -120,8 +125,8 @@ function CapturePanel({ api, onQueued }) {
 
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-5">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-5">
           <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-2">Smart Capture</div>
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
@@ -161,12 +166,7 @@ function CapturePanel({ api, onQueued }) {
               <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
             </div>
           )}
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <StatBadge label="Total" value={<ValueAnim v={undefined} />} tone="zinc" />
-          <StatBadge label="In Progress" value={<ValueAnim v={undefined} />} tone="blue" />
-          <StatBadge label="Errors" value={<ValueAnim v={undefined} />} tone="red" />
-        </div>
+  </div>
       </div>
     </section>
   );
@@ -174,7 +174,7 @@ function CapturePanel({ api, onQueued }) {
 
 function ValueAnim({ v }) { return <span>{v ?? '—'}</span>; }
 
-function CommandBar({ counts, actions, query, setQuery, type, setType, view, setView }) {
+function CommandBar({ counts, actions, query, setQuery, type, setType }) {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
       <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
@@ -184,23 +184,25 @@ function CommandBar({ counts, actions, query, setQuery, type, setType, view, set
               <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm" />
             </div>
             <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-950">
-              {['all','url','youtube','file'].map(opt => (
-                <button key={opt} onClick={() => setType(opt)} className={(type===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
-              ))}
-            </div>
-            <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-950">
-              {['table','cards'].map(opt => (
-                <button key={opt} onClick={() => setView(opt)} className={(view===opt ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm capitalize'}>{opt}</button>
+              {[
+                {k:'all', label:'All'},
+                {k:'url', label:'URL'},
+                {k:'youtube', label:'YouTube'},
+                {k:'file', label:'File'},
+              ].map(opt => (
+                <button key={opt.k} onClick={() => setType(opt.k)} className={(type===opt.k ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{opt.label}</button>
               ))}
             </div>
             <div className="relative">
               <details className="group">
-                <summary className="list-none cursor-pointer rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-sm inline-flex items-center gap-2 select-none">Actions ▾</summary>
-                <div className="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm">
+                <summary className="list-none cursor-pointer inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Actions" aria-label="Actions">
+                  {Icon.dots()}
+                </summary>
+                <div className="dv-menu absolute right-0 mt-2 w-48 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm">
                   <button onClick={actions.refresh} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.refresh()} Refresh</button>
                   <button onClick={actions.export} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.download()} Export</button>
                   <label className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2 cursor-pointer">
-                    <span>Import</span>
+                    {Icon.upload()} <span>Import</span>
                     <input type="file" accept=".zip" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) actions.import(f); e.target.value = ''; }} />
                   </label>
                 </div>
@@ -230,7 +232,7 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 md:bottom-4">
       <div className="mx-auto max-w-3xl px-3 md:px-0">
-        <div className="pointer-events-auto w-full md:w-auto rounded-t-2xl md:rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-zinc-900/85 backdrop-blur shadow-soft">
+        <div className="pointer-events-auto w-full md:w-auto rounded-t-2xl md:rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-zinc-900/85 backdrop-blur shadow-soft animate-slideUp">
           <div className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2">
             <div className="text-sm text-zinc-700 dark:text-zinc-200">
               <span className="font-medium">{count}</span> selected
@@ -239,17 +241,17 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
               )}
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <button onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Retry selected">
+              <button onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Retry selected">
                 {Icon.refresh()} <span className="hidden sm:inline">Retry</span>
               </button>
-              <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Download PDFs">
+              <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Download PDFs">
                 {Icon.download()} <span className="hidden sm:inline">Download</span>
               </button>
-              <button onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 px-3 py-1.5 text-sm hover:bg-red-50/60 dark:hover:bg-red-900/20" title="Delete selected">
+              <button onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-full border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 px-3 py-1.5 text-sm hover:bg-red-50/60 dark:hover:bg-red-900/20 active:scale-[0.98] transition" title="Delete selected">
                 {Icon.delete()} <span className="hidden sm:inline">Delete</span>
               </button>
               <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
-              <button onClick={onClear} className="rounded-md px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white" title="Clear selection">Deselect</button>
+              <button onClick={onClear} className="rounded-full px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white active:scale-[0.98] transition" title="Clear selection">Deselect</button>
             </div>
           </div>
         </div>
@@ -258,21 +260,109 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
   );
 }
 
-function KBTable({ items, selected, toggle, open, download, del, stop, retry }) {
+function KBTable({ items, selected, toggle, open, download, del, stop, retry, sort, onChangeSort }) {
+  const [colWidths, setColWidths] = React.useState(() => {
+    const def = {
+    name: 380,
+    source: 320,
+    type: 120,
+    status: 140,
+    duration: 120,
+    created: 200,
+    actions: 240,
+    };
+    try { const saved = JSON.parse(localStorage.getItem('dv-colwidths')||'null'); return saved ? { ...def, ...saved } : def; } catch { return def; }
+  });
+
+  const startXRef = React.useRef(0);
+  const startWRef = React.useRef(0);
+  const colKeyRef = React.useRef('');
+  const dragHandlerRef = React.useRef(null);
+
+  const onDragStart = (e, key) => {
+    startXRef.current = e.clientX;
+    startWRef.current = colWidths[key];
+    colKeyRef.current = key;
+    const handler = (evt) => {
+      const dx = evt.clientX - startXRef.current;
+      const k = colKeyRef.current;
+      if (!k) return;
+      setColWidths(prev => {
+        const next = { ...prev, [k]: Math.max(100, Math.min(700, startWRef.current + dx)) };
+        try { localStorage.setItem('dv-colwidths', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    };
+    dragHandlerRef.current = handler;
+    document.addEventListener('mousemove', handler);
+    document.addEventListener('mouseup', onDragEnd, { once: true });
+    e.preventDefault();
+  };
+  const onDragEnd = () => {
+    if (dragHandlerRef.current) {
+      document.removeEventListener('mousemove', dragHandlerRef.current);
+      dragHandlerRef.current = null;
+    }
+    colKeyRef.current = '';
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (dragHandlerRef.current) {
+        try { document.removeEventListener('mousemove', dragHandlerRef.current); } catch {}
+      }
+    };
+  }, []);
+
+  const SortIcon = ({ active, dir }) => (
+    <span className="inline-block ml-1 text-zinc-400">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
-        <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
-          <thead className="bg-zinc-50 dark:bg-zinc-800/60">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
+        <table className="w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 44 }} />
+            <col style={{ width: colWidths.name }} />
+            <col style={{ width: colWidths.source }} />
+            <col style={{ width: colWidths.type }} />
+            <col style={{ width: colWidths.status }} />
+            <col style={{ width: colWidths.duration }} />
+            <col style={{ width: colWidths.created }} />
+            <col style={{ width: colWidths.actions }} />
+          </colgroup>
+          <thead className="bg-zinc-50 dark:bg-zinc-800/60 select-none">
             <tr>
               <th className="w-10" />
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Source</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Created</th>
-              <th className="px-4 py-3" />
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                <button onClick={() => onChangeSort('title')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
+                  Name <SortIcon active={sort.by==='title'} dir={sort.dir} />
+                </button>
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'name')}>⋮</span>
+              </th>
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Source
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'source')}>⋮</span>
+              </th>
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Type
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'type')}>⋮</span>
+              </th>
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                <button onClick={() => onChangeSort('status')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
+                  Status <SortIcon active={sort.by==='status'} dir={sort.dir} />
+                </button>
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'status')}>⋮</span>
+              </th>
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'duration')}>⋮</span>
+              </th>
+              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                <button onClick={() => onChangeSort('createdAt')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
+                  Created <SortIcon active={sort.by==='createdAt'} dir={sort.dir} />
+                </button>
+                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'created')}>⋮</span>
+              </th>
+              <th className="px-2 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -281,12 +371,12 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry }) 
                 <td className="px-2">
                   <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} />
                 </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate max-w-[26rem]">{it.title || 'Untitled'}</div>
+                <td className="px-2 py-3">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate" title={it.title || 'Untitled'}>{it.title || 'Untitled'}</div>
                 </td>
-                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate max-w-[22rem]">{it.sourceUrl || (it.sourceFile?.name || '—')}</td>
-                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{it.sourceType || '—'}</td>
-                <td className="px-4 py-3 text-sm">
+                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate" title={it.sourceUrl || (it.sourceFile?.name || '—')}>{it.sourceUrl || (it.sourceFile?.name || '—')}</td>
+                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{it.sourceType || '—'}</td>
+                <td className="px-2 py-3 text-sm">
                   <span className={
                     'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
                     (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
@@ -297,19 +387,28 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry }) 
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {it.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{formatDuration(it)}</td>
-                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{new Date(it.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3 text-sm flex items-center gap-2 justify-end">
-                  <button onClick={() => open('content', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1">View</button>
-                  <button onClick={() => open('logs', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1">Logs</button>
-                  <button onClick={() => download(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1">PDF</button>
-                  {(it.status === 'extracting' || it.status === 'distilling') && (
-                    <button onClick={() => stop(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1">Stop</button>
-                  )}
-                  {(it.status === 'error' || it.status === 'stopped') && (
-                    <button onClick={() => retry(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1">Retry</button>
-                  )}
-                  <button onClick={() => del(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1">Delete</button>
+                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{formatDuration(it)}</td>
+                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{new Date(it.createdAt).toLocaleString()}</td>
+                <td className="px-2 py-3 text-sm flex items-center justify-end">
+                  <div className="relative">
+                    <details>
+                      <summary className="list-none inline-flex items-center justify-center w-9 h-9 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Actions" aria-label="Row actions">
+                        {Icon.dots()}
+                      </summary>
+                      <div className="absolute right-0 mt-2 w-40 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm z-10">
+                        <button onClick={() => open('content', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View content">{Icon.eye()} View</button>
+                        <button onClick={() => open('logs', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View logs">{Icon.logs()} Logs</button>
+                        <button onClick={() => download(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="Download PDF">{Icon.pdf()} PDF</button>
+                        {(it.status === 'extracting' || it.status === 'distilling') && (
+                          <button onClick={() => stop(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-red-50/60 dark:hover:bg-red-900/20 inline-flex items-center gap-2 text-red-600 dark:text-red-300" title="Stop processing">Stop</button>
+                        )}
+                        {(it.status === 'error' || it.status === 'stopped') && (
+                          <button onClick={() => retry(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="Retry">{Icon.refresh()} Retry</button>
+                        )}
+                        <button onClick={() => del(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-red-50/60 dark:hover:bg-red-900/20 inline-flex items-center gap-2 text-red-600 dark:text-red-300" title="Delete">{Icon.delete()} Delete</button>
+                      </div>
+                    </details>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -320,57 +419,14 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry }) 
   );
 }
 
-function KBCardList({ items, selected, toggle, open, download, del, stop, retry }) {
-  return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4 grid grid-cols-1 md:hidden gap-3">
-      {items.map(it => (
-        <div key={it.id} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2 min-w-0">
-              <input type="checkbox" className="mt-1" checked={selected.has(it.id)} onChange={() => toggle(it.id)} />
-              <div className="min-w-0">
-                <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{it.title || 'Untitled'}</div>
-                <div className="text-xs text-zinc-500 truncate">{it.sourceUrl || (it.sourceFile?.name || '—')}</div>
-              </div>
-            </div>
-            <span className={
-              'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
-              (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-               it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-               it.status === 'distilling' || it.status === 'extracting' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-               it.status === 'pending' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300')
-            }>
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {it.status}
-            </span>
-          </div>
-          <div className="mt-2 grid grid-cols-2 text-xs text-zinc-600 dark:text-zinc-300">
-            <div>Duration: {formatDuration(it)}</div>
-            <div className="text-right">{new Date(it.createdAt).toLocaleString()}</div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <button onClick={() => open('content', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">View</button>
-            <button onClick={() => open('logs', it)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">Logs</button>
-            <button onClick={() => download(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">PDF</button>
-            {(it.status === 'extracting' || it.status === 'distilling') && (
-              <button onClick={() => stop(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1 text-sm">Stop</button>
-            )}
-            {(it.status === 'error' || it.status === 'stopped') && (
-              <button onClick={() => retry(it.id)} className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-sm">Retry</button>
-            )}
-            <button onClick={() => del(it.id)} className="rounded border border-red-300 text-red-600 dark:border-red-700 px-2 py-1 text-sm ml-auto">Delete</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+// Removed mobile cards view for a cleaner, focused table UX
 
 function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={(wide ? 'max-w-4xl' : 'max-w-2xl') + ' relative w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl'}>
+      <div className={(wide ? 'max-w-4xl' : 'max-w-2xl') + ' relative w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl animate-inScale'}>
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">✕</button>
@@ -387,7 +443,7 @@ function Drawer({ open, onClose, title, children, side='right', width='max-w-xl'
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`absolute top-0 ${side==='right'?'right-0':'left-0'} h-full w-full sm:w-[520px] ${width} bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col`}>
+      <div className={`absolute top-0 ${side==='right'?'right-0':'left-0'} h-full w-full sm:w-[520px] ${width} bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col animate-slideInRight`}>
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">✕</button>
@@ -397,71 +453,118 @@ function Drawer({ open, onClose, title, children, side='right', width='max-w-xl'
     </div>
   );
 }
-
 function SettingsSheet({ open, onClose, api }) {
   const [settings, setSettings] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const [toast, setToast] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      api.getAiSettings().then(setSettings);
-    }
-  }, [open]);
+  useEffect(() => { if (open) api.getAiSettings().then(setSettings); }, [open]);
 
   const save = async () => {
     setSaving(true);
-    try { await api.saveAiSettings(settings); onClose(); } catch (e) { alert(e?.message || 'Failed'); } finally { setSaving(false); }
+    try { await api.saveAiSettings(settings); setToast('Saved'); setTimeout(()=>setToast(''),1500); onClose(); }
+    catch (e) { alert(e?.message || 'Failed'); }
+    finally { setSaving(false); }
+  };
+
+  const testConnection = async () => {
+    if (!settings) return;
+    setTesting(true);
+    try {
+      if (settings.mode === 'offline') {
+        // simple health check on Ollama endpoint
+        const ep = (settings.offline?.endpoint || '').replace(/\/$/, '');
+        const res = await fetch(ep + '/api/tags', { method: 'GET' });
+        if (!res.ok) throw new Error('Ollama not reachable');
+        setToast('Ollama reachable');
+      } else {
+        const p = settings.online?.provider;
+        const key = settings.online?.apiKey;
+        if (!p || !key) throw new Error('Missing provider or API key');
+        // lightweight probes
+        if (p === 'openai') {
+          const r = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` } });
+          if (!r.ok) throw new Error('OpenAI auth failed');
+        } else if (p === 'anthropic') {
+          const r = await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' } });
+          if (!r.ok) throw new Error('Anthropic auth failed');
+        } else if (p === 'google') {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+          if (!r.ok) throw new Error('Gemini auth failed');
+        }
+        setToast('Connection OK');
+      }
+    } catch (e) {
+      alert(e?.message || 'Connection test failed');
+    } finally { setTesting(false); }
   };
 
   if (!open) return null;
   return (
-    <Drawer open={open} onClose={onClose} title="Settings">
+    <Drawer open={open} onClose={onClose} title="AI Settings">
       {!settings ? (
         <div className="text-sm text-zinc-500">Loading…</div>
       ) : (
         <div className="space-y-6">
           <div>
-            <div className="text-sm font-medium mb-2">Processing mode</div>
-            <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 p-1">
+            <div className="text-sm font-medium mb-2">Mode</div>
+            <div className="inline-flex rounded-full border border-zinc-300 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-950">
               {['online','offline'].map(m => (
-                <button key={m} onClick={() => setSettings({ ...settings, mode: m })} className={(settings.mode === m ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{m}</button>
+                <button key={m} onClick={() => setSettings({ ...settings, mode: m })} className={(settings.mode === m ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded-full text-sm capitalize'}>{m}</button>
               ))}
             </div>
-            <div className="mt-2 text-xs text-zinc-500">Use cloud AI for best quality; offline requires local Ollama.</div>
+            <div className="mt-2 text-xs text-zinc-500">Cloud for best quality; offline requires local Ollama.</div>
           </div>
 
           {settings.mode === 'offline' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">Ollama model</label>
-                <input value={settings.offline?.model || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, model: e.target.value } })} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="llama3" />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm">Ollama model</label>
+                  <input value={settings.offline?.model || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, model: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="llama3" />
+                </div>
+                <div>
+                  <label className="text-sm">Ollama endpoint</label>
+                  <input value={settings.offline?.endpoint || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, endpoint: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="http://localhost:11434" />
+                </div>
               </div>
-              <div>
-                <label className="text-sm">Ollama endpoint</label>
-                <input value={settings.offline?.endpoint || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, endpoint: e.target.value } })} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="http://localhost:11434" />
+              <div className="flex items-center gap-2">
+                <button onClick={testConnection} disabled={testing} className="rounded-full border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">{testing ? 'Testing…' : 'Test connection'}</button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">Provider</label>
-                <select value={settings.online?.provider || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, provider: e.target.value } })} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm">
-                  <option value="">Select…</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Gemini</option>
-                  <option value="grok">Grok</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm">Provider</label>
+                  <select value={settings.online?.provider || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, provider: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm">
+                    <option value="">Select…</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Gemini</option>
+                    <option value="grok">Grok</option>
+                    <option value="deepseek">DeepSeek</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm">Model</label>
+                  <input value={settings.online?.model || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, model: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="gpt-4o" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-sm">API key</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="sk-…" />
+                    <button onClick={() => setShowKey(s => !s)} className="rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800" title={showKey? 'Hide key':'Show key'}>
+                      {Icon.eye()}
+                    </button>
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-500">Keys are stored locally in this browser.</div>
+                </div>
               </div>
-              <div>
-                <label className="text-sm">Model</label>
-                <input value={settings.online?.model || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, model: e.target.value } })} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="gpt-4o" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-sm">API key</label>
-                <input type="password" value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="sk-…" />
-                <div className="mt-1 text-xs text-zinc-500">Keys are stored locally in this browser.</div>
+              <div className="flex items-center gap-2">
+                <button onClick={testConnection} disabled={testing} className="rounded-full border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">{testing ? 'Testing…' : 'Test connection'}</button>
               </div>
             </div>
           )}
@@ -469,15 +572,19 @@ function SettingsSheet({ open, onClose, api }) {
           <div>
             <label className="text-sm">Simultaneous processing</label>
             <div className="mt-1 inline-flex items-center gap-2">
-              <input type="number" min={1} max={10} value={settings.concurrentProcessing || 1} onChange={e => setSettings({ ...settings, concurrentProcessing: Math.min(10, Math.max(1, parseInt(e.target.value || '1', 10))) })} className="w-24 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
+              <input type="number" min={1} max={10} value={settings.concurrentProcessing || 1} onChange={e => setSettings({ ...settings, concurrentProcessing: Math.min(10, Math.max(1, parseInt(e.target.value || '1', 10))) })} className="w-24 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
               <span className="text-xs text-zinc-500">Max 10</span>
             </div>
           </div>
 
-      <div className="flex items-center justify-end gap-2">
-            <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
-            <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-md px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save'}</button>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-zinc-500">Tuned for speed and reliability.</div>
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className="rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
+              <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-full px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save changes'}</button>
+            </div>
           </div>
+          {toast && <div className="text-sm text-green-600 dark:text-green-400">{toast}</div>}
         </div>
       )}
     </Drawer>
@@ -537,7 +644,11 @@ function App() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
-  const [view, setView] = useState('table');
+  // sorting: default by createdAt desc; persisted in localStorage
+  const [sort, setSort] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('dv-sort')||'null'); if (s && s.by && s.dir) return s; } catch {}
+    return { by: 'createdAt', dir: 'desc' };
+  });
   const [selected, setSelected] = useState(new Set());
   const [toast, setToast] = useState('');
   const [contentItem, setContentItem] = useState(null);
@@ -568,6 +679,42 @@ function App() {
       return byType && byQ;
     });
   }, [items, query, type]);
+
+  const visibleItems = useMemo(() => {
+    const arr = filtered.slice();
+    if (sort.by === 'title') {
+      arr.sort((a,b) => {
+        const an = String(a.title||'').toLowerCase();
+        const bn = String(b.title||'').toLowerCase();
+        const c = an.localeCompare(bn);
+        return sort.dir === 'asc' ? c : -c;
+      });
+    } else {
+      if (sort.by === 'createdAt') {
+        arr.sort((a,b) => (sort.dir === 'asc' ? 1 : -1) * (new Date(a.createdAt) - new Date(b.createdAt)));
+      } else if (sort.by === 'status') {
+        arr.sort((a,b) => {
+          const as = String(a.status||'').toLowerCase();
+          const bs = String(b.status||'').toLowerCase();
+          const c = as.localeCompare(bs);
+          return sort.dir === 'asc' ? c : -c;
+        });
+      }
+    }
+    return arr;
+  }, [filtered, sort]);
+
+  useEffect(() => { try { localStorage.setItem('dv-sort', JSON.stringify(sort)); } catch {} }, [sort]);
+
+  const onChangeSort = (by) => {
+    if (sort.by !== by) {
+      // default direction: name asc, created desc, status asc
+      const def = by === 'createdAt' ? 'desc' : 'asc';
+      setSort({ by, dir: def });
+    } else {
+      setSort({ by, dir: sort.dir === 'asc' ? 'desc' : 'asc' });
+    }
+  };
 
   // Actions
   const toggle = (id) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next); };
@@ -622,35 +769,21 @@ function App() {
         counts={{ selected: selected.size }}
         actions={{ selectAll, retry: bulkRetry, retryAll: bulkRetryAll, retryFailed: bulkRetryFailed, bulkDelete, bulkDownload, refresh, export: exportKB, import: importKB }}
         query={query} setQuery={setQuery} type={type} setType={setType}
-        view={view} setView={setView}
       />
 
-      {/* Desktop table */}
-      {view === 'table' && (
-        <KBTable
-          items={filtered}
-          selected={selected}
-          toggle={toggle}
-          open={openItem}
-          download={download}
-          del={del}
-          stop={stop}
-          retry={retry}
-        />
-      )}
-      {/* Mobile card list */}
-      {view === 'cards' && (
-        <KBCardList
-          items={filtered}
-          selected={selected}
-          toggle={toggle}
-          open={openItem}
-          download={download}
-          del={del}
-          stop={stop}
-          retry={retry}
-        />
-      )}
+      {/* Table (resizable, sortable) */}
+      <KBTable
+        items={visibleItems}
+        selected={selected}
+        toggle={toggle}
+        open={openItem}
+        download={download}
+        del={del}
+        stop={stop}
+        retry={retry}
+  sort={sort}
+  onChangeSort={onChangeSort}
+      />
 
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
       <LogsModal open={!!logsItem} onClose={() => setLogsItem(null)} item={logsItem} />
