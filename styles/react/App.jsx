@@ -286,8 +286,8 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
-      <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
-        <table className="w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
+  <div className="overflow-auto max-h-[65vh] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
+  <table className="min-w-[880px] w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
             <col style={{ width: colWidths.name }} />
@@ -316,9 +316,9 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
               <th className="px-1 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {items.map(it => (
-              <tr key={it.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/60">
+        <tr key={it.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/60">
                 <td className="px-2">
                   <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} />
                 </td>
@@ -560,7 +560,7 @@ function SettingsSheet({ open, onClose, api }) {
 
           <div>
             <label className="text-sm">Simultaneous processing</label>
-            <div className="mt-1 inline-flex items-center gap-2">
+            <div className="mt-3 inline-flex items-center gap-2">
               <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
               <div className="min-w-[2.5rem] text-center text-sm text-zinc-800 dark:text-zinc-100">{settings.concurrentProcessing || 1}</div>
               <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>
