@@ -27,6 +27,9 @@ const useTheme = () => {
 
 // Simple inline icons (SVG)
 const Icon = {
+  search: (cls='') => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}><circle cx="11" cy="11" r="7" strokeWidth="1.8"/><path strokeWidth="1.8" strokeLinecap="round" d="M20 20l-3.5-3.5"/></svg>
+  ),
   settings: (cls='') => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}><path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.03-3.5a6.99 6.99 0 0 0-.1-.99l2.06-1.6a.75.75 0 0 0 .18-.96l-1.95-3.38a.75.75 0 0 0-.9-.34l-2.43.98a6.96 6.96 0 0 0-1.7-.99l-.37-2.57A.75.75 0 0 0 12.08 1h-3.9a.75.75 0 0 0-.74.64L6.99 4.2c-.61.24-1.18.56-1.7.94l-2.42-.98a.75.75 0 0 0-.9.35L-.01 8.9c-.17.31-.08.7.19.92l2.06 1.7a6.99 6.99 0 0 0 0 1.93L.18 15.1a.75.75 0 0 0-.19.92l1.96 3.38c.2.35.61.5.98.36l2.42-.97c.52.38 1.09.7 1.7.94l.44 2.56c.07.36.39.63.75.63h3.9c.37 0 .68-.27.74-.63l.44-2.56c.6-.23 1.17-.55 1.7-.93l2.42.97c.37.15.78-.01.97-.36l1.96-3.38a.75.75 0 0 0-.19-.92l-2.05-1.68c.07-.33.1-.66.1-1Z"/></svg>
   ),
@@ -186,6 +189,40 @@ function CapturePanel({ api, onQueued }) {
   );
 }
 
+// Collapsible search control: icon that expands to input and collapses when empty
+function SearchToggle({ value, onChange, placeholder="Search knowledge base…" }) {
+  const [open, setOpen] = useState(() => (value && value.length > 0));
+  const ref = useRef(null);
+  useEffect(() => { if (open && ref.current) ref.current.focus(); }, [open]);
+  useEffect(() => { if (!value || value.length === 0) setOpen(false); }, [value]);
+  return (
+    <div className="relative">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+          title="Search"
+          aria-label="Search"
+        >
+          {Icon.search()}
+        </button>
+      ) : (
+        <div className="relative w-64 sm:w-72">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">{Icon.search()}</span>
+          <input
+            ref={ref}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => { if (!value) setOpen(false); }}
+            placeholder={placeholder}
+            className="w-full pl-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusToast({ message }) {
   if (!message) return null;
   return (
@@ -195,7 +232,7 @@ function StatusToast({ message }) {
   );
 }
 
-function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, onSelectAll }) {
+function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAll, onViewSingle }) {
   if (!count) return null;
   const allSelected = count === total && total > 0;
   return (
@@ -210,6 +247,11 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
               )}
             </div>
             <div className="ml-auto flex items-center gap-2">
+              {count === 1 && (
+                <button onClick={onViewSingle} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="View">
+                  {Icon.eye()} <span className="hidden sm:inline">View</span>
+                </button>
+              )}
               <button onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Retry selected">
                 {Icon.refresh()} <span className="hidden sm:inline">Retry</span>
               </button>
@@ -219,8 +261,6 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
               <button onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-full border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 px-3 py-1.5 text-sm hover:bg-red-50/60 dark:hover:bg-red-900/20 active:scale-[0.98] transition" title="Delete selected">
                 {Icon.delete()} <span className="hidden sm:inline">Delete</span>
               </button>
-              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
-              <button onClick={onClear} className="rounded-full px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white active:scale-[0.98] transition" title="Clear selection">Deselect</button>
             </div>
           </div>
         </div>
@@ -229,13 +269,12 @@ function SelectionDock({ count, total, onClear, onRetry, onDownload, onDelete, o
   );
 }
 
-function KBTable({ items, selected, toggle, open, download, del, stop, retry, sort, onChangeSort }) {
+function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked }) {
   const [colWidths, setColWidths] = React.useState(() => {
     const def = {
       name: 480,
       status: 140,
       duration: 120,
-      actions: 64,
     };
     try { const saved = JSON.parse(localStorage.getItem('dv-colwidths')||'null'); return saved ? { ...def, ...saved } : def; } catch { return def; }
   });
@@ -287,17 +326,18 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
   <div className="overflow-auto max-h-[65vh] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
-  <table className="min-w-[880px] w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
+  <table className="min-w-[760px] w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
             <col style={{ width: colWidths.name }} />
             <col style={{ width: colWidths.status }} />
             <col style={{ width: colWidths.duration }} />
-            <col style={{ width: colWidths.actions }} />
           </colgroup>
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 select-none">
             <tr>
-              <th className="w-10" />
+              <th className="w-10 px-2 py-3">
+                <input type="checkbox" checked={!!allChecked} onChange={onToggleAll} aria-label="Select all" />
+              </th>
               <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('title')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Name <SortIcon active={sort.by==='title'} dir={sort.dir} />
@@ -313,7 +353,6 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
               <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration
                 <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'duration')}>⋮</span>
               </th>
-              <th className="px-1 py-3" />
             </tr>
           </thead>
       <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -337,27 +376,6 @@ function KBTable({ items, selected, toggle, open, download, del, stop, retry, so
                   </span>
                 </td>
                 <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{formatDuration(it)}</td>
-                <td className="px-1 py-2 text-sm">
-                  <div className="relative flex items-center justify-end w-full">
-                    <details>
-                      <summary className="list-none inline-flex items-center justify-center w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Actions" aria-label="Row actions">
-                        {Icon.dots()}
-                      </summary>
-                      <div className="absolute right-0 mt-2 w-40 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm z-10">
-                        <button onClick={() => open('content', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View content">{Icon.eye()} View</button>
-                        <button onClick={() => open('logs', it)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="View logs">{Icon.logs()} Logs</button>
-                        <button onClick={() => download(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="Download PDF">{Icon.pdf()} PDF</button>
-                        {(it.status === 'extracting' || it.status === 'distilling') && (
-                          <button onClick={() => stop(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-red-50/60 dark:hover:bg-red-900/20 inline-flex items-center gap-2 text-red-600 dark:text-red-300" title="Stop processing">Stop</button>
-                        )}
-                        {(it.status === 'error' || it.status === 'stopped') && (
-                          <button onClick={() => retry(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2" title="Retry">{Icon.refresh()} Retry</button>
-                        )}
-                        <button onClick={() => del(it.id)} className="w-full text-left px-3 py-2 rounded hover:bg-red-50/60 dark:hover:bg-red-900/20 inline-flex items-center gap-2 text-red-600 dark:text-red-300" title="Delete">{Icon.delete()} Delete</button>
-                      </div>
-                    </details>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -405,6 +423,7 @@ function SettingsSheet({ open, onClose, api }) {
   const [testing, setTesting] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [toast, setToast] = useState('');
+  const [connStatus, setConnStatus] = useState(null); // 'ok' | 'fail' | null
 
   useEffect(() => { if (open) api.getAiSettings().then(setSettings); }, [open]);
 
@@ -438,6 +457,24 @@ function SettingsSheet({ open, onClose, api }) {
     finally { setSaving(false); }
   };
 
+  const resetDefaults = () => ({
+    mode: 'online',
+    concurrentProcessing: 1,
+    offline: { model: '', endpoint: 'http://localhost:11434' },
+    online: { provider: '', apiKey: '', model: 'gpt-4o', endpoint: '' },
+    lastUpdated: new Date().toISOString()
+  });
+
+  const reset = async () => {
+    if (!confirm('Reset AI settings to defaults?')) return;
+    const next = resetDefaults();
+    setSettings(next);
+    setSaving(true);
+    try { await api.saveAiSettings(next); setToast('Reset'); setTimeout(()=>setToast(''),1500); onClose(); }
+    catch (e) { alert(e?.message || 'Failed'); }
+    finally { setSaving(false); }
+  };
+
   const testConnection = async () => {
     if (!settings) return;
     setTesting(true);
@@ -446,6 +483,7 @@ function SettingsSheet({ open, onClose, api }) {
         const ep = (settings.offline?.endpoint || '').replace(/\/$/, '');
         const res = await fetch(ep + '/api/tags', { method: 'GET' });
         if (!res.ok) throw new Error('Ollama not reachable');
+        setConnStatus('ok');
         setToast('Ollama reachable');
       } else {
         const p = settings.online?.provider;
@@ -461,9 +499,11 @@ function SettingsSheet({ open, onClose, api }) {
           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
           if (!r.ok) throw new Error('Gemini auth failed');
         }
+        setConnStatus('ok');
         setToast('Connection OK');
       }
     } catch (e) {
+      setConnStatus('fail');
       alert(e?.message || 'Connection test failed');
     } finally { setTesting(false); }
   };
@@ -558,9 +598,9 @@ function SettingsSheet({ open, onClose, api }) {
             </div>
           )}
 
-          <div>
-            <label className="text-sm">Simultaneous processing</label>
-            <div className="mt-3 inline-flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm">Simultaneous processings</label>
+            <div className="inline-flex items-center gap-3">
               <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
               <div className="min-w-[2.5rem] text-center text-sm text-zinc-800 dark:text-zinc-100">{settings.concurrentProcessing || 1}</div>
               <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>
@@ -568,10 +608,18 @@ function SettingsSheet({ open, onClose, api }) {
           </div>
 
           <div className="flex items-center justify-between">
-            <div />
+            <div className="min-h-[28px]">
+              {connStatus && (
+                <span className={(connStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300') + ' inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs'}>
+                  <span className={(connStatus==='ok' ? 'bg-green-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full animate-pulse'}></span>
+                  {connStatus==='ok' ? 'Connected' : 'Not connected'}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
-              <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-md px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save changes'}</button>
+              <button onClick={reset} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Reset</button>
+              <button onClick={save} disabled={saving} className={(saving ? 'opacity-60' : 'bg-brand text-white') + ' rounded-md px-4 py-2 text-sm font-medium'}>{saving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
           {toast && <div className="text-sm text-green-600 dark:text-green-400">{toast}</div>}
@@ -753,14 +801,12 @@ function App() {
         </div>
       </div>
 
-      {/* Command bar simplified (kept for search/filter) */}
+      {/* Command bar with search toggle and export */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="flex-1 flex items-center gap-2">
-              <div className="relative flex-1">
-                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search knowledge base…" className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2.5 text-sm" />
-              </div>
+              <SearchToggle value={query} onChange={setQuery} />
               <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-950">
                 {[
                   {k:'all', label:'All'},
@@ -771,20 +817,10 @@ function App() {
                   <button key={opt.k} onClick={() => setType(opt.k)} className={(type===opt.k ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{opt.label}</button>
                 ))}
               </div>
-        <div className="relative">
-                <details className="group">
-          <summary className="list-none cursor-pointer inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition" title="Actions" aria-label="Actions">
-                    {Icon.dots()}
-                  </summary>
-                  <div className="dv-menu absolute right-0 mt-2 w-48 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-1 text-sm">
-                    <button onClick={async ()=>{ const data = await api.getSummaries(); setItems(data); }} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.refresh()} Refresh</button>
-                    <button onClick={async ()=>{ await api.exportKnowledgeBase(); }} className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2">{Icon.download()} Export</button>
-                    <label className="w-full text-left px-3 py-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-2 cursor-pointer">
-                      {Icon.upload()} <span>Import</span>
-                      <input type="file" accept=".zip" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) { await api.importKnowledgeBase(f, { clearExisting: confirm('Clear existing items first?') }); const data = await api.getSummaries(); setItems(data); } e.target.value = ''; }} />
-                    </label>
-                  </div>
-                </details>
+              <div className="relative">
+                <button onClick={async ()=>{ await api.exportKnowledgeBase(); setToast('Export started'); setTimeout(()=>setToast(''),2000); }} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Export knowledge base">
+                  {Icon.download()} <span className="hidden sm:inline">Export</span>
+                </button>
               </div>
             </div>
             <div className="hidden" />
@@ -797,13 +833,14 @@ function App() {
         items={visibleItems}
         selected={selected}
         toggle={toggle}
-        open={openItem}
-        download={download}
-        del={del}
-        stop={stop}
-        retry={retry}
         sort={sort}
         onChangeSort={onChangeSort}
+        onToggleAll={() => {
+          const allIds = new Set(visibleItems.map(x => x.id));
+          const allSelected = visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id));
+          setSelected(allSelected ? new Set() : allIds);
+        }}
+        allChecked={visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id))}
       />
 
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
@@ -813,11 +850,16 @@ function App() {
       <SelectionDock
         count={selected.size}
         total={visibleItems.length}
-        onClear={() => setSelected(new Set())}
         onRetry={async () => { for (const id of selected) { try { await api.retryDistillation(id); } catch {} } setToast('Retry queued'); setTimeout(()=>setToast(''),2000); }}
         onDownload={async () => { await api.bulkDownload(Array.from(selected)); setToast('Downloads started'); setTimeout(()=>setToast(''),2000); }}
         onDelete={async () => { await api.bulkDelete(Array.from(selected)); setSelected(new Set()); const data = await api.getSummaries(); setItems(data); setToast('Deleted'); setTimeout(()=>setToast(''),2000); }}
         onSelectAll={() => setSelected(new Set(visibleItems.map(x => x.id)))}
+        onViewSingle={async () => {
+          const id = Array.from(selected)[0];
+          if (!id) return;
+          const item = await api.getSummary(id);
+          setContentItem(item);
+        }}
       />
     </div>
   );
