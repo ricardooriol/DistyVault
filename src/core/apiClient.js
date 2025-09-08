@@ -37,8 +37,8 @@ class ApiClient {
         return Promise.race([promise, timeout]);
     }
 
-    // Feature flag: optionally enable LangChain YouTube loader (off by default to avoid CDN noise)
-    _lcEnabled() { try { return !!window.DV_ENABLE_LC; } catch { return false; } }
+    // Feature flag: enable LangChain YouTube loader by default (matches old_code transcript-first behavior)
+    _lcEnabled() { try { return (typeof window.DV_ENABLE_LC === 'undefined') ? true : !!window.DV_ENABLE_LC; } catch { return true; } }
 
     // Helper
     async _json(res) {
@@ -668,23 +668,38 @@ class ApiClient {
                     await this.db.addLog(id, 'Failed to expand YouTube playlist; continuing with generic extraction', 'warn', { message: e?.message || String(e) });
                 }
             }
-            // Extract: use client extractor by default to avoid 404 logs; opt-in server with window.DV_USE_SERVER
-        let extraction;
-            if (this.serverEnabled) {
+            // Extract: prefer server for YouTube videos (aligns with old_code), otherwise follow existing preference
+            let extraction;
+            const isYtVideo = this._isYouTubeUrl(url) && !this._isYouTubePlaylist(url);
+            if (isYtVideo) {
                 try {
-            const extractRes = await fetch(`${this.base}/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-                    if (extractRes.status === 404) {
-                        throw Object.assign(new Error('Serverless API not available (404). Using client fallback.'), { status: 404 });
-                    }
+                    const extractRes = await fetch(`${this.base}/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+                    if (extractRes.status === 404) throw Object.assign(new Error('Serverless API 404'), { status: 404 });
                     const payload = await this._handle(extractRes);
                     extraction = payload.extraction || payload;
                 } catch (e) {
+                    // Fallback to client path when server route is unavailable
                     const status = e?.status || 0;
-                    await this.db.addLog(id, 'Serverless API unavailable, using client-side extractor', 'warn', { status, message: e?.message });
+                    if (status && status !== 404) {
+                        await this.db.addLog(id, 'YouTube server extractor failed; falling back to client', 'error', { status, message: e?.message });
+                    }
                     extraction = await this._extractUrlClient(url);
                 }
             } else {
-                extraction = await this._extractUrlClient(url);
+                if (this.serverEnabled) {
+                    try {
+                        const extractRes = await fetch(`${this.base}/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+                        if (extractRes.status === 404) throw Object.assign(new Error('Serverless API 404'), { status: 404 });
+                        const payload = await this._handle(extractRes);
+                        extraction = payload.extraction || payload;
+                    } catch (e) {
+                        const status = e?.status || 0;
+                        await this.db.addLog(id, 'Serverless API unavailable, using client-side extractor', 'warn', { status, message: e?.message });
+                        extraction = await this._extractUrlClient(url);
+                    }
+                } else {
+                    extraction = await this._extractUrlClient(url);
+                }
             }
             if (extraction.contentType === 'youtube-playlist' && extraction.metadata?.videos?.length) {
                 // Spawn items for each video and delete tracking
@@ -1001,10 +1016,10 @@ class ApiClient {
                 }
             }
             if (!transcript || transcript.length < 120) {
-                // Fallback to description via privacy-friendly backends
+                // Fallback to description via minimal privacy-friendly backends (reduced to avoid noise)
                 let description = '';
-                const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
-                const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
+                const invHosts = ['yewtu.be','vid.puffyan.us'];
+                const pipedHosts = ['piped.video'];
                 const endpoints = [
                     ...invHosts.map(h => `https://${h}/api/v1/videos/${videoId}`),
                     ...pipedHosts.map(h => `https://${h}/api/v1/video/${videoId}`),
@@ -1020,6 +1035,7 @@ class ApiClient {
                             if (description) break;
                         }
                     } catch {}
+                    await this._sleep(100);
                 }
                 transcript = (description || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
             }
