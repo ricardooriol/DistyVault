@@ -568,6 +568,22 @@ class ApiClient {
     // ----------------------
     // Internal helpers
     // ----------------------
+    _useServer() { return !!this.serverEnabled; }
+
+    /** Fetch target via server proxy if enabled; fallback to public read proxy. */
+    async _proxyFetch(targetUrl, options = {}) {
+        const target = String(targetUrl);
+        if (this._useServer()) {
+            try {
+                const res = await fetch(`${this.base}/proxy?url=${encodeURIComponent(target)}`, options);
+                if (res.status !== 404) return res;
+            } catch {}
+        }
+        try {
+            const alt = `https://r.jina.ai/${target}`;
+            return await fetch(alt, options);
+        } catch (e) { throw e; }
+    }
     _createDistillation({ sourceUrl = null, sourceType, title, sourceFile = null }) {
         return {
             id: `dist_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -736,7 +752,7 @@ class ApiClient {
                 try {
                     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
                     // Always try via proxy first to dodge CORS/cache oddities
-                    let res = await fetch(`${this.base}/proxy?url=${encodeURIComponent(oembedUrl)}`);
+                    let res = await this._proxyFetch(oembedUrl);
                     if (!res.ok) { try { res = await fetch(oembedUrl); } catch {} }
                     if (res.ok) {
                         const txt = await res.text();
@@ -757,8 +773,7 @@ class ApiClient {
                 }
                 for (const ep of endpoints) {
                     try {
-                        const proxied = `${this.base}/proxy?url=${encodeURIComponent(ep)}`;
-                        const res = await fetch(proxied);
+                        const res = await this._proxyFetch(ep);
                         if (res.ok) {
                             const txt = await res.text();
                             let j = null;
@@ -795,7 +810,7 @@ class ApiClient {
             ];
             for (const ep of endpoints) {
                 try {
-                    const res = await fetch(`${this.base}/proxy?url=${encodeURIComponent(ep)}`);
+                    const res = await this._proxyFetch(ep);
                     if (res.ok) {
                         const txt = await res.text();
                         let data = null; try { data = JSON.parse(txt); } catch {}
@@ -812,7 +827,7 @@ class ApiClient {
         for (const h of invHosts) {
             const ep = `https://${h}/api/v1/playlists/${encodeURIComponent(id)}`;
             try {
-                const res = await fetch(`${this.base}/proxy?url=${encodeURIComponent(ep)}`);
+                const res = await this._proxyFetch(ep);
                 if (res.ok) {
                     const txt = await res.text();
                     let data = null; try { data = JSON.parse(txt); } catch {}
@@ -826,7 +841,7 @@ class ApiClient {
         // 3) Fallback: proxy HTML scrape (may fail with 451 depending on region)
         try {
             const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
-            const res = await fetch(`${this.base}/proxy?url=${encodeURIComponent(target)}`, { method: 'GET' });
+            const res = await this._proxyFetch(target, { method: 'GET' });
             if (res.ok) {
                 const html = await res.text();
                 const idMatches = [];
@@ -866,7 +881,7 @@ class ApiClient {
                 ];
                 for (const ep of invEndpoints) {
                     try {
-                        const r = await fetch(`${this.base}/proxy?url=${encodeURIComponent(ep)}`);
+                        const r = await this._proxyFetch(ep);
                         if (r.ok) {
                             const txt = await r.text();
                             let j = null; try { j = JSON.parse(txt); } catch {}
@@ -889,13 +904,8 @@ class ApiClient {
         }
 
         // Generic pages via CORS-friendly proxy
-        const proxyUrl = `${this.base}/proxy?url=${encodeURIComponent(target)}`;
-        let res = await fetch(proxyUrl, { method: 'GET' }).catch(() => null);
-        if (!res || !res.ok) {
-            // fallback to public readable proxy if our serverless proxy is not available locally
-            const alt = `https://r.jina.ai/${encodeURI(target)}`;
-            res = await fetch(alt, { method: 'GET' });
-        }
+    let res = await this._proxyFetch(target, { method: 'GET' }).catch(() => null);
+    if (!res) { throw new Error('Client extractor failed: proxy unreachable'); }
         if (!res.ok) {
             const text = await res.text().catch(() => '');
             throw new Error(`Client extractor failed: HTTP ${res.status}${text ? ' - ' + text.slice(0, 200) : ''}`);
@@ -929,7 +939,7 @@ class ApiClient {
             if (looksGeneric) {
                 try {
                     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target)}&format=json`;
-                    let oRes = await fetch(`${this.base}/proxy?url=${encodeURIComponent(oembedUrl)}`);
+                    let oRes = await this._proxyFetch(oembedUrl);
                     if (!oRes.ok) { try { oRes = await fetch(oembedUrl); } catch {} }
                     if (oRes.ok) {
                         const txt = await oRes.text();
