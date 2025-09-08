@@ -31,7 +31,10 @@ const Icon = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}><circle cx="11" cy="11" r="7" strokeWidth="1.8"/><path strokeWidth="1.8" strokeLinecap="round" d="M20 20l-3.5-3.5"/></svg>
   ),
   settings: (cls='') => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}><path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.03-3.5a6.99 6.99 0 0 0-.1-.99l2.06-1.6a.75.75 0 0 0 .18-.96l-1.95-3.38a.75.75 0 0 0-.9-.34l-2.43.98a6.96 6.96 0 0 0-1.7-.99l-.37-2.57A.75.75 0 0 0 12.08 1h-3.9a.75.75 0 0 0-.74.64L6.99 4.2c-.61.24-1.18.56-1.7.94l-2.42-.98a.75.75 0 0 0-.9.35L-.01 8.9c-.17.31-.08.7.19.92l2.06 1.7a6.99 6.99 0 0 0 0 1.93L.18 15.1a.75.75 0 0 0-.19.92l1.96 3.38c.2.35.61.5.98.36l2.42-.97c.52.38 1.09.7 1.7.94l.44 2.56c.07.36.39.63.75.63h3.9c.37 0 .68-.27.74-.63l.44-2.56c.6-.23 1.17-.55 1.7-.93l2.42.97c.37.15.78-.01.97-.36l1.96-3.38a.75.75 0 0 0-.19-.92l-2.05-1.68c.07-.33.1-.66.1-1Z"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}>
+      <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M20.25 12c0-.53-.05-1.05-.16-1.55l2.06-1.19-1.5-2.6-2.06 1.19a7.97 7.97 0 0 0-2.68-1.55V3h-3.22v2.3a7.97 7.97 0 0 0-2.68 1.55L6.55 6.66l-1.5 2.6 2.06 1.19c-.1.5-.16 1.02-.16 1.55s.06 1.05.16 1.55l-2.06 1.19 1.5 2.6 2.06-1.19c.78.66 1.7 1.19 2.68 1.55V21h3.22v-2.3c.98-.36 1.9-.89 2.68-1.55l2.06 1.19 1.5-2.6-2.06-1.19c.11-.5.16-1.02.16-1.55Z"/>
+      <circle cx="12" cy="12" r="3.25" strokeWidth="1.8" />
+    </svg>
   ),
   sun: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><circle cx="12" cy="12" r="4" strokeWidth="1.8"/><path strokeWidth="1.8" d="M12 2v2m0 16v2M4.93 4.93 6.34 6.34m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07 6.34 17.66m11.32-11.32 1.41-1.41"/></svg>),
   moon: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><path strokeWidth="1.8" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>),
@@ -345,19 +348,19 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 select-none">
             <tr>
               <th className="w-10 px-2 py-3" />
-              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('title')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Name <SortIcon active={sort.by==='title'} dir={sort.dir} />
                 </button>
                 <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'name')}>⋮</span>
               </th>
-              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('status')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Status <SortIcon active={sort.by==='status'} dir={sort.dir} />
                 </button>
                 <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'status')}>⋮</span>
               </th>
-              <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration
+              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">Duration
                 <button onClick={() => onResetSort && onResetSort()} className="float-right inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to last queued">
                   {Icon.refresh('h-3.5 w-3.5')}
                 </button>
