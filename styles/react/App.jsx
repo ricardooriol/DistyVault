@@ -232,7 +232,7 @@ function StatusToast({ message }) {
   );
 }
 
-function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAll, onViewSingle }) {
+function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAll, onViewSingle, onClear }) {
   if (!count) return null;
   const allSelected = count === total && total > 0;
   return (
@@ -244,6 +244,9 @@ function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAl
               <span className="font-medium">{count}</span> selected
               {!allSelected && total > 0 && (
                 <button onClick={onSelectAll} className="ml-2 underline text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white">Select all</button>
+              )}
+              {allSelected && (
+                <button onClick={onClear} className="ml-2 underline text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white">Unselect all</button>
               )}
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -335,9 +338,7 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
           </colgroup>
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 select-none">
             <tr>
-              <th className="w-10 px-2 py-3">
-                <input type="checkbox" checked={!!allChecked} onChange={onToggleAll} aria-label="Select all" />
-              </th>
+              <th className="w-10 px-2 py-3" />
               <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('title')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Name <SortIcon active={sort.by==='title'} dir={sort.dir} />
@@ -589,16 +590,18 @@ function SettingsSheet({ open, onClose, api }) {
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-sm">API key</label>
-                  <div className="mt-1 flex items-center gap-2 flex-wrap">
-                    <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="Enter your API key" />
-                    <button onClick={() => setShowKey(s => !s)} className="rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center" title={showKey? 'Hide key':'Show key'}>{Icon.eye()}</button>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm">API key</label>
                     {connStatus && (
-                      <span className={(connStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300') + ' inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs'}>
-                        <span className={(connStatus==='ok' ? 'bg-green-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full animate-pulse'}></span>
+                      <span className={(connStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300') + ' ml-2 inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs'}>
+                        <span className={(connStatus==='ok' ? 'bg-green-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full'}></span>
                         {connStatus==='ok' ? 'Connected' : 'Not connected'}
                       </span>
                     )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="Enter your API key" />
+                    <button onClick={() => setShowKey(s => !s)} className="rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center" title={showKey? 'Hide key':'Show key'}>{Icon.eye()}</button>
                   </div>
                 </div>
               </div>
@@ -797,10 +800,28 @@ function App() {
       <CapturePanel api={api} onQueued={() => refresh()} />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
-        <div className="grid grid-cols-3 gap-3">
-          <StatBadge label="Total" value={total} tone="zinc" />
-          <StatBadge label="In Progress" value={inProgress} tone="blue" />
-          <StatBadge label="Errors" value={errors} tone="red" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-zinc-500">Total</div>
+              <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{total}</div>
+            </div>
+            <button onClick={async ()=>{ if (items.length) { await api.bulkDownload(items.map(i=>i.id)); setToast('Downloads started'); setTimeout(()=>setToast(''),2000); } }} className="text-xs rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Download all</button>
+          </div>
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-zinc-500">In Progress</div>
+              <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{inProgress}</div>
+            </div>
+            <button onClick={async ()=>{ const ids = items.filter(it=>['pending','extracting','distilling'].includes(String(it.status||'').toLowerCase())).map(i=>i.id); for (const id of ids) { try { await api.stopProcessing(id); } catch {} } if (ids.length) { setToast('Stopped all in progress'); setTimeout(()=>setToast(''),2000); } }} className="text-xs rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Stop all</button>
+          </div>
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-zinc-500">Errors</div>
+              <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{errors}</div>
+            </div>
+            <button onClick={async ()=>{ const ids = items.filter(it=>String(it.status||'').toLowerCase()==='error').map(i=>i.id); for (const id of ids) { try { await api.retryDistillation(id); } catch {} } if (ids.length) { setToast('Retry failed queued'); setTimeout(()=>setToast(''),2000); } }} className="text-xs rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Retry failed</button>
+          </div>
         </div>
       </div>
 
@@ -820,10 +841,14 @@ function App() {
                   <button key={opt.k} onClick={() => setType(opt.k)} className={(type===opt.k ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{opt.label}</button>
                 ))}
               </div>
-              <div className="relative">
+              <div className="relative inline-flex items-center gap-2">
                 <button onClick={async ()=>{ await api.exportKnowledgeBase(); setToast('Export started'); setTimeout(()=>setToast(''),2000); }} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Export knowledge base">
                   {Icon.download()} <span className="hidden sm:inline">Export</span>
                 </button>
+                <label className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer" title="Import knowledge base">
+                  {Icon.upload()} <span className="hidden sm:inline">Import</span>
+                  <input type="file" accept=".zip" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) { await api.importKnowledgeBase(f, { clearExisting: confirm('Clear existing items first?') }); const data = await api.getSummaries(); setItems(data); setToast('Import completed'); setTimeout(()=>setToast(''),2000); } e.target.value = ''; }} />
+                </label>
               </div>
             </div>
             <div className="hidden" />
@@ -863,6 +888,7 @@ function App() {
           const item = await api.getSummary(id);
           setContentItem(item);
         }}
+        onClear={() => setSelected(new Set())}
       />
     </div>
   );
