@@ -735,10 +735,9 @@ class ApiClient {
             const oembed = async () => {
                 try {
                     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-                    let res = await fetch(oembedUrl);
-                    if (!res.ok) {
-                        res = await fetch(`https://r.jina.ai/${oembedUrl}`);
-                    }
+                    // Always try via proxy first to dodge CORS/cache oddities
+                    let res = await fetch(`https://r.jina.ai/${oembedUrl}`);
+                    if (!res.ok) { res = await fetch(oembedUrl); }
                     if (res.ok) {
                         const txt = await res.text();
                         const data = JSON.parse(txt);
@@ -748,16 +747,22 @@ class ApiClient {
                 return null;
             };
             const invTitle = async () => {
-                // Invidious-compatible instances often allow CORS
-                const endpoints = [
-                    videoId ? `https://yewtu.be/api/v1/videos/${videoId}` : null,
-                    videoId ? `https://piped.video/api/v1/video/${videoId}` : null
-                ].filter(Boolean);
+                // Try multiple Invidious/Piped hosts proxied via r.jina.ai to avoid CORS and 429 from a single instance
+                const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+                const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
+                const endpoints = [];
+                if (videoId) {
+                    for (const h of invHosts) endpoints.push(`https://${h}/api/v1/videos/${videoId}`);
+                    for (const h of pipedHosts) endpoints.push(`https://${h}/api/v1/video/${videoId}`);
+                }
                 for (const ep of endpoints) {
                     try {
-                        const res = await fetch(ep);
+                        const proxied = `https://r.jina.ai/${ep}`;
+                        const res = await fetch(proxied);
                         if (res.ok) {
-                            const j = await res.json();
+                            const txt = await res.text();
+                            let j = null;
+                            try { j = JSON.parse(txt); } catch {}
                             const t = j?.title || j?.videoTitle || null;
                             if (t) return t;
                         }
@@ -779,30 +784,45 @@ class ApiClient {
     async _expandYouTubePlaylist(playlistUrl) {
         const id = this._extractYouTubePlaylistId(playlistUrl);
         if (!id) return [];
-        // Prefer privacy-friendly JSON APIs that allow CORS; fall back to HTML scraping via proxy
-        // 1) Piped
-        try {
-            const resPiped = await fetch(`https://piped.video/api/playlist/${encodeURIComponent(id)}`);
-            if (resPiped.ok) {
-                const data = await resPiped.json();
-                const vids = (data?.relatedStreams || data?.videos || []).map(v => v?.url || v?.id || v?.videoId).filter(Boolean);
-                const ids = vids.map(v => {
-                    if (typeof v === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
-                    const m = String(v).match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-                    return m ? m[1] : null;
-                }).filter(Boolean);
-                if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+        // Prefer privacy-friendly JSON APIs proxied via r.jina.ai to avoid CORS; try multiple hosts then fall back to HTML scraping
+        const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+        const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
+        // 1) Piped APIs (some instances use different paths)
+        for (const h of pipedHosts) {
+            const endpoints = [
+                `https://${h}/api/v1/playlist?playlistId=${encodeURIComponent(id)}`,
+                `https://${h}/api/playlist/${encodeURIComponent(id)}`
+            ];
+            for (const ep of endpoints) {
+                try {
+                    const res = await fetch(`https://r.jina.ai/${ep}`);
+                    if (res.ok) {
+                        const txt = await res.text();
+                        let data = null; try { data = JSON.parse(txt); } catch {}
+                        if (data) {
+                            const arr = (data.relatedStreams || data.videos || []).filter(Boolean);
+                            const ids = arr.map(v => v?.videoId || v?.id || (typeof v.url === 'string' ? (v.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/)?.[1] || null) : null)).filter(Boolean);
+                            if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+                        }
+                    }
+                } catch {}
             }
-        } catch {}
-        // 2) Invidious
-        try {
-            const resInv = await fetch(`https://yewtu.be/api/v1/playlists/${encodeURIComponent(id)}`);
-            if (resInv.ok) {
-                const data = await resInv.json();
-                const vids = (data?.videos || []).map(v => v?.videoId || v?.id).filter(Boolean);
-                if (vids.length) return Array.from(new Set(vids)).map(v => `https://www.youtube.com/watch?v=${v}`);
-            }
-        } catch {}
+        }
+        // 2) Invidious APIs
+        for (const h of invHosts) {
+            const ep = `https://${h}/api/v1/playlists/${encodeURIComponent(id)}`;
+            try {
+                const res = await fetch(`https://r.jina.ai/${ep}`);
+                if (res.ok) {
+                    const txt = await res.text();
+                    let data = null; try { data = JSON.parse(txt); } catch {}
+                    if (data && Array.isArray(data.videos)) {
+                        const ids = data.videos.map(v => v?.videoId || v?.id).filter(Boolean);
+                        if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+                    }
+                }
+            } catch {}
+        }
         // 3) Fallback: proxy HTML scrape (may fail with 451 depending on region)
         try {
             const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
@@ -839,15 +859,18 @@ class ApiClient {
             let description = '';
             // Try Invidious first for description/text
             if (videoId) {
+                const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+                const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
                 const invEndpoints = [
-                    `https://yewtu.be/api/v1/videos/${videoId}`,
-                    `https://piped.video/api/v1/video/${videoId}`
+                    ...invHosts.map(h => `https://${h}/api/v1/videos/${videoId}`),
+                    ...pipedHosts.map(h => `https://${h}/api/v1/video/${videoId}`),
                 ];
                 for (const ep of invEndpoints) {
                     try {
-                        const r = await fetch(ep);
+                        const r = await fetch(`https://r.jina.ai/${ep}`);
                         if (r.ok) {
-                            const j = await r.json();
+                            const txt = await r.text();
+                            let j = null; try { j = JSON.parse(txt); } catch {}
                             description = j?.description || j?.shortDescription || description;
                             if (!title) title = j?.title || j?.videoTitle || title;
                             if (description || title) break;
