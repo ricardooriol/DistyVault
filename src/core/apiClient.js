@@ -770,17 +770,21 @@ class ApiClient {
         if (this._isYouTubeUrl(url) && !this._isYouTubePlaylist(url)) {
             const videoId = this._extractYouTubeVideoId(url);
             const oembed = async () => {
-                try {
-                    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-                    // Always try via proxy first to dodge CORS/cache oddities
-                    let res = await this._proxyFetch(oembedUrl);
-                    if (!res.ok) { try { res = await fetch(oembedUrl); } catch {} }
-                    if (res.ok) {
-                        const txt = await res.text();
-                        const data = JSON.parse(txt);
-                        return data?.title || null;
-                    }
-                } catch {}
+                const endpoints = [
+                    `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+                    // Alternate mirrors via textise dot iitty (if available) can be added, but keep to primary
+                ];
+                for (const ep of endpoints) {
+                    try {
+                        let res = await this._proxyFetch(ep);
+                        if (!res.ok && res.status !== 451) { try { res = await fetch(ep); } catch {} }
+                        if (res.ok) {
+                            const txt = await res.text();
+                            const data = JSON.parse(txt);
+                            if (data?.title) return data.title;
+                        }
+                    } catch {}
+                }
                 return null;
             };
             const invTitle = async () => {
@@ -823,29 +827,27 @@ class ApiClient {
     // ----------
     async _ensureLangChainYouTube() {
         if (this._lcYoutubeLoaderFactory) return this._lcYoutubeLoaderFactory;
-        // Try modern community package first, then legacy path
-        let mod = null;
-        try {
-            mod = await import('https://esm.sh/@langchain/community@0.2.31/document_loaders/web/youtube');
-        } catch {}
-        if (!mod) {
+        const candidates = [
+            'https://esm.sh/@langchain/community@0.2.31/document_loaders/web/youtube',
+            'https://esm.sh/@langchain/community/document_loaders/web/youtube',
+            'https://esm.run/@langchain/community@0.2.31/document_loaders/web/youtube',
+            'https://esm.run/@langchain/community/document_loaders/web/youtube',
+            'https://esm.sh/langchain@0.2.18/document_loaders/web/youtube',
+            'https://esm.sh/langchain@0.1.37/document_loaders/web/youtube',
+            // Fallbacks via CDN dist builds (may not exist; best-effort)
+            'https://cdn.jsdelivr.net/npm/@langchain/community@0.2.31/dist/document_loaders/web/youtube.js',
+            'https://unpkg.com/@langchain/community@0.2.31/dist/document_loaders/web/youtube.js'
+        ];
+        for (const url of candidates) {
             try {
-                mod = await import('https://esm.sh/langchain@0.2.18/document_loaders/web/youtube');
+                const mod = await import(/* @vite-ignore */ url);
+                const Loader = mod?.YoutubeLoader || mod?.YouTubeLoader || mod?.default;
+                if (Loader) {
+                    this._lcYoutubeLoaderFactory = Loader;
+                    return this._lcYoutubeLoaderFactory;
+                }
             } catch {}
         }
-        if (mod && (mod.YoutubeLoader || mod.YouTubeLoader)) {
-            this._lcYoutubeLoaderFactory = mod.YoutubeLoader || mod.YouTubeLoader;
-            return this._lcYoutubeLoaderFactory;
-        }
-        // As a last resort, try the main community bundle and access path
-        try {
-            const cm = await import('https://esm.sh/@langchain/community@0.2.31');
-            // Attempt property lookup if namespace export
-            if (cm?.document_loaders?.web?.youtube?.YoutubeLoader) {
-                this._lcYoutubeLoaderFactory = cm.document_loaders.web.youtube.YoutubeLoader;
-                return this._lcYoutubeLoaderFactory;
-            }
-        } catch {}
         throw new Error('LangChain YouTube loader not available');
     }
 
@@ -853,11 +855,11 @@ class ApiClient {
         try {
             const YoutubeLoader = await this._ensureLangChainYouTube();
             const url = this._normalizeYoutubeUrl(videoUrlOrId);
-            const loader = new YoutubeLoader(url, { language: 'en', addVideoInfo: true });
+            const loader = (YoutubeLoader.createFromUrl ? YoutubeLoader.createFromUrl(url, { language: 'en', addVideoInfo: true }) : new YoutubeLoader(url, { language: 'en', addVideoInfo: true }));
             const docs = await loader.load();
             if (Array.isArray(docs) && docs.length) {
                 // Concatenate pageContent; prefer the first document
-                const content = docs.map(d => d.pageContent || '').join('\n').trim();
+                const content = docs.map(d => (d.page_content ?? d.pageContent) || '').join('\n').trim();
                 return content || '';
             }
         } catch {}
@@ -867,7 +869,8 @@ class ApiClient {
     async _lcExpandPlaylistViaLC(playlistUrl) {
         try {
             const YoutubeLoader = await this._ensureLangChainYouTube();
-            const loader = new YoutubeLoader(this._normalizeYoutubeUrl(playlistUrl), { language: 'en', addVideoInfo: true });
+            const inputUrl = this._normalizeYoutubeUrl(playlistUrl);
+            const loader = (YoutubeLoader.createFromUrl ? YoutubeLoader.createFromUrl(inputUrl, { language: 'en', addVideoInfo: true }) : new YoutubeLoader(inputUrl, { language: 'en', addVideoInfo: true }));
             const docs = await loader.load();
             if (!Array.isArray(docs) || docs.length === 0) return [];
             const urls = [];
