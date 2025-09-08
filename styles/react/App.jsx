@@ -32,8 +32,8 @@ const Icon = {
   ),
   settings: (cls='') => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-5 w-5 "+cls}>
-      <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M20.25 12c0-.53-.05-1.05-.16-1.55l2.06-1.19-1.5-2.6-2.06 1.19a7.97 7.97 0 0 0-2.68-1.55V3h-3.22v2.3a7.97 7.97 0 0 0-2.68 1.55L6.55 6.66l-1.5 2.6 2.06 1.19c-.1.5-.16 1.02-.16 1.55s.06 1.05.16 1.55l-2.06 1.19 1.5 2.6 2.06-1.19c.78.66 1.7 1.19 2.68 1.55V21h3.22v-2.3c.98-.36 1.9-.89 2.68-1.55l2.06 1.19 1.5-2.6-2.06-1.19c.11-.5.16-1.02.16-1.55Z"/>
-      <circle cx="12" cy="12" r="3.25" strokeWidth="1.8" />
+      <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+      <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.69 0 1.3-.4 1.51-1a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 3.5l.06.06c.49.49 1.21.64 1.82.33.44-.22.74-.67.74-1.17V3a2 2 0 1 1 4 0v.09c0 .5.29.95.74 1.17.61.31 1.33.16 1.82-.33l.06-.06A2 2 0 1 1 21 7.04l-.06.06c-.49.49-.64 1.21-.33 1.82.22.44.67.74 1.17.74H21a2 2 0 1 1 0 4h-.09c-.5 0-.95.29-1.17.74Z"/>
     </svg>
   ),
   sun: (cls='') => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"h-4 w-4 "+cls}><circle cx="12" cy="12" r="4" strokeWidth="1.8"/><path strokeWidth="1.8" d="M12 2v2m0 16v2M4.93 4.93 6.34 6.34m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07 6.34 17.66m11.32-11.32 1.41-1.41"/></svg>),
@@ -360,8 +360,11 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                 </button>
                 <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'status')}>⋮</span>
               </th>
-              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">Duration
-                <button onClick={() => onResetSort && onResetSort()} className="float-right inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to last queued">
+              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
+                <button onClick={() => onChangeSort('duration')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
+                  Duration <span className="ml-1 text-zinc-400">{sort.by==='duration' ? (sort.dir==='asc' ? '▲' : '▼') : '↕'}</span>
+                </button>
+                <button onClick={() => onResetSort && onResetSort()} className="float-right inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to queue/last queued">
                   {Icon.refresh('h-3.5 w-3.5')}
                 </button>
               </th>
@@ -738,6 +741,27 @@ function App() {
 
   const visibleItems = useMemo(() => {
     const arr = filtered.slice();
+    const getDurationSec = (it) => {
+      // Completed: prefer processingTime or elapsedTime
+      const status = String(it.status || '').toLowerCase();
+      if (status === 'completed') {
+        if (Number.isFinite(it.processingTime)) return it.processingTime;
+        if (Number.isFinite(it.elapsedTime)) return it.elapsedTime;
+        const start = it.startTime ? new Date(it.startTime) : null;
+        const end = it.completedAt ? new Date(it.completedAt) : (it.updatedAt ? new Date(it.updatedAt) : null);
+        if (start && end && !isNaN(start) && !isNaN(end)) return Math.max(0, (end - start) / 1000);
+        return Number.POSITIVE_INFINITY;
+      }
+      // Active: from startTime to now
+      if ((status === 'extracting' || status === 'distilling') && it.startTime) {
+        const start = new Date(it.startTime);
+        const now = new Date();
+        if (!isNaN(start) && !isNaN(now)) return Math.max(0, (now - start) / 1000);
+      }
+      // Pending/queued or unknown
+      if (Number.isFinite(it.elapsedTime)) return it.elapsedTime;
+      return Number.POSITIVE_INFINITY;
+    };
     if (sort.by === 'title') {
       arr.sort((a,b) => {
         const an = String(a.title||'').toLowerCase();
@@ -754,6 +778,13 @@ function App() {
       });
     } else if (sort.by === 'createdAt') {
       arr.sort((a,b) => (sort.dir === 'asc' ? 1 : -1) * (new Date(a.createdAt) - new Date(b.createdAt)));
+    } else if (sort.by === 'duration') {
+      arr.sort((a,b) => {
+        const da = getDurationSec(a);
+        const db = getDurationSec(b);
+        const c = da - db;
+        return sort.dir === 'asc' ? c : -c;
+      });
     } else if (sort.by === 'queue') {
       // Custom queue-aware ordering:
       // 1) Completed and Error first (rank 0 and 1)
