@@ -1115,70 +1115,35 @@ class ApiClient {
             .replace(/<[^>]*>/g, '')
             .replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 
-        // 1) Direct timedtext on YouTube via proxy (en, en-US, en-GB, with/without ASR)
-        const langs = ['en','en-US','en-GB'];
-        const kinds = [null,'asr'];
-        for (const lang of langs) {
-            for (const kind of kinds) {
-                const url = `https://www.youtube.com/api/timedtext?v=${encodeURIComponent(videoId)}&lang=${encodeURIComponent(lang)}${kind ? `&kind=${kind}` : ''}&fmt=vtt`;
-                try {
-                    const res = await this._proxyFetch(url);
-                    if (res.ok) {
-                        const vtt = await res.text();
-                        const text = this._parseVttToText(vtt);
-                        const out = clean(text);
-                        if (out && out.length > 120) return out;
-                    }
-                } catch {}
-            }
-        }
-        // 2) Parse captionTracks from the watch page and fetch the first English track
-        try {
-            const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
-            const res = await this._proxyFetch(watchUrl);
-            if (res.ok) {
-                const html = await res.text();
-                const m = html.match(/\"captionTracks\":(\[.*?\])/);
-                if (m) {
-                    let tracks = null; try { tracks = JSON.parse(m[1].replace(/\\u0026/g, '&')); } catch {}
-                    if (Array.isArray(tracks) && tracks.length) {
-                        const pick = tracks.find(t => /en(-|$|_)/i.test(t?.languageCode || '') || /english/i.test(t?.name?.simpleText || '')) || tracks[0];
-                        const base = pick?.baseUrl;
-                        if (base) {
-                            try {
-                                const r = await this._proxyFetch(base + (base.includes('fmt=') ? '' : '&fmt=vtt'));
-                                if (r.ok) {
-                                    const vtt = await r.text();
-                                    const text = this._parseVttToText(vtt);
-                                    const out = clean(text);
-                                    if (out && out.length > 120) return out;
-                                }
-                            } catch {}
-                        }
-                    }
-                }
-            }
-        } catch {}
-        // 3) Invidious caption endpoints
-        const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+        // Use privacy-friendly Invidious caption endpoints only, to avoid direct YouTube 451/429 noise
+        const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev']; // keep short to reduce retries
+        let attempts = 0;
         for (const h of invHosts) {
             try {
                 const listRes = await this._proxyFetch(`https://${h}/api/v1/captions/${encodeURIComponent(videoId)}`);
-                if (listRes.ok) {
-                    const txt = await listRes.text();
-                    let list = null; try { list = JSON.parse(txt); } catch {}
-                    const track = Array.isArray(list) ? (list.find(t => /english/i.test(t?.label || '')) || list[0]) : null;
-                    if (track && track.label) {
-                        const capRes = await this._proxyFetch(`https://${h}/api/v1/captions/${encodeURIComponent(videoId)}?label=${encodeURIComponent(track.label)}`);
-                        if (capRes.ok) {
-                            const vtt = await capRes.text();
-                            const text = this._parseVttToText(vtt);
-                            const out = clean(text);
-                            if (out && out.length > 120) return out;
-                        }
+                attempts++;
+                if (!listRes.ok) {
+                    if (listRes.status === 429) break; // don't spam on rate limit
+                    continue;
+                }
+                const txt = await listRes.text();
+                let list = null; try { list = JSON.parse(txt); } catch {}
+                const track = Array.isArray(list) ? (list.find(t => /english/i.test(t?.label || '')) || list[0]) : null;
+                if (track && track.label) {
+                    const capRes = await this._proxyFetch(`https://${h}/api/v1/captions/${encodeURIComponent(videoId)}?label=${encodeURIComponent(track.label)}`);
+                    attempts++;
+                    if (!capRes.ok) {
+                        if (capRes.status === 429) break;
+                        continue;
                     }
+                    const vtt = await capRes.text();
+                    const text = this._parseVttToText(vtt);
+                    const out = clean(text);
+                    if (out && out.length > 120) return out;
                 }
             } catch {}
+            await this._sleep(120);
+            if (attempts >= 4) break;
         }
         return '';
     }

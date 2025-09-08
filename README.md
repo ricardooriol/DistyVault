@@ -13,6 +13,10 @@ DistyVault is a local-first web app to capture URLs, YouTube videos/playlists, a
 - Use the table to monitor status, open content, view logs, download PDFs, retry, or delete
 
 ### Configuration
+### Notes
+• YouTube fetching is proxy-only by default to avoid 451/429 noise. LangChain’s YouTube loader is opt-in (Settings → Enable LangChain YouTube transcript loader).
+• PDFs are generated client-side with proper formatting; downloads are cached for speed.
+
 - AI settings are stored locally in the browser (LocalStorage) and mirrored in-memory in the app
 - Online providers require an API key; nothing is sent to a backend by default
 

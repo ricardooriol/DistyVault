@@ -9,6 +9,17 @@
         <link rel="dns-prefetch" href="https://fonts.googleapis.com">
         <link rel="dns-prefetch" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <script>
+            // Quiet specific console warnings to keep single-file setup clean (no build step)
+            (function(){
+                const warn = console.warn.bind(console);
+                const filt = [/cdn\.tailwindcss\.com should not be used in production/i, /in-browser Babel transformer/i];
+                console.warn = function(...args){
+                    try { const s = args.map(a=>String(a)).join(' '); if (filt.some(rx => rx.test(s))) return; } catch {}
+                    warn(...args);
+                };
+            })();
+        </script>
         <!-- TailwindCSS Play CDN for zero-build styling -->
             <script src="https://cdn.tailwindcss.com"></script>
             <script>
