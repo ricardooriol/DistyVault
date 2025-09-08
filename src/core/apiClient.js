@@ -462,24 +462,30 @@ class ApiClient {
             try {
                 const videos = await this._expandYouTubePlaylist(url);
                 if (Array.isArray(videos) && videos.length > 0) {
-            // Create rows and queue processing for each video
-            try { window.app?.showTemporaryMessage(`Queued ${videos.length} videos from playlist`, 'info'); } catch {}
+                    // Schedule processing for each video; create the row only when its slot starts
+                    try { window.app?.showTemporaryMessage(`Processing ${videos.length} videos sequentially…`, 'info'); } catch {}
                     for (const v of videos) {
-                        try {
-                            // Prefetch title best-effort
-                            let title = this._titleFromUrl(v);
-                            try { const t = await this._prefetchTitle(v, 1600); if (t) title = t.trim(); } catch {}
-                const dist = this._createDistillation({ sourceUrl: v, sourceType: 'youtube', title });
-                dist.processingStep = 'Queued from playlist';
-                            await this.db.saveDistillation(dist);
-                            try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
-                // Queue immediately respecting concurrency
-                this._runWithLimit(() => this._processUrlPipeline(dist.id, v)).catch(() => {});
-                        } catch {}
-                        // Tiny yield for UI responsiveness
-                        await new Promise(r => setTimeout(r, 10));
+                        // Enqueue a task that will create the item at start time and immediately begin extraction
+                        this._runWithLimit(async () => {
+                            try {
+                                // Prefetch title best-effort
+                                let title = this._titleFromUrl(v);
+                                try { const t = await this._prefetchTitle(v, 1600); if (t) title = t.trim(); } catch {}
+                                // Create distillation row at the moment this task starts so it's not stuck in QUEUED state
+                                const dist = this._createDistillation({ sourceUrl: v, sourceType: 'youtube', title });
+                                dist.status = 'extracting';
+                                dist.processingStep = 'Extracting content...';
+                                dist.startTime = new Date();
+                                await this.db.saveDistillation(dist);
+                                try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
+                                // Run the pipeline for this video URL
+                                await this._processUrlPipeline(dist.id, v);
+                            } catch {}
+                        }).catch(() => {});
+                        // Tiny yield to keep UI responsive between enqueues
+                        await new Promise(r => setTimeout(r, 5));
                     }
-                    return { status: 'added', count: videos.length };
+                    return { status: 'scheduled', count: videos.length };
                 }
                 throw new Error('Playlist has no public videos or could not be expanded.');
             } catch (e) {

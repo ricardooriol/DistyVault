@@ -156,6 +156,34 @@ class AIService {
     }
 
     async distillWithOpenAI(prompt) {
+        // Prefer LangChain in-browser; no server required
+        try {
+            const [{ ChatOpenAI }, { ChatPromptTemplate }, { StringOutputParser }] = await Promise.all([
+                import('https://esm.sh/@langchain/openai@0.3.11'),
+                import('https://esm.sh/@langchain/core@0.2.34/prompts'),
+                import('https://esm.sh/@langchain/core@0.2.34/output_parsers')
+            ]);
+
+            const llm = new ChatOpenAI({
+                apiKey: this.config.apiKey,
+                model: this.config.model || 'gpt-4o-mini',
+                temperature: 0,
+                maxTokens: 2000,
+                // Required for browser usage
+                dangerouslyAllowBrowser: true
+            });
+            const tmpl = ChatPromptTemplate.fromMessages([
+                ['user', '{input}']
+            ]);
+            const chain = tmpl.pipe(llm).pipe(new StringOutputParser());
+            const result = await chain.invoke({ input: prompt });
+            if (result && typeof result === 'string') return result;
+            // Fallback to native call if empty
+        } catch (e) {
+            // Swallow and try native API below
+        }
+
+        // Fallback: native REST call (kept for resilience, still client-only)
         try {
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -166,10 +194,7 @@ class AIService {
                 body: JSON.stringify({
                     model: this.config.model || 'gpt-4o',
                     messages: [
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
+                        { role: 'user', content: prompt }
                     ],
                     max_tokens: 2000
                 })
