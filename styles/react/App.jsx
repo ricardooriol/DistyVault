@@ -956,22 +956,30 @@ function App() {
         </div>
       </div>
 
-      {/* Table (resizable, fewer columns) */}
-      <KBTable
-        items={visibleItems}
-        selected={selected}
-        toggle={toggle}
-        sort={sort}
-        onChangeSort={onChangeSort}
-        onToggleAll={() => {
-          const allIds = new Set(visibleItems.map(x => x.id));
-          const allSelected = visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id));
-          setSelected(allSelected ? new Set() : allIds);
-        }}
-        allChecked={visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id))}
-        onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
-  onErrorClick={async (it) => { const item = await api.getSummary(it.id); setErrorItem(item); }}
-      />
+      {/* Table or Empty State */}
+      {items.length === 0 ? (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
+            <div className="text-sm text-zinc-600 dark:text-zinc-300">Paste a URL or upload a document to start</div>
+          </div>
+        </div>
+      ) : (
+        <KBTable
+          items={visibleItems}
+          selected={selected}
+          toggle={toggle}
+          sort={sort}
+          onChangeSort={onChangeSort}
+          onToggleAll={() => {
+            const allIds = new Set(visibleItems.map(x => x.id));
+            const allSelected = visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id));
+            setSelected(allSelected ? new Set() : allIds);
+          }}
+          allChecked={visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id))}
+          onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
+          onErrorClick={async (it) => { const item = await api.getSummary(it.id); setErrorItem(item); }}
+        />
+      )}
 
       <div className="h-12" />
       <div className="fixed inset-x-0 bottom-0 z-10">
