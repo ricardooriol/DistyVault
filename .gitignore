@@ -1,14 +1,7 @@
 # Dependencies
 node_modules/
 
-# Old Sawron working code for referencing
-oldCode.txt
-
-# Databases and data
-backend/data
-uploads/
-
-# Logs
+#Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,3 +24,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+old_code/
