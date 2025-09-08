@@ -391,12 +391,12 @@ function Modal({ open, onClose, title, children, wide }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={(wide ? 'max-w-4xl' : 'max-w-2xl') + ' relative w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl animate-inScale'}>
+  <div className={(wide ? 'max-w-4xl' : 'max-w-2xl') + ' relative w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl animate-inScale'}>
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">✕</button>
         </div>
-        <div className="p-4 max-h-[70vh] overflow-auto">{children}</div>
+  <div className="p-4 max-h-[70vh] overflow-auto">{children}</div>
       </div>
     </div>
   );
@@ -536,7 +536,7 @@ function SettingsSheet({ open, onClose, api }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm">Ollama model</label>
-                  <input value={settings.offline?.model || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, model: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="llama3" />
+                  <input value={settings.offline?.model || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, model: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="Enter a model name" />
                 </div>
                 <div>
                   <label className="text-sm">Ollama endpoint</label>
@@ -646,7 +646,9 @@ function ContentModal({ open, onClose, item }) {
             <div><span className="font-medium">Processing:</span> {formatDuration(item)}</div>
           </div>
           <article className="prose dark:prose-invert max-w-none">
-            {item.content || 'No content available'}
+            {item.content
+              ? <div dangerouslySetInnerHTML={{ __html: item.content }} />
+              : 'No content available'}
           </article>
         </div>
       )}
@@ -688,10 +690,10 @@ function App() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
-  // sorting: default by createdAt desc; persisted in localStorage
+  // sorting: default by queue date (custom) so new/retried items go to the bottom; persisted in localStorage
   const [sort, setSort] = useState(() => {
     try { const s = JSON.parse(localStorage.getItem('dv-sort')||'null'); if (s && s.by && s.dir) return s; } catch {}
-    return { by: 'createdAt', dir: 'desc' };
+    return { by: 'queue', dir: 'asc' };
   });
   const [selected, setSelected] = useState(new Set());
   const [toast, setToast] = useState('');
@@ -732,17 +734,43 @@ function App() {
         const c = an.localeCompare(bn);
         return sort.dir === 'asc' ? c : -c;
       });
-    } else {
-      if (sort.by === 'createdAt') {
-        arr.sort((a,b) => (sort.dir === 'asc' ? 1 : -1) * (new Date(a.createdAt) - new Date(b.createdAt)));
-      } else if (sort.by === 'status') {
-        arr.sort((a,b) => {
-          const as = String(a.status||'').toLowerCase();
-          const bs = String(b.status||'').toLowerCase();
-          const c = as.localeCompare(bs);
+    } else if (sort.by === 'status') {
+      arr.sort((a,b) => {
+        const as = String(a.status||'').toLowerCase();
+        const bs = String(b.status||'').toLowerCase();
+        const c = as.localeCompare(bs);
+        return sort.dir === 'asc' ? c : -c;
+      });
+    } else if (sort.by === 'createdAt') {
+      arr.sort((a,b) => (sort.dir === 'asc' ? 1 : -1) * (new Date(a.createdAt) - new Date(b.createdAt)));
+    } else if (sort.by === 'queue') {
+      // Custom queue-aware ordering:
+      // 1) Completed and Error first (rank 0 and 1)
+      // 2) Active/waiting (pending/extracting/distilling/queued) by lastQueuedAt/createdAt ASC (oldest first)
+      const rank = (s) => {
+        const t = String(s||'').toLowerCase();
+        if (t === 'completed') return 0;
+        if (t === 'error') return 1;
+        if (['pending','queued','extracting','distilling'].includes(t)) return 2;
+        return 3;
+      };
+      arr.sort((a,b) => {
+        const ra = rank(a.status); const rb = rank(b.status);
+        if (ra !== rb) return (sort.dir === 'asc' ? 1 : -1) * (ra - rb);
+        // Same rank: apply secondary sort
+        if (ra <= 1) {
+          // Completed/Error: newest first
+          const ta = new Date(a.completedAt || a.updatedAt || a.createdAt || 0).getTime();
+          const tb = new Date(b.completedAt || b.updatedAt || b.createdAt || 0).getTime();
+          const c = tb - ta;
           return sort.dir === 'asc' ? c : -c;
-        });
-      }
+        }
+        // Active/waiting: oldest queued first
+        const qa = new Date(a.lastQueuedAt || a.createdAt || 0).getTime();
+        const qb = new Date(b.lastQueuedAt || b.createdAt || 0).getTime();
+        const c = qa - qb;
+        return sort.dir === 'asc' ? c : -c;
+      });
     }
     return arr;
   }, [filtered, sort]);
@@ -791,6 +819,7 @@ function App() {
 
   // Stats
   const total = items.length;
+  const completed = items.filter(it => String(it.status||'').toLowerCase()==='completed').length;
   const inProgress = items.filter(it => ['pending','extracting','distilling'].includes(String(it.status||'').toLowerCase())).length;
   const errors = items.filter(it => String(it.status||'').toLowerCase()==='error').length;
 
@@ -803,10 +832,10 @@ function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-zinc-500">Total</div>
-              <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{total}</div>
+              <div className="text-[11px] uppercase tracking-wide text-zinc-500">Completed</div>
+              <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{completed}</div>
             </div>
-            <button onClick={async ()=>{ if (items.length) { await api.bulkDownload(items.map(i=>i.id)); setToast('Downloads started'); setTimeout(()=>setToast(''),2000); } }} className="text-xs rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Download all</button>
+            <button onClick={async ()=>{ const ids = items.filter(it=>String(it.status||'').toLowerCase()==='completed').map(i=>i.id); if (ids.length) { await api.bulkDownload(ids, { zip: true }); setToast('ZIP download started'); setTimeout(()=>setToast(''),2000); } }} className="text-xs rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">Download all</button>
           </div>
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between">
             <div>
@@ -825,7 +854,7 @@ function App() {
         </div>
       </div>
 
-      {/* Command bar with search toggle and export */}
+      {/* Command bar with search toggle (left) and export/import (right) */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -841,17 +870,16 @@ function App() {
                   <button key={opt.k} onClick={() => setType(opt.k)} className={(type===opt.k ? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'px-3 py-1.5 rounded text-sm'}>{opt.label}</button>
                 ))}
               </div>
-              <div className="relative inline-flex items-center gap-2">
-                <button onClick={async ()=>{ await api.exportKnowledgeBase(); setToast('Export started'); setTimeout(()=>setToast(''),2000); }} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Export knowledge base">
-                  {Icon.download()} <span className="hidden sm:inline">Export</span>
-                </button>
-                <label className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer" title="Import knowledge base">
-                  {Icon.upload()} <span className="hidden sm:inline">Import</span>
-                  <input type="file" accept=".zip" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) { await api.importKnowledgeBase(f, { clearExisting: confirm('Clear existing items first?') }); const data = await api.getSummaries(); setItems(data); setToast('Import completed'); setTimeout(()=>setToast(''),2000); } e.target.value = ''; }} />
-                </label>
-              </div>
             </div>
-            <div className="hidden" />
+            <div className="shrink-0 flex items-center gap-2">
+              <button onClick={async ()=>{ await api.exportKnowledgeBase(); setToast('Export started'); setTimeout(()=>setToast(''),2000); }} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Export knowledge base">
+                {Icon.download()} <span className="hidden sm:inline">Export</span>
+              </button>
+              <label className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer" title="Import knowledge base">
+                {Icon.upload()} <span className="hidden sm:inline">Import</span>
+                <input type="file" accept=".zip" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) { await api.importKnowledgeBase(f, { clearExisting: confirm('Clear existing items first?') }); const data = await api.getSummaries(); setItems(data); setToast('Import completed'); setTimeout(()=>setToast(''),2000); } e.target.value = ''; }} />
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -879,7 +907,7 @@ function App() {
         count={selected.size}
         total={visibleItems.length}
         onRetry={async () => { for (const id of selected) { try { await api.retryDistillation(id); } catch {} } setToast('Retry queued'); setTimeout(()=>setToast(''),2000); }}
-        onDownload={async () => { await api.bulkDownload(Array.from(selected)); setToast('Downloads started'); setTimeout(()=>setToast(''),2000); }}
+  onDownload={async () => { await api.bulkDownload(Array.from(selected), { zip: true }); setToast('ZIP download started'); setTimeout(()=>setToast(''),2000); }}
         onDelete={async () => { await api.bulkDelete(Array.from(selected)); setSelected(new Set()); const data = await api.getSummaries(); setItems(data); setToast('Deleted'); setTimeout(()=>setToast(''),2000); }}
         onSelectAll={() => setSelected(new Set(visibleItems.map(x => x.id)))}
         onViewSingle={async () => {
