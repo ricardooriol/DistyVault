@@ -277,17 +277,16 @@
             return this.saveDistillation(item);
         }
 
-        /** Append a log entry to a distillation */
+        /** Append a log entry to a distillation (only store error-level logs) */
         async addLog(id, message, level = 'info', data = null) {
+            // Only persist logs for failures
+            if (String(level).toLowerCase() !== 'error') return true;
             const item = await this.getDistillation(id);
             if (!item) return false;
-            const entry = {
-                timestamp: new Date(),
-                level,
-                message,
-                data: data || undefined
-            };
+            const entry = { timestamp: new Date(), level: 'error', message, data: data || undefined };
             item.logs = Array.isArray(item.logs) ? [...item.logs, entry] : [entry];
+            // Also mirror the latest error message for quick access
+            try { item.error = message; } catch {}
             return this.saveDistillation(item);
         }
 

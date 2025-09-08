@@ -125,24 +125,27 @@ function StatBadge({ label, value, tone='zinc' }) {
 
 function CapturePanel({ api, onQueued }) {
   const [url, setUrl] = useState('');
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]); // support multiple files
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef();
   const [busy, setBusy] = useState(false);
 
-  const canSubmit = (url && url.trim().length > 0) || !!file;
+  const canSubmit = (url && url.trim().length > 0) || (files && files.length > 0);
 
   const submit = async () => {
     if (!canSubmit || busy) return;
     setBusy(true);
     try {
-      if (file) {
-        await api.processFile(file);
+      if (files && files.length > 0) {
+        // Process sequentially to respect client concurrency logic
+        for (const f of files) {
+          try { await api.processFile(f); } catch (e) { alert(e?.message || `Failed for ${f?.name || 'file'}`); }
+        }
       } else if (url) {
         await api.processUrl(url.trim());
       }
       setUrl('');
-      setFile(null);
+      setFiles([]);
       onQueued?.();
     } catch (e) {
       console.error(e);
@@ -160,14 +163,22 @@ function CapturePanel({ api, onQueued }) {
           onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const list = Array.from(e.dataTransfer.files || []).filter(Boolean);
+            if (list.length > 0) {
+              setFiles(list);
+              setUrl('');
+            }
+          }}
         >
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
             <div className="relative flex-[2] min-w-0 text-zinc-900 dark:text-zinc-100">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">{Icon.link()}</span>
               <input
                 value={url}
-                onChange={e => { setUrl(e.target.value); if (file) setFile(null); }}
+                onChange={e => { setUrl(e.target.value); if (files.length) setFiles([]); }}
                 placeholder="Paste any URL"
                 className="w-full pl-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-brand"
               />
@@ -177,19 +188,36 @@ function CapturePanel({ api, onQueued }) {
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.doc,.docx,.txt"
+                multiple
                 className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
+                onChange={e => {
+                  const list = Array.from(e.target.files || []).filter(Boolean);
+                  if (list.length) { setFiles(list); setUrl(''); }
+                  // reset input so re-selecting same file(s) triggers change
+                  try { e.target.value = ''; } catch {}
+                }}
               />
-              <button onClick={() => fileInputRef.current?.click()} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-2" aria-label="Choose/drop file">{Icon.file()} Choose/drop file</button>
+              <button onClick={() => fileInputRef.current?.click()} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-2" aria-label="Choose/drop files">{Icon.file()} Choose/drop files</button>
               <button onClick={submit} disabled={!canSubmit || busy} className={(canSubmit && !busy ? 'bg-brand text-white hover:opacity-95' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 cursor-not-allowed') + ' w-full rounded-lg px-6 md:px-7 py-2.5 text-sm font-medium'}>
-                {busy ? 'Queueing…' : 'Distill'}
+                {busy ? (files.length > 1 ? 'Queueing files…' : 'Queueing…') : 'Distill'}
               </button>
             </div>
           </div>
-          {(file) && (
-            <div className="mt-3 flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-              <div className="truncate">📄 {file.name}</div>
-              <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
+          {(files && files.length > 0) && (
+            <div className="mt-3 rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+              <div className="mb-1 font-medium">{files.length} file{files.length>1?'s':''} selected</div>
+              <ul className="max-h-32 overflow-auto space-y-1">
+                {files.slice(0, 5).map((f, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <div className="truncate">📄 {f.name}</div>
+                    <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
+                  </li>
+                ))}
+                {files.length > 5 && (
+                  <li className="text-zinc-500">+ {files.length - 5} more…</li>
+                )}
+              </ul>
+              <div className="mt-2 text-xs text-zinc-500">Uploading processes sequentially.</div>
             </div>
           )}
         </div>
@@ -281,7 +309,7 @@ function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAl
   );
 }
 
-function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked, onResetSort }) {
+function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked, onResetSort, onErrorClick }) {
   // Fixed layout: checkbox column fixed, then Name 60%, Status 20%, Duration 20%
 
   const SortIcon = ({ active, dir }) => (
@@ -331,10 +359,11 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                   <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate" title={it.title || 'Untitled'}>{it.title || 'Untitled'}</div>
                 </td>
                 <td className="px-2 py-3 text-sm text-center align-middle">
-                  <span className={
+                  <span onClick={() => { if (String(it.status||'').toLowerCase()==='error') onErrorClick?.(it); }}
+                    className={
                     'inline-flex items-center justify-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
                     (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                     it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                     it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 cursor-pointer underline decoration-transparent hover:decoration-current' :
                      it.status === 'distilling' || it.status === 'extracting' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
                      it.status === 'pending' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300')
                   }>
@@ -364,6 +393,23 @@ function Modal({ open, onClose, title, children, wide }) {
   <div className="p-4 max-h-[70vh] overflow-auto">{children}</div>
       </div>
     </div>
+  );
+}
+
+function ErrorModal({ open, onClose, item }) {
+  if (!open || !item) return null;
+  const latestError = (() => {
+    if (item.error && String(item.error).trim()) return String(item.error);
+    const logs = Array.isArray(item.logs) ? item.logs : [];
+    const lastErr = [...logs].reverse().find(l => String(l.level||'').toLowerCase()==='error' && l.message);
+    return lastErr?.message || 'An error occurred.';
+  })();
+  return (
+    <Modal open={open} onClose={onClose} title="Error">
+      <div className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
+        {latestError}
+      </div>
+    </Modal>
   );
 }
 
@@ -696,6 +742,7 @@ function App() {
   const [toast, setToast] = useState('');
   const [contentItem, setContentItem] = useState(null);
   const [logsItem, setLogsItem] = useState(null);
+  const [errorItem, setErrorItem] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
   // Load and poll
@@ -827,6 +874,7 @@ function App() {
     const item = await api.getSummary(it.id);
     if (kind === 'content') setContentItem(item);
     if (kind === 'logs') setLogsItem(item);
+    if (kind === 'error') setErrorItem(item);
   };
   const download = async (id) => { try { await api.downloadPdf(id); } catch (e) { alert(e?.message||'Download failed'); } };
   const del = async (id) => { await api.deleteSummary(id); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); await refresh(); };
@@ -923,6 +971,7 @@ function App() {
         }}
         allChecked={visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id))}
         onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
+  onErrorClick={async (it) => { const item = await api.getSummary(it.id); setErrorItem(item); }}
       />
 
       <div className="h-12" />
@@ -934,7 +983,8 @@ function App() {
 
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
       <LogsModal open={!!logsItem} onClose={() => setLogsItem(null)} item={logsItem} />
-      <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} api={api} />
+  <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} api={api} />
+  <ErrorModal open={!!errorItem} onClose={() => setErrorItem(null)} item={errorItem} />
       <StatusToast message={toast} />
       <SelectionDock
         count={selected.size}
