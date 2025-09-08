@@ -959,7 +959,7 @@ function App() {
       {/* Table or Empty State */}
       {items.length === 0 ? (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3">
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft p-3 md:p-4 flex flex-col gap-3 max-w-md mx-auto items-center text-center">
             <div className="text-sm text-zinc-600 dark:text-zinc-300">Paste a URL or upload a document to start</div>
           </div>
         </div>
