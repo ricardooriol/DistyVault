@@ -367,22 +367,10 @@ ${text}`;
                     processed = NumberingProcessor.emergencyHTMLFormat(rawDistillation);
                 }
             }
-            // Emphasize main sentences when they end with a colon pattern like "Main point:"
-            try {
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = processed;
-                wrapper.querySelectorAll('ol > li').forEach(li => {
-                    const text = li.textContent || '';
-                    const firstLine = text.split('\n')[0] || '';
-                    const colonIdx = firstLine.indexOf(':');
-                    if (colonIdx > 0 && colonIdx < 140) {
-                        const bold = firstLine.slice(0, colonIdx + 1);
-                        const rest = firstLine.slice(colonIdx + 1);
-                        li.innerHTML = `<strong>${bold}</strong>${rest}${li.innerHTML.slice(firstLine.length)}`;
-                    }
-                });
-                processed = wrapper.innerHTML;
-            } catch {}
+            // Final sanitize and enforce allowed tags
+            if (window.NumberingProcessor) {
+                processed = NumberingProcessor.sanitizeHTML(processed);
+            }
             return processed;
         } catch (e) {
             try { return NumberingProcessor.emergencyHTMLFormat(rawDistillation); } catch { return rawDistillation; }

@@ -612,8 +612,8 @@ function SettingsSheet({ open, onClose, api }) {
           )}
 
           <div>
-            <label className="text-sm">Simultaneous processings</label>
-            <div className="mt-2 inline-flex items-center gap-3">
+            <label className="block text-sm mb-1">Simultaneous processings</label>
+            <div className="mt-1 inline-flex items-center gap-3">
               <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
               <div className="min-w-[2.5rem] text-center text-sm text-zinc-800 dark:text-zinc-100">{settings.concurrentProcessing || 1}</div>
               <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>

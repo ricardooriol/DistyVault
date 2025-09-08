@@ -105,6 +105,8 @@
     <!-- Core Services required for ApiClient (EventBus, DB, AI) -->
     <script src="src/core/eventBus.js"></script>
     <script src="src/core/database.js"></script>
+    <!-- Ensure processors are available before AI modules -->
+    <script src="src/processors/numberingProcessor.js"></script>
     <script src="src/ai/aiProvider.js"></script>
     <script src="src/ai/providers/openAI.js"></script>
     <script src="src/ai/providers/anthropic.js"></script>

@@ -369,8 +369,8 @@ class ApiClient {
 
     /** Bulk download: sequentially trigger PDF downloads for given ids */
     async bulkDownload(ids, options = {}) {
-        // If requested, package into a single ZIP
-        if (options && options.zip === true) {
+        // If more than one id is provided, package into a single ZIP by default
+        if (Array.isArray(ids) && ids.length > 1) {
             return this._bulkDownloadAsZip(ids, options);
         }
         let count = 0;
