@@ -683,9 +683,11 @@ class ApiClient {
                 await this.db.addLog(id, 'Processing interrupted; re-queued', 'warn', { message: e?.message || String(e) });
                 this._runWithLimit(async () => { await this._processUrlPipeline(id, url); }).catch(() => {});
             } else {
-                await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+                // Use the most descriptive message available
+                const friendlyMsg = e?.message || (typeof e === 'string' ? e : 'Processing failed');
+                await this.db.updateDistillationStatus(id, 'error', friendlyMsg);
                 try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
-                await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+                await this.db.addLog(id, friendlyMsg, 'error', { message: e?.message || String(e) });
             }
         }
     }
@@ -880,9 +882,10 @@ class ApiClient {
                 await this.db.addLog(id, 'Processing interrupted; re-queued', 'warn', { message: e?.message || String(e) });
                 this._runWithLimit(async () => { await this._processFilePipeline(id, file); }).catch(() => {});
             } else {
-                await this.db.updateDistillationStatus(id, 'error', e?.message || 'Processing failed');
+                const friendlyMsg = e?.message || (typeof e === 'string' ? e : 'Processing failed');
+                await this.db.updateDistillationStatus(id, 'error', friendlyMsg);
                 try { const itErr = await this.db.getDistillation(id); window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, itErr); } catch {}
-                await this.db.addLog(id, 'Processing error', 'error', { message: e?.message || String(e) });
+                await this.db.addLog(id, friendlyMsg, 'error', { message: e?.message || String(e) });
             }
         }
     }

@@ -80,7 +80,7 @@ class AIService {
 
     async distillWithOllama(content) {
         if (!this.config.ollamaEndpoint || !this.config.ollamaModel) {
-            throw new Error('Ollama configuration is incomplete');
+            throw new Error('Ollama settings are incomplete. Provide an HTTPS-accessible endpoint and model in Settings.');
         }
 
         // Prevent mixed-content request from HTTPS app to HTTP endpoint
@@ -138,7 +138,7 @@ class AIService {
 
     async distillWithProvider(content) {
         if (!this.config.provider || !this.config.apiKey) {
-            throw new Error('AI provider configuration is incomplete');
+            throw new Error('AI provider configuration is incomplete. Please configure your provider and API key in Settings.');
         }
 
     const prompt = this.buildDistillationPrompt(content);
@@ -178,6 +178,9 @@ class AIService {
             if (!response.ok) {
                 let msg = `OpenAI API error: HTTP ${response.status}`;
                 try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                if (response.status === 401) msg = 'Invalid OpenAI API key. Please check your API key in Settings.';
+                else if (response.status === 429) msg = 'OpenAI API rate limit exceeded. Please wait and try again.';
+                else if (response.status === 403) msg = 'OpenAI access denied. Your API key may not have the required permissions.';
                 const err = new Error(msg);
                 err.status = response.status;
                 err.provider = 'openai';
@@ -218,6 +221,10 @@ class AIService {
             if (!response.ok) {
                 let msg = `Anthropic API error: HTTP ${response.status}`;
                 try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                if (response.status === 401) msg = 'Invalid Anthropic API key. Please check your API key in Settings.';
+                else if (response.status === 429) msg = 'Anthropic API rate limit exceeded. Please wait and try again.';
+                else if (response.status === 400) msg = msg || 'Anthropic invalid request. Check model and parameters.';
+                else if (response.status === 403) msg = 'Anthropic access denied. Your API key may not have the required permissions.';
                 const err = new Error(msg);
                 err.status = response.status;
                 err.provider = 'anthropic';
@@ -257,6 +264,10 @@ class AIService {
             if (!response.ok) {
                 let msg = `Gemini API error: HTTP ${response.status}`;
                 try { const j = await response.json(); if (j?.error?.message) msg = j.error.message; } catch {}
+                if (response.status === 401) msg = 'Invalid Google AI Studio API key. Please check your API key in Settings.';
+                else if (response.status === 403) msg = 'Google AI access denied. Your API key may be invalid or lacks permissions.';
+                else if (response.status === 429) msg = 'Gemini API rate limit exceeded. Please wait and try again.';
+                else if (response.status === 400) msg = msg || 'Gemini invalid request. Check model and parameters.';
                 const err = new Error(msg);
                 err.status = response.status;
                 err.provider = 'google';

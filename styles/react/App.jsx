@@ -217,7 +217,6 @@ function CapturePanel({ api, onQueued }) {
                   <li className="text-zinc-500">+ {files.length - 5} more…</li>
                 )}
               </ul>
-              <div className="mt-2 text-xs text-zinc-500">Uploading processes sequentially.</div>
             </div>
           )}
         </div>
