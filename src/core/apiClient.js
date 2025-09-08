@@ -477,8 +477,13 @@ class ApiClient {
             }
         }
     // Create tracking distillation for non-playlist URLs
-    // Use a neutral placeholder so the table doesn't display URL path fragments like 'watch'
-    const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: 'Processing...' });
+    // Prefetch a best-effort title (especially for YouTube) so the UI shows the correct name while processing
+    let preTitle = this._titleFromUrl(url);
+    try {
+        const t = await this._prefetchTitle(url, 1800);
+        if (t && typeof t === 'string') preTitle = t.trim();
+    } catch {}
+    const dist = this._createDistillation({ sourceUrl: url, sourceType: this._detectUrlType(url), title: preTitle });
     await this.db.saveDistillation(dist);
     // Optimistic UI: push immediately if eventBus exists
     try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
@@ -709,23 +714,112 @@ class ApiClient {
         const m = String(u).match(/[?&]list=([a-zA-Z0-9_-]+)/);
         return m ? m[1] : null;
     }
+    _extractYouTubeVideoId(u) {
+        try {
+            const s = String(u);
+            const m1 = s.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+            if (m1) return m1[1];
+            const uobj = new URL(s);
+            // youtu.be/<id>
+            const pathId = uobj.hostname.includes('youtu.be') ? (uobj.pathname.split('/').filter(Boolean)[0] || '') : '';
+            if (/^[a-zA-Z0-9_-]{11}$/.test(pathId)) return pathId;
+            const em = s.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+            if (em) return em[1];
+        } catch {}
+        return null;
+    }
+    async _prefetchTitle(url, timeoutMs = 1500) {
+        // For YouTube videos, prefer oEmbed then privacy-friendly backends
+        if (this._isYouTubeUrl(url) && !this._isYouTubePlaylist(url)) {
+            const videoId = this._extractYouTubeVideoId(url);
+            const oembed = async () => {
+                try {
+                    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+                    let res = await fetch(oembedUrl);
+                    if (!res.ok) {
+                        res = await fetch(`https://r.jina.ai/${oembedUrl}`);
+                    }
+                    if (res.ok) {
+                        const txt = await res.text();
+                        const data = JSON.parse(txt);
+                        return data?.title || null;
+                    }
+                } catch {}
+                return null;
+            };
+            const invTitle = async () => {
+                // Invidious-compatible instances often allow CORS
+                const endpoints = [
+                    videoId ? `https://yewtu.be/api/v1/videos/${videoId}` : null,
+                    videoId ? `https://piped.video/api/v1/video/${videoId}` : null
+                ].filter(Boolean);
+                for (const ep of endpoints) {
+                    try {
+                        const res = await fetch(ep);
+                        if (res.ok) {
+                            const j = await res.json();
+                            const t = j?.title || j?.videoTitle || null;
+                            if (t) return t;
+                        }
+                    } catch {}
+                }
+                return null;
+            };
+
+            try {
+                return await Promise.race([
+                    (async () => (await oembed()) || (await invTitle()))(),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), Math.max(500, timeoutMs)))
+                ]);
+            } catch {}
+        }
+        // Generic fallback: derive from URL
+        return this._titleFromUrl(url);
+    }
     async _expandYouTubePlaylist(playlistUrl) {
         const id = this._extractYouTubePlaylistId(playlistUrl);
         if (!id) return [];
-        // Use CORS-friendly proxy to fetch playlist page content
-        const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
-        const proxy = `https://r.jina.ai/${target}`;
-        const res = await fetch(proxy, { method: 'GET' });
-        if (!res.ok) return [];
-        const html = await res.text();
-        // Extract video IDs via robust patterns
-        const idMatches = [];
-        const m1 = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g) || [];
-        for (const m of m1) { const mm = m.match(/"videoId":"([a-zA-Z0-9_-]{11})"/); if (mm) idMatches.push(mm[1]); }
-        const m2 = html.match(/watch\?v=([a-zA-Z0-9_-]{11})/g) || [];
-        for (const m of m2) { const mm = m.match(/watch\?v=([a-zA-Z0-9_-]{11})/); if (mm) idMatches.push(mm[1]); }
-        const unique = Array.from(new Set(idMatches));
-        return unique.map(v => `https://www.youtube.com/watch?v=${v}`);
+        // Prefer privacy-friendly JSON APIs that allow CORS; fall back to HTML scraping via proxy
+        // 1) Piped
+        try {
+            const resPiped = await fetch(`https://piped.video/api/playlist/${encodeURIComponent(id)}`);
+            if (resPiped.ok) {
+                const data = await resPiped.json();
+                const vids = (data?.relatedStreams || data?.videos || []).map(v => v?.url || v?.id || v?.videoId).filter(Boolean);
+                const ids = vids.map(v => {
+                    if (typeof v === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+                    const m = String(v).match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                    return m ? m[1] : null;
+                }).filter(Boolean);
+                if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+            }
+        } catch {}
+        // 2) Invidious
+        try {
+            const resInv = await fetch(`https://yewtu.be/api/v1/playlists/${encodeURIComponent(id)}`);
+            if (resInv.ok) {
+                const data = await resInv.json();
+                const vids = (data?.videos || []).map(v => v?.videoId || v?.id).filter(Boolean);
+                if (vids.length) return Array.from(new Set(vids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+            }
+        } catch {}
+        // 3) Fallback: proxy HTML scrape (may fail with 451 depending on region)
+        try {
+            const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
+            const proxy = `https://r.jina.ai/${target}`;
+            const res = await fetch(proxy, { method: 'GET' });
+            if (res.ok) {
+                const html = await res.text();
+                const idMatches = [];
+                const m1 = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g) || [];
+                for (const m of m1) { const mm = m.match(/"videoId":"([a-zA-Z0-9_-]{11})"/); if (mm) idMatches.push(mm[1]); }
+                const m2 = html.match(/watch\?v=([a-zA-Z0-9_-]{11})/g) || [];
+                for (const m of m2) { const mm = m.match(/watch\?v=([a-zA-Z0-9_-]{11})/); if (mm) idMatches.push(mm[1]); }
+                const unique = Array.from(new Set(idMatches));
+                if (unique.length) return unique.map(v => `https://www.youtube.com/watch?v=${v}`);
+            }
+        } catch {}
+        return [];
     }
 
     /**
@@ -737,6 +831,42 @@ class ApiClient {
         // Normalize URL
         let target = String(url || '').trim();
         if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
+        // If YouTube video: use APIs to get accurate title/description without scraping blocked pages
+        if (this._isYouTubeUrl(target) && !this._isYouTubePlaylist(target)) {
+            const videoId = this._extractYouTubeVideoId(target);
+            // Title from prefetch (oEmbed/alt backends)
+            let title = await this._prefetchTitle(target, 1600);
+            let description = '';
+            // Try Invidious first for description/text
+            if (videoId) {
+                const invEndpoints = [
+                    `https://yewtu.be/api/v1/videos/${videoId}`,
+                    `https://piped.video/api/v1/video/${videoId}`
+                ];
+                for (const ep of invEndpoints) {
+                    try {
+                        const r = await fetch(ep);
+                        if (r.ok) {
+                            const j = await r.json();
+                            description = j?.description || j?.shortDescription || description;
+                            if (!title) title = j?.title || j?.videoTitle || title;
+                            if (description || title) break;
+                        }
+                    } catch {}
+                }
+            }
+            const text = (description || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+            return {
+                text: text || `YouTube video: ${target}`,
+                title: (title || '').trim() || this._titleFromUrl(target),
+                contentType: 'youtube',
+                extractionMethod: 'youtube-api',
+                fallbackUsed: true,
+                metadata: { url: target, videoId }
+            };
+        }
+
+        // Generic pages via CORS-friendly proxy
         const proxyUrl = `https://r.jina.ai/${encodeURI(target)}`;
         const res = await fetch(proxyUrl, { method: 'GET' });
         if (!res.ok) {
