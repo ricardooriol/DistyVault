@@ -28,6 +28,18 @@ class ApiClient {
     this._pdfRenderInFlight = new Set();
     }
 
+    // Tiny sleep helper for gentle backoff between mirror attempts
+    _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Watchdog: wrap a promise with a timeout to avoid indefinite "Processing…" states
+    _withTimeout(promise, ms, label = 'operation') {
+        const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms));
+        return Promise.race([promise, timeout]);
+    }
+
+    // Feature flag: optionally enable LangChain YouTube loader (off by default to avoid CDN noise)
+    _lcEnabled() { try { return !!window.DV_ENABLE_LC; } catch { return false; } }
+
     // Helper
     async _json(res) {
         const ct = res.headers.get('Content-Type') || '';
@@ -107,7 +119,8 @@ class ApiClient {
             await this.db.updateDistillationStatus(id, 'distilling', 'Regenerating with AI');
             await this.db.addLog(id, 'Retry started');
             const raw = latest.rawContent || '';
-            const distilled = await this.ai.distillContent(raw, { id });
+            // Guard distillation with a watchdog timeout (defaults ~3 minutes)
+            const distilled = await this._withTimeout(this.ai.distillContent(raw, { id }), 180000, 'AI distillation');
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, raw, 0, wordCount);
             // Prepare PDF cache in the background for smooth downloads
@@ -702,7 +715,8 @@ class ApiClient {
             } catch {}
             await this.db.addLog(id, 'AI distillation started', 'info');
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
-            const distilled = await this.ai.distillContent(item.rawContent, { id });
+            // Guard distillation with a watchdog timeout to avoid indefinite locks
+            const distilled = await this._withTimeout(this.ai.distillContent(item.rawContent, { id }), 180000, 'AI distillation');
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
             // Prepare PDF cache in the background for smooth downloads
@@ -777,7 +791,6 @@ class ApiClient {
                 for (const ep of endpoints) {
                     try {
                         let res = await this._proxyFetch(ep);
-                        if (!res.ok && res.status !== 451) { try { res = await fetch(ep); } catch {} }
                         if (res.ok) {
                             const txt = await res.text();
                             const data = JSON.parse(txt);
@@ -807,6 +820,8 @@ class ApiClient {
                             if (t) return t;
                         }
                     } catch {}
+                    // gentle backoff before trying next mirror
+                    await this._sleep(80);
                 }
                 return null;
             };
@@ -826,17 +841,12 @@ class ApiClient {
     // LangChain helpers (browser ESM via CDN)
     // ----------
     async _ensureLangChainYouTube() {
+        if (!this._lcEnabled()) throw new Error('LangChain YouTube disabled');
         if (this._lcYoutubeLoaderFactory) return this._lcYoutubeLoaderFactory;
+        // Keep candidate list short to avoid noisy network errors
         const candidates = [
             'https://esm.sh/@langchain/community@0.2.31/document_loaders/web/youtube',
-            'https://esm.sh/@langchain/community/document_loaders/web/youtube',
-            'https://esm.run/@langchain/community@0.2.31/document_loaders/web/youtube',
-            'https://esm.run/@langchain/community/document_loaders/web/youtube',
-            'https://esm.sh/langchain@0.2.18/document_loaders/web/youtube',
-            'https://esm.sh/langchain@0.1.37/document_loaders/web/youtube',
-            // Fallbacks via CDN dist builds (may not exist; best-effort)
-            'https://cdn.jsdelivr.net/npm/@langchain/community@0.2.31/dist/document_loaders/web/youtube.js',
-            'https://unpkg.com/@langchain/community@0.2.31/dist/document_loaders/web/youtube.js'
+            'https://esm.run/@langchain/community@0.2.31/document_loaders/web/youtube'
         ];
         for (const url of candidates) {
             try {
@@ -853,6 +863,7 @@ class ApiClient {
 
     async _lcLoadYoutubeTranscript(videoUrlOrId) {
         try {
+            if (!this._lcEnabled()) throw new Error('LangChain YouTube disabled');
             const YoutubeLoader = await this._ensureLangChainYouTube();
             const url = this._normalizeYoutubeUrl(videoUrlOrId);
             const loader = (YoutubeLoader.createFromUrl ? YoutubeLoader.createFromUrl(url, { language: 'en', addVideoInfo: true }) : new YoutubeLoader(url, { language: 'en', addVideoInfo: true }));
@@ -868,6 +879,7 @@ class ApiClient {
 
     async _lcExpandPlaylistViaLC(playlistUrl) {
         try {
+            if (!this._lcEnabled()) throw new Error('LangChain YouTube disabled');
             const YoutubeLoader = await this._ensureLangChainYouTube();
             const inputUrl = this._normalizeYoutubeUrl(playlistUrl);
             const loader = (YoutubeLoader.createFromUrl ? YoutubeLoader.createFromUrl(inputUrl, { language: 'en', addVideoInfo: true }) : new YoutubeLoader(inputUrl, { language: 'en', addVideoInfo: true }));
@@ -902,8 +914,10 @@ class ApiClient {
         if (!id) return [];
         // 0) Prefer LangChain YouTube loader (client-only)
         try {
-            const list = await this._lcExpandPlaylistViaLC(playlistUrl);
-            if (Array.isArray(list) && list.length) return list;
+            if (this._lcEnabled()) {
+                const list = await this._lcExpandPlaylistViaLC(playlistUrl);
+                if (Array.isArray(list) && list.length) return list;
+            }
         } catch {}
         // 1) Privacy-friendly JSON APIs via proxy; then fallback to HTML scraping
         const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
@@ -927,6 +941,7 @@ class ApiClient {
                         }
                     }
                 } catch {}
+                await this._sleep(80);
             }
         }
     // 1b) Invidious APIs
@@ -943,6 +958,7 @@ class ApiClient {
                     }
                 }
             } catch {}
+            await this._sleep(80);
         }
     // 2) Fallback: proxy HTML scrape (may fail with 451 depending on region)
         try {
@@ -978,7 +994,7 @@ class ApiClient {
             let title = await this._prefetchTitle(target, 1600);
             // 0) LangChain transcript
             let transcript = '';
-            try { transcript = await this._lcLoadYoutubeTranscript(target); } catch {}
+            try { if (this._lcEnabled()) transcript = await this._lcLoadYoutubeTranscript(target); } catch {}
             if (videoId) {
                 if (!transcript || transcript.length < 120) {
                     try { transcript = await this._fetchYouTubeTranscript(videoId); } catch {}
@@ -1054,7 +1070,6 @@ class ApiClient {
                 try {
                     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target)}&format=json`;
                     let oRes = await this._proxyFetch(oembedUrl);
-                    if (!oRes.ok) { try { oRes = await fetch(oembedUrl); } catch {} }
                     if (oRes.ok) {
                         const txt = await oRes.text();
                         const data = JSON.parse(txt);
@@ -1227,7 +1242,8 @@ class ApiClient {
                 if (it2) window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_UPDATED, it2);
             } catch {}
             if (this._isCancelled(id)) { await this._markStopped(id); return; }
-            const distilled = await this.ai.distillContent(item.rawContent, { id });
+            // Guard distillation with a watchdog timeout to avoid indefinite locks
+            const distilled = await this._withTimeout(this.ai.distillContent(item.rawContent, { id }), 180000, 'AI distillation');
             const wordCount = (distilled || '').split(/\s+/).length;
             await this.db.updateDistillationContent(id, distilled, item.rawContent, 0, wordCount);
             // Prepare PDF cache in the background for smooth downloads
@@ -1467,7 +1483,7 @@ class ApiClient {
             .meta a { color: #0a66c2; text-decoration: none; }
             .meta a:hover { text-decoration: underline; }
             .divider { height: 2px; background: linear-gradient(90deg, #e5e7eb, #cbd5e1, #e5e7eb); border: 0; margin: 14px 0 20px; }
-            .content { font-size: 11pt; }
+            .content { font-size: 11pt; white-space: pre-wrap; }
             .content ol { padding-left: 1.2em; }
             .content li { margin: 6px 0; }
             .content b, .content strong { font-weight: 700; }
@@ -1495,7 +1511,7 @@ class ApiClient {
                     margin: [40, 40, 40, 40],
                     filename: `${this._safeFilename(item.title || 'distillation')}.pdf`,
                     image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900, logging: false },
                     jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
                 };
                 const worker = window.html2pdf().set(opt).from(target).toPdf();

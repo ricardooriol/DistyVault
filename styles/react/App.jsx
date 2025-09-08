@@ -437,6 +437,9 @@ function SettingsSheet({ open, onClose, api }) {
   const [connStatus, setConnStatus] = useState(null); // 'ok' | 'fail' | null
   const [offlineConnStatus, setOfflineConnStatus] = useState(null); // 'ok' | 'fail' | 'warn' | null
   const [offlineConnMsg, setOfflineConnMsg] = useState('');
+  const [enableLC, setEnableLC] = useState(() => {
+    try { return !!JSON.parse(localStorage.getItem('dv-enable-lc')||'false'); } catch { return false; }
+  });
 
   useEffect(() => { if (open) api.getAiSettings().then(setSettings); }, [open]);
 
@@ -465,7 +468,11 @@ function SettingsSheet({ open, onClose, api }) {
 
   const save = async () => {
     setSaving(true);
-    try { await api.saveAiSettings(settings); setToast('Saved'); setTimeout(()=>setToast(''),1500); onClose(); }
+    try {
+      await api.saveAiSettings(settings);
+      try { localStorage.setItem('dv-enable-lc', JSON.stringify(!!enableLC)); window.DV_ENABLE_LC = !!enableLC; } catch {}
+      setToast('Saved'); setTimeout(()=>setToast(''),1500); onClose();
+    }
     catch (e) { alert(e?.message || 'Failed'); }
     finally { setSaving(false); }
   };
@@ -591,6 +598,10 @@ function SettingsSheet({ open, onClose, api }) {
             </div>
           ) : (
     <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <input id="dv-lc-toggle" type="checkbox" checked={enableLC} onChange={(e)=>setEnableLC(e.target.checked)} />
+                <label htmlFor="dv-lc-toggle" className="text-sm">Enable LangChain YouTube transcript loader (experimental)</label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
       <label className="text-sm">AI Provider</label>
