@@ -908,8 +908,11 @@ function App() {
         onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
       />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 sticky bottom-0 pt-6 pb-6">
-        <footer className="text-center text-xs text-zinc-500 dark:text-zinc-400">DistyVault 2025</footer>
+      <div className="h-12" />
+      <div className="fixed inset-x-0 bottom-0 z-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/85 backdrop-blur">
+          <footer className="text-center text-xs text-zinc-500 dark:text-zinc-400">DistyVault 2025</footer>
+        </div>
       </div>
 
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
