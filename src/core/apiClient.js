@@ -458,22 +458,23 @@ class ApiClient {
     /** Process URL: extract via API, then distill client-side */
     async processUrl(url) {
         // If this is a YouTube playlist, expand into individual videos BEFORE creating any item
-        if (this._isYouTubePlaylist(url)) {
+    if (this._isYouTubePlaylist(url)) {
             try {
                 const videos = await this._expandYouTubePlaylist(url);
                 if (Array.isArray(videos) && videos.length > 0) {
-                    // Create rows immediately without starting processing (no queuing)
-                    try { window.app?.showTemporaryMessage(`Added ${videos.length} videos from playlist`, 'info'); } catch {}
+            // Create rows and queue processing for each video
+            try { window.app?.showTemporaryMessage(`Queued ${videos.length} videos from playlist`, 'info'); } catch {}
                     for (const v of videos) {
                         try {
                             // Prefetch title best-effort
                             let title = this._titleFromUrl(v);
                             try { const t = await this._prefetchTitle(v, 1600); if (t) title = t.trim(); } catch {}
-                            const dist = this._createDistillation({ sourceUrl: v, sourceType: 'youtube', title });
-                            // Set a neutral step to avoid "Queued" wording
-                            dist.processingStep = 'Ready';
+                const dist = this._createDistillation({ sourceUrl: v, sourceType: 'youtube', title });
+                dist.processingStep = 'Queued from playlist';
                             await this.db.saveDistillation(dist);
                             try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
+                // Queue immediately respecting concurrency
+                this._runWithLimit(() => this._processUrlPipeline(dist.id, v)).catch(() => {});
                         } catch {}
                         // Tiny yield for UI responsiveness
                         await new Promise(r => setTimeout(r, 10));
@@ -750,7 +751,11 @@ class ApiClient {
             const pathId = uobj.hostname.includes('youtu.be') ? (uobj.pathname.split('/').filter(Boolean)[0] || '') : '';
             if (/^[a-zA-Z0-9_-]{11}$/.test(pathId)) return pathId;
             const em = s.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
-            if (em) return em[1];
+            if (em) return em[2];
+            const live = s.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+            if (live) return live[1];
+            const shorts = s.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+            if (shorts) return shorts[1];
         } catch {}
         return null;
     }
@@ -894,16 +899,22 @@ class ApiClient {
             const videoId = this._extractYouTubeVideoId(target);
             // Title from prefetch (oEmbed/alt backends)
             let title = await this._prefetchTitle(target, 1600);
-            let description = '';
-            // Try Invidious first for description/text
+            let transcript = '';
             if (videoId) {
+                try {
+                    transcript = await this._fetchYouTubeTranscript(videoId);
+                } catch {}
+            }
+            if (!transcript || transcript.length < 120) {
+                // Fallback to description via privacy-friendly backends
+                let description = '';
                 const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
                 const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
-                const invEndpoints = [
+                const endpoints = [
                     ...invHosts.map(h => `https://${h}/api/v1/videos/${videoId}`),
                     ...pipedHosts.map(h => `https://${h}/api/v1/video/${videoId}`),
                 ];
-                for (const ep of invEndpoints) {
+                for (const ep of endpoints) {
                     try {
                         const r = await this._proxyFetch(ep);
                         if (r.ok) {
@@ -911,17 +922,17 @@ class ApiClient {
                             let j = null; try { j = JSON.parse(txt); } catch {}
                             description = j?.description || j?.shortDescription || description;
                             if (!title) title = j?.title || j?.videoTitle || title;
-                            if (description || title) break;
+                            if (description) break;
                         }
                     } catch {}
                 }
+                transcript = (description || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
             }
-            const text = (description || '').replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
             return {
-                text: text || `YouTube video: ${target}`,
+                text: transcript || `YouTube video: ${target}`,
                 title: (title || '').trim() || this._titleFromUrl(target),
                 contentType: 'youtube',
-                extractionMethod: 'youtube-api',
+                extractionMethod: transcript ? 'youtube-transcript' : 'youtube-meta',
                 fallbackUsed: true,
                 metadata: { url: target, videoId }
             };
@@ -1000,6 +1011,93 @@ class ApiClient {
             fallbackUsed: true,
             metadata: { url: target }
         };
+    }
+
+    // Try multiple backends to fetch a YouTube transcript without server support
+    async _fetchYouTubeTranscript(videoId) {
+        const clean = (t) => String(t || '')
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+            .replace(/<[^>]*>/g, '')
+            .replace(/\s+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+        // 1) Direct timedtext on YouTube via proxy (en, en-US, en-GB, with/without ASR)
+        const langs = ['en','en-US','en-GB'];
+        const kinds = [null,'asr'];
+        for (const lang of langs) {
+            for (const kind of kinds) {
+                const url = `https://www.youtube.com/api/timedtext?v=${encodeURIComponent(videoId)}&lang=${encodeURIComponent(lang)}${kind ? `&kind=${kind}` : ''}&fmt=vtt`;
+                try {
+                    const res = await this._proxyFetch(url);
+                    if (res.ok) {
+                        const vtt = await res.text();
+                        const text = this._parseVttToText(vtt);
+                        const out = clean(text);
+                        if (out && out.length > 120) return out;
+                    }
+                } catch {}
+            }
+        }
+        // 2) Parse captionTracks from the watch page and fetch the first English track
+        try {
+            const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+            const res = await this._proxyFetch(watchUrl);
+            if (res.ok) {
+                const html = await res.text();
+                const m = html.match(/\"captionTracks\":(\[.*?\])/);
+                if (m) {
+                    let tracks = null; try { tracks = JSON.parse(m[1].replace(/\\u0026/g, '&')); } catch {}
+                    if (Array.isArray(tracks) && tracks.length) {
+                        const pick = tracks.find(t => /en(-|$|_)/i.test(t?.languageCode || '') || /english/i.test(t?.name?.simpleText || '')) || tracks[0];
+                        const base = pick?.baseUrl;
+                        if (base) {
+                            try {
+                                const r = await this._proxyFetch(base + (base.includes('fmt=') ? '' : '&fmt=vtt'));
+                                if (r.ok) {
+                                    const vtt = await r.text();
+                                    const text = this._parseVttToText(vtt);
+                                    const out = clean(text);
+                                    if (out && out.length > 120) return out;
+                                }
+                            } catch {}
+                        }
+                    }
+                }
+            }
+        } catch {}
+        // 3) Invidious caption endpoints
+        const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+        for (const h of invHosts) {
+            try {
+                const listRes = await this._proxyFetch(`https://${h}/api/v1/captions/${encodeURIComponent(videoId)}`);
+                if (listRes.ok) {
+                    const txt = await listRes.text();
+                    let list = null; try { list = JSON.parse(txt); } catch {}
+                    const track = Array.isArray(list) ? (list.find(t => /english/i.test(t?.label || '')) || list[0]) : null;
+                    if (track && track.label) {
+                        const capRes = await this._proxyFetch(`https://${h}/api/v1/captions/${encodeURIComponent(videoId)}?label=${encodeURIComponent(track.label)}`);
+                        if (capRes.ok) {
+                            const vtt = await capRes.text();
+                            const text = this._parseVttToText(vtt);
+                            const out = clean(text);
+                            if (out && out.length > 120) return out;
+                        }
+                    }
+                }
+            } catch {}
+        }
+        return '';
+    }
+
+    _parseVttToText(vtt) {
+        if (!vtt || typeof vtt !== 'string') return '';
+        // Drop WEBVTT header and timestamps, keep text lines; merge with spaces
+        const lines = vtt.replace(/^WEBVTT[^\n]*\n+/i, '')
+            .split(/\r?\n/) // split lines
+            .filter(l => l && !/^\d+$/.test(l.trim()) && !/-->/.test(l));
+        // Remove style tags and cues
+        const text = lines.map(l => l.replace(/<[^>]+>/g, '').trim()).filter(Boolean).join(' ');
+        return text;
     }
 
     async _processFilePipeline(id, file) {

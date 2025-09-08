@@ -11,7 +11,7 @@ class ContentExtractor {
 
   classifyYoutubeUrl(url) {
     if (url.includes('list=')) return 'playlist';
-    if (url.includes('watch?v=') || url.includes('youtu.be/')) return 'video';
+    if (url.includes('watch?v=') || url.includes('youtu.be/') || url.includes('/embed/') || url.includes('/live/') || url.includes('/shorts/')) return 'video';
     if (url.includes('/channel/') || url.includes('/c/') || url.includes('/@')) return 'channel';
     return 'unknown';
   }
@@ -20,7 +20,9 @@ class ContentExtractor {
     const patterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
       /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/
+      /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/
     ];
     for (const p of patterns) {
       const m = url.match(p);
@@ -37,6 +39,37 @@ class ContentExtractor {
   async extractPlaylistVideos(playlistUrl) {
     const id = this.extractYoutubePlaylistId(playlistUrl);
     if (!id) throw new Error('Invalid playlist URL');
+    // Try Piped/Invidious JSON APIs first (more stable than scraping)
+    const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
+    const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
+    for (const h of pipedHosts) {
+      const endpoints = [
+        `https://${h}/api/v1/playlist?playlistId=${encodeURIComponent(id)}`,
+        `https://${h}/api/playlist/${encodeURIComponent(id)}`
+      ];
+      for (const ep of endpoints) {
+        try {
+          const r = await axios.get(ep, { timeout: 20000 });
+          const data = r.data;
+          if (data) {
+            const arr = (data.relatedStreams || data.videos || []).filter(Boolean);
+            const ids = arr.map(v => v?.videoId || v?.id || (typeof v.url === 'string' ? (v.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/)?.[1] || null) : null)).filter(Boolean);
+            if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+          }
+        } catch {}
+      }
+    }
+    for (const h of invHosts) {
+      try {
+        const r = await axios.get(`https://${h}/api/v1/playlists/${encodeURIComponent(id)}`, { timeout: 20000 });
+        const data = r.data;
+        if (data && Array.isArray(data.videos)) {
+          const ids = data.videos.map(v => v?.videoId || v?.id).filter(Boolean);
+          if (ids.length) return Array.from(new Set(ids)).map(v => `https://www.youtube.com/watch?v=${v}`);
+        }
+      } catch {}
+    }
+    // Fallback: scrape the YouTube playlist HTML
     const response = await axios.get(`https://www.youtube.com/playlist?list=${id}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
