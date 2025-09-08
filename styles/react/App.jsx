@@ -62,13 +62,19 @@ function ThemeSelect({ value, onChange }) {
 // Icon-only theme menu
 function ThemeMenu({ value, onChange }) {
   const icon = value === 'light' ? Icon.sun() : value === 'dark' ? Icon.moon() : Icon.laptop();
+  const detailsRef = React.useRef(null);
+  const choose = (v) => {
+    onChange(v);
+    // Auto-close the dropdown after selection
+    try { if (detailsRef.current) detailsRef.current.open = false; } catch {}
+  };
   const Item = ({ v, label, icon }) => (
-    <button onClick={() => onChange(v)} className={(value===v? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'w-full text-left px-3 py-2 rounded inline-flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800'}>
+    <button onClick={() => choose(v)} className={(value===v? 'bg-zinc-100 dark:bg-zinc-800 ' : '') + 'w-full text-left px-3 py-2 rounded inline-flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800'}>
       {icon} <span>{label}</span>
     </button>
   );
   return (
-    <details className="relative">
+    <details ref={detailsRef} className="relative">
       <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer select-none" title="Theme" aria-label="Theme">
         {icon}
       </summary>
@@ -83,11 +89,11 @@ function ThemeMenu({ value, onChange }) {
 
 function TopBar({ onOpenSettings, theme, setTheme }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-b from-white/80 to-white/60 dark:from-zinc-950/80 dark:to-zinc-950/60 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-b from-white/80 to-white/60 dark:from-zinc-950/80 dark:to-zinc-950/60 backdrop-blur text-zinc-900 dark:text-zinc-100">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src="logos/logo.png" alt="logo" className="h-7 w-7" />
-          <div className="font-semibold text-zinc-900 dark:text-zinc-100">DistyVault</div>
+          <div className="font-semibold">DistyVault</div>
           <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Gather, distill and control your knowledge</span>
         </div>
         <div className="flex items-center gap-2">
@@ -154,7 +160,7 @@ function CapturePanel({ api, onQueued }) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) { setFile(f); setUrl(''); } }}
         >
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-            <div className="relative flex-[2] min-w-0">
+            <div className="relative flex-[2] min-w-0 text-zinc-900 dark:text-zinc-100">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">{Icon.link()}</span>
               <input
                 value={url}
@@ -163,7 +169,7 @@ function CapturePanel({ api, onQueued }) {
                 className="w-full pl-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
-            <div className="flex-1 grid grid-cols-2 gap-2">
+            <div className="flex-1 grid grid-cols-2 gap-2 text-zinc-900 dark:text-zinc-100">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -178,8 +184,8 @@ function CapturePanel({ api, onQueued }) {
             </div>
           </div>
           {(file) && (
-            <div className="mt-3 flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm">
-              <div className="truncate text-zinc-700 dark:text-zinc-200">📄 {file.name}</div>
+            <div className="mt-3 flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+              <div className="truncate">📄 {file.name}</div>
               <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">Remove</button>
             </div>
           )}
@@ -272,7 +278,7 @@ function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAl
   );
 }
 
-function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked }) {
+function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked, onResetSort }) {
   const [colWidths, setColWidths] = React.useState(() => {
     const def = {
       name: 480,
@@ -327,8 +333,8 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
-  <div className="overflow-auto max-h-[65vh] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4 text-zinc-900 dark:text-zinc-100">
+  <div className="overflow-auto max-h-[60vh] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
   <table className="min-w-[760px] w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
@@ -352,7 +358,9 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                 <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'status')}>⋮</span>
               </th>
               <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration
-                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'duration')}>⋮</span>
+                <button onClick={() => onResetSort && onResetSort()} className="float-right inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to last queued">
+                  {Icon.refresh('h-3.5 w-3.5')}
+                </button>
               </th>
             </tr>
           </thead>
@@ -381,7 +389,7 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
             ))}
           </tbody>
         </table>
-      </div>
+  </div>
     </div>
   );
 }
@@ -517,7 +525,7 @@ function SettingsSheet({ open, onClose, api }) {
 
   if (!open) return null;
   return (
-    <Drawer open={open} onClose={onClose} title="AI Settings">
+  <Drawer open={open} onClose={onClose} title="AI Settings">
       {!settings ? (
         <div className="text-sm text-zinc-500">Loading…</div>
       ) : (
@@ -548,10 +556,10 @@ function SettingsSheet({ open, onClose, api }) {
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+    <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm">Provider</label>
+      <label className="text-sm">AI Provider</label>
                   <div className="relative mt-1">
                   <select
                     value={settings.online?.provider || ''}
@@ -589,7 +597,7 @@ function SettingsSheet({ open, onClose, api }) {
                   <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400">▾</span>
                   </div>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 mt-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm">API key</label>
                     {connStatus && (
@@ -824,7 +832,7 @@ function App() {
   const errors = items.filter(it => String(it.status||'').toLowerCase()==='error').length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-950">
+  <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100">
       <TopBar onOpenSettings={() => setShowSettings(true)} theme={theme} setTheme={setTheme} />
       <CapturePanel api={api} onQueued={() => refresh()} />
 
@@ -897,7 +905,12 @@ function App() {
           setSelected(allSelected ? new Set() : allIds);
         }}
         allChecked={visibleItems.length > 0 && visibleItems.every(x => selected.has(x.id))}
+        onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
       />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4 mb-8">
+        <footer className="text-center text-xs text-zinc-500 dark:text-zinc-400">DistyVault 2025</footer>
+      </div>
 
       <ContentModal open={!!contentItem} onClose={() => setContentItem(null)} item={contentItem} />
       <LogsModal open={!!logsItem} onClose={() => setLogsItem(null)} item={logsItem} />
