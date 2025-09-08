@@ -832,7 +832,7 @@ function App() {
   const errors = items.filter(it => String(it.status||'').toLowerCase()==='error').length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100">
+  <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100">
       <TopBar onOpenSettings={() => setShowSettings(true)} theme={theme} setTheme={setTheme} />
       <CapturePanel api={api} onQueued={() => refresh()} />
 
@@ -908,7 +908,7 @@ function App() {
         onResetSort={() => setSort({ by: 'queue', dir: 'asc' })}
       />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-auto py-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 sticky bottom-0 pt-6 pb-6">
         <footer className="text-center text-xs text-zinc-500 dark:text-zinc-400">DistyVault 2025</footer>
       </div>
 
