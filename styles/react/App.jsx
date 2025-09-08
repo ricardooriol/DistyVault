@@ -88,7 +88,7 @@ function TopBar({ onOpenSettings, theme, setTheme }) {
         <div className="flex items-center gap-3">
           <img src="logos/logo.png" alt="logo" className="h-7 w-7" />
           <div className="font-semibold text-zinc-900 dark:text-zinc-100">DistyVault</div>
-          <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Capture. Distill. Control.</span>
+          <span className="hidden sm:inline text-sm text-zinc-500 dark:text-zinc-400">Gather, distill and control your knowledge</span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeMenu value={theme} onChange={setTheme} />
@@ -483,8 +483,7 @@ function SettingsSheet({ open, onClose, api }) {
         const ep = (settings.offline?.endpoint || '').replace(/\/$/, '');
         const res = await fetch(ep + '/api/tags', { method: 'GET' });
         if (!res.ok) throw new Error('Ollama not reachable');
-        setConnStatus('ok');
-        setToast('Ollama reachable');
+  // For offline we don't show inline status near API key; keep silent success
       } else {
         const p = settings.online?.provider;
         const key = settings.online?.apiKey;
@@ -499,8 +498,7 @@ function SettingsSheet({ open, onClose, api }) {
           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
           if (!r.ok) throw new Error('Gemini auth failed');
         }
-        setConnStatus('ok');
-        setToast('Connection OK');
+  setConnStatus('ok');
       }
     } catch (e) {
       setConnStatus('fail');
@@ -553,6 +551,7 @@ function SettingsSheet({ open, onClose, api }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm">Provider</label>
+                  <div className="relative mt-1">
                   <select
                     value={settings.online?.provider || ''}
                     onChange={e => {
@@ -560,7 +559,7 @@ function SettingsSheet({ open, onClose, api }) {
                       const models = getModelsFor(p);
                       setSettings(s => ({ ...s, online: { ...s.online, provider: p, model: models[0] || '' } }));
                     }}
-                    className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm"
+                    className="w-full appearance-none rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                   >
                     <option value="">Select…</option>
                     <option value="openai">OpenAI</option>
@@ -569,26 +568,37 @@ function SettingsSheet({ open, onClose, api }) {
                     <option value="grok">Grok</option>
                     <option value="deepseek">DeepSeek</option>
                   </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400">▾</span>
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm">Model</label>
+                  <div className="relative mt-1">
                   <select
                     value={settings.online?.model || ''}
                     onChange={e => setSettings({ ...settings, online: { ...settings.online, model: e.target.value } })}
                     disabled={!settings.online?.provider}
-                    className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm disabled:opacity-60"
+                    className="w-full appearance-none rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 pr-8 text-sm disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-brand"
                   >
                     {(!settings.online?.provider) && <option value="">Select a provider first</option>}
                     {settings.online?.provider && getModelsFor(settings.online.provider).map(m => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400">▾</span>
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-sm">API key</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="sk-…" />
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <input type={showKey ? 'text' : 'password'} value={settings.online?.apiKey || ''} onChange={e => setSettings({ ...settings, online: { ...settings.online, apiKey: e.target.value } })} className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="Enter your API key" />
                     <button onClick={() => setShowKey(s => !s)} className="rounded-full border border-zinc-300 dark:border-zinc-700 w-10 h-10 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center" title={showKey? 'Hide key':'Show key'}>{Icon.eye()}</button>
+                    {connStatus && (
+                      <span className={(connStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300') + ' inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs'}>
+                        <span className={(connStatus==='ok' ? 'bg-green-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full animate-pulse'}></span>
+                        {connStatus==='ok' ? 'Connected' : 'Not connected'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -598,9 +608,9 @@ function SettingsSheet({ open, onClose, api }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div>
             <label className="text-sm">Simultaneous processings</label>
-            <div className="inline-flex items-center gap-3">
+            <div className="mt-2 inline-flex items-center gap-3">
               <button onClick={()=>adjustConcurrent(-1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Decrease">−</button>
               <div className="min-w-[2.5rem] text-center text-sm text-zinc-800 dark:text-zinc-100">{settings.concurrentProcessing || 1}</div>
               <button onClick={()=>adjustConcurrent(1)} className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800" aria-label="Increase">+</button>
@@ -608,14 +618,7 @@ function SettingsSheet({ open, onClose, api }) {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="min-h-[28px]">
-              {connStatus && (
-                <span className={(connStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300') + ' inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs'}>
-                  <span className={(connStatus==='ok' ? 'bg-green-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full animate-pulse'}></span>
-                  {connStatus==='ok' ? 'Connected' : 'Not connected'}
-                </span>
-              )}
-            </div>
+            <div />
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Cancel</button>
               <button onClick={reset} className="rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">Reset</button>
