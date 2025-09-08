@@ -462,13 +462,23 @@ class ApiClient {
             try {
                 const videos = await this._expandYouTubePlaylist(url);
                 if (Array.isArray(videos) && videos.length > 0) {
-                    // Emit small toast if available
-                    try { window.app?.showTemporaryMessage(`Queueing ${videos.length} videos from playlist`, 'info'); } catch {}
+                    // Create rows immediately without starting processing (no queuing)
+                    try { window.app?.showTemporaryMessage(`Added ${videos.length} videos from playlist`, 'info'); } catch {}
                     for (const v of videos) {
-                        try { await this.processUrl(v); } catch {}
-                        await new Promise(r => setTimeout(r, 20));
+                        try {
+                            // Prefetch title best-effort
+                            let title = this._titleFromUrl(v);
+                            try { const t = await this._prefetchTitle(v, 1600); if (t) title = t.trim(); } catch {}
+                            const dist = this._createDistillation({ sourceUrl: v, sourceType: 'youtube', title });
+                            // Set a neutral step to avoid "Queued" wording
+                            dist.processingStep = 'Ready';
+                            await this.db.saveDistillation(dist);
+                            try { window.app?.eventBus?.emit(window.EventBus?.Events?.ITEM_ADDED, dist); } catch {}
+                        } catch {}
+                        // Tiny yield for UI responsiveness
+                        await new Promise(r => setTimeout(r, 10));
                     }
-                    return { status: 'spawned', count: videos.length };
+                    return { status: 'added', count: videos.length };
                 }
                 throw new Error('Playlist has no public videos or could not be expanded.');
             } catch (e) {
@@ -799,6 +809,20 @@ class ApiClient {
     async _expandYouTubePlaylist(playlistUrl) {
         const id = this._extractYouTubePlaylistId(playlistUrl);
         if (!id) return [];
+        // 0) Prefer server extractor (LangChain-backed) when enabled for reliability
+        if (this._useServer()) {
+            try {
+                const res = await fetch(`${this.base}/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: playlistUrl }) });
+                if (res.ok) {
+                    const payload = await this._json(res);
+                    const data = payload?.extraction || payload;
+                    const vids = data?.metadata?.videos;
+                    if (data?.contentType === 'youtube-playlist' && Array.isArray(vids) && vids.length) {
+                        return Array.from(new Set(vids.map(v => String(v))));
+                    }
+                }
+            } catch {}
+        }
     // Prefer privacy-friendly JSON APIs proxied via server to avoid CORS; try multiple hosts then fall back to HTML scraping
         const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
         const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
