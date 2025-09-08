@@ -10,12 +10,17 @@ class AIService {
 
     loadConfig() {
         const saved = localStorage.getItem('aiConfig');
-        return saved ? JSON.parse(saved) : {
+        if (saved) return JSON.parse(saved);
+        // Default config favors HTTPS-safe same-origin proxy when app runs on HTTPS
+    const isHttpsApp = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+    // Default to localhost in dev; on HTTPS deployments, user must provide an HTTPS tunnel URL
+    const defaultOllamaEndpoint = isHttpsApp ? '' : 'http://localhost:11434';
+        return {
             mode: 'online',
             provider: '',
             model: '',
             apiKey: '',
-            ollamaEndpoint: 'http://localhost:11434',
+            ollamaEndpoint: defaultOllamaEndpoint,
             ollamaModel: 'llama2'
         };
     }
@@ -78,10 +83,26 @@ class AIService {
             throw new Error('Ollama configuration is incomplete');
         }
 
+        // Prevent mixed-content request from HTTPS app to HTTP endpoint
+        try {
+            const isHttpsApp = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+            const ep = String(this.config.ollamaEndpoint || '');
+            const isAbsoluteHttp = /^http:\/\//i.test(ep);
+            // If we're on HTTPS and endpoint is absolute HTTP, block. Relative endpoints require a backend proxy which is not present.
+            if (isHttpsApp && isAbsoluteHttp) {
+                const err = new Error('Blocked by browser: HTTPS app cannot call HTTP Ollama endpoint. Set an HTTPS tunnel URL in Settings (e.g., Cloudflare Tunnel or ngrok).');
+                err.provider = 'ollama';
+                err.endpoint = this.config.ollamaEndpoint;
+                err.code = 'MIXED_CONTENT_BLOCKED';
+                throw err;
+            }
+        } catch {}
+
     const prompt = this.buildDistillationPrompt(content);
         
         try {
-            const response = await fetch(`${this.config.ollamaEndpoint}/api/generate`, {
+            const base = String(this.config.ollamaEndpoint || '').replace(/\/$/, '');
+            const response = await fetch(`${base}/api/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -389,13 +410,27 @@ ${text}`;
 
     async testOllamaConnection(config) {
         try {
-            const response = await fetch(`${config.ollamaEndpoint}/api/tags`);
+            const ep = String(config.ollamaEndpoint || '').replace(/\/$/, '');
+            if (!ep) {
+                return { success: false, message: 'No endpoint set. On HTTPS, configure an HTTPS Ollama URL (e.g., via Cloudflare Tunnel or ngrok).', mixedContent: false };
+            }
+            const isHttpsApp = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+            const isAbsoluteHttp = /^http:\/\//i.test(ep);
+            const isRelative = ep.startsWith('/');
+            const mixed = isHttpsApp && isAbsoluteHttp; // relative endpoints are same-origin and safe
+            if (mixed) {
+                return { success: false, message: 'Mixed content blocked: use an HTTPS tunnel to your local Ollama.', mixedContent: true };
+            }
+            const url = `${ep}/api/tags`;
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            return { success: true, message: 'Ollama connection successful' };
+            return { success: true, message: mixed ? 'Connected (mixed)' : 'Ollama connection successful', mixedContent: mixed };
         } catch (error) {
-            return { success: false, message: `Ollama connection failed: ${error.message}` };
+            const msg = String(error?.message || 'failed').toLowerCase();
+            const blocked = /failed to fetch|not allowed|blocked|access control/i.test(msg);
+            return { success: false, message: blocked ? 'Blocked by browser (mixed content/CORS)' : `Ollama connection failed: ${error.message}` };
         }
     }
 

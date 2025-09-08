@@ -499,10 +499,13 @@ class ApiClient {
     async getAiSettings() {
         const stored = localStorage.getItem('ai-provider-settings');
         if (stored) return JSON.parse(stored);
+    const isHttpsApp = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+    // On HTTPS deployments, user must set an HTTPS tunnel URL manually
+    const defaultOllamaEndpoint = isHttpsApp ? '' : 'http://localhost:11434';
         return {
             mode: 'online',
             concurrentProcessing: 1,
-            offline: { model: '', endpoint: 'http://localhost:11434' },
+            offline: { model: '', endpoint: defaultOllamaEndpoint },
             online: { provider: '', apiKey: '', model: 'gpt-4o', endpoint: '' },
             lastUpdated: new Date().toISOString()
         };
@@ -514,7 +517,7 @@ class ApiClient {
         localStorage.setItem('ai-provider-settings', JSON.stringify(settings));
         // Mirror config for AIService
         const aiCfg = {
-            mode: 'online',
+            mode: settings.mode === 'offline' ? 'offline' : 'online',
             provider: settings.online?.provider || '',
             model: settings.online?.model || '',
             apiKey: settings.online?.apiKey || '',
@@ -760,9 +763,10 @@ class ApiClient {
         }
         // Clean common suffixes like " - YouTube" or site names
         title = title.replace(/\s*[|\-]\s*(YouTube|YouTube Music|Medium|Substack|Blog|News).*$/i, '').trim();
-        // If it's a YouTube video and the title looks generic, attempt to fetch via oEmbed for accuracy
+        // If it's a YouTube video and the title looks generic OR looks like a bare video ID, fetch via oEmbed for accuracy
         if (this._isYouTubeUrl(target) && !this._isYouTubePlaylist(target)) {
-            const looksGeneric = !title || /^(watch|youtube)$/i.test(title);
+            const looksLikeId = /^[A-Za-z0-9_-]{11}$/.test(title);
+            const looksGeneric = !title || /^(watch|youtube)$/i.test(title) || looksLikeId;
             if (looksGeneric) {
                 try {
                     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target)}&format=json`;
@@ -1044,20 +1048,19 @@ class ApiClient {
                     this._drainQueue();
                 }
             };
-            if (this.activeTasks < this.concurrentLimit) {
-                // run immediately
-                void task();
-            } else {
-                this.taskQueue.push(task);
-            }
+            // Always enqueue, then drain to schedule at most one respecting the limit
+            this.taskQueue.push(task);
+            this._drainQueue();
         });
     }
 
     _drainQueue() {
-        while (this.activeTasks < this.concurrentLimit && this.taskQueue.length > 0) {
-            const next = this.taskQueue.shift();
-            if (next) void next();
-        }
+        // Schedule at most one next task per drain to avoid exceeding the limit
+        if (this.activeTasks >= this.concurrentLimit) return;
+        const next = this.taskQueue.shift();
+        if (!next) return;
+        // Run in a microtask to keep ordering predictable and let activeTasks update within task()
+        Promise.resolve().then(() => { void next(); });
     }
 
     // ----------
@@ -1116,6 +1119,26 @@ class ApiClient {
         doc.close();
         await new Promise(r => setTimeout(r, 30));
         const target = doc.body;
+
+        // Prefer html2pdf.js for proper page wrapping, fallback to manual slicing if unavailable
+        try {
+            await this._ensureHtml2Pdf();
+            if (window.html2pdf) {
+                const opt = {
+                    margin: [40, 40, 40, 40],
+                    filename: `${this._safeFilename(item.title || 'distillation')}.pdf`,
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900 },
+                    jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+                };
+                const worker = window.html2pdf().set(opt).from(target).toPdf();
+                const pdfBlob = await worker.get('pdf').then(pdf => pdf.output('blob'));
+                document.body.removeChild(iframe);
+                return pdfBlob;
+            }
+        } catch {}
+
+        // Fallback: html2canvas + jsPDF with slight slice overlap to avoid glyph halving
         const opt = { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 900, logging: false };
         const canvas = await window.html2canvas(target, opt);
         const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
@@ -1123,29 +1146,33 @@ class ApiClient {
         const pageHeight = pdf.internal.pageSize.getHeight();
         const imgWidth = pageWidth - 80;
         const imgHeight = canvas.height * imgWidth / canvas.width;
-        let y = 40;
+        const topMargin = 40; const bottomMargin = 40;
+        let y = topMargin;
         let remainingHeight = imgHeight;
         let position = y;
-        const pageImgHeight = pageHeight - 80;
+        const pageImgHeight = pageHeight - (topMargin + bottomMargin);
         let srcY = 0;
         const pxPerPt = canvas.height / imgHeight;
+        const overlapPt = 2; // small overlap in points
         while (remainingHeight > 0) {
             const sliceHeightPt = Math.min(pageImgHeight, remainingHeight);
-            const sliceHeightPx = Math.floor(sliceHeightPt * pxPerPt);
+            // Add a tiny overlap except on the last page to avoid text being split in half visually
+            const sliceWithOverlapPt = sliceHeightPt + (remainingHeight > sliceHeightPt ? overlapPt : 0);
+            const sliceHeightPx = Math.floor(sliceWithOverlapPt * pxPerPt);
             const sliceCanvas = document.createElement('canvas');
             sliceCanvas.width = canvas.width;
             sliceCanvas.height = sliceHeightPx;
             const ctx = sliceCanvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
             ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
             const sliceImg = sliceCanvas.toDataURL('image/png');
-            pdf.addImage(sliceImg, 'PNG', 40, position, imgWidth, sliceHeightPt);
+            pdf.addImage(sliceImg, 'PNG', 40, position, imgWidth, sliceWithOverlapPt);
             remainingHeight -= sliceHeightPt;
-            srcY += sliceHeightPx;
+            srcY += Math.floor(sliceHeightPt * pxPerPt);
             if (remainingHeight > 0) {
                 pdf.addPage();
                 position = y;
             }
-            // Yield a frame to keep UI responsive on very long documents
             await new Promise(r => setTimeout(r, 0));
         }
         document.body.removeChild(iframe);
@@ -1219,6 +1246,12 @@ class ApiClient {
         if (!window.jspdf) {
             await this._loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
         }
+    }
+
+    async _ensureHtml2Pdf() {
+        if (window.html2pdf) return;
+        // Bundle includes html2canvas + jsPDF, but loading it after individual libs is safe
+        await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
     }
 
     _loadScript(src) {

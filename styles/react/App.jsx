@@ -282,54 +282,7 @@ function SelectionDock({ count, total, onRetry, onDownload, onDelete, onSelectAl
 }
 
 function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, allChecked, onResetSort }) {
-  const [colWidths, setColWidths] = React.useState(() => {
-    const def = {
-      name: 480,
-      status: 140,
-      duration: 120,
-    };
-    try { const saved = JSON.parse(localStorage.getItem('dv-colwidths')||'null'); return saved ? { ...def, ...saved } : def; } catch { return def; }
-  });
-
-  const startXRef = React.useRef(0);
-  const startWRef = React.useRef(0);
-  const colKeyRef = React.useRef('');
-  const dragHandlerRef = React.useRef(null);
-
-  const onDragStart = (e, key) => {
-    startXRef.current = e.clientX;
-    startWRef.current = colWidths[key];
-    colKeyRef.current = key;
-    const handler = (evt) => {
-      const dx = evt.clientX - startXRef.current;
-      const k = colKeyRef.current;
-      if (!k) return;
-      setColWidths(prev => {
-        const next = { ...prev, [k]: Math.max(80, Math.min(700, startWRef.current + dx)) };
-        try { localStorage.setItem('dv-colwidths', JSON.stringify(next)); } catch {}
-        return next;
-      });
-    };
-    dragHandlerRef.current = handler;
-    document.addEventListener('mousemove', handler);
-    document.addEventListener('mouseup', onDragEnd, { once: true });
-    e.preventDefault();
-  };
-  const onDragEnd = () => {
-    if (dragHandlerRef.current) {
-      document.removeEventListener('mousemove', dragHandlerRef.current);
-      dragHandlerRef.current = null;
-    }
-    colKeyRef.current = '';
-  };
-
-  React.useEffect(() => {
-    return () => {
-      if (dragHandlerRef.current) {
-        try { document.removeEventListener('mousemove', dragHandlerRef.current); } catch {}
-      }
-    };
-  }, []);
+  // Fixed layout: checkbox column fixed, then Name 60%, Status 20%, Duration 20%
 
   const SortIcon = ({ active, dir }) => (
     <span className="inline-block ml-1 text-zinc-400">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
@@ -341,9 +294,9 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
   <table className="min-w-[760px] w-full divide-y divide-zinc-200 dark:divide-zinc-800" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
-            <col style={{ width: colWidths.name }} />
-            <col style={{ width: colWidths.status }} />
-            <col style={{ width: colWidths.duration }} />
+            <col style={{ width: '60%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '20%' }} />
           </colgroup>
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 select-none">
             <tr>
@@ -352,19 +305,17 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                 <button onClick={() => onChangeSort('title')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Name <SortIcon active={sort.by==='title'} dir={sort.dir} />
                 </button>
-                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'name')}>⋮</span>
               </th>
               <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('status')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Status <SortIcon active={sort.by==='status'} dir={sort.dir} />
                 </button>
-                <span className="float-right cursor-col-resize select-none px-1" onMouseDown={(e) => onDragStart(e, 'status')}>⋮</span>
               </th>
-              <th className="px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
+              <th className="relative px-2 py-3 text-center align-middle text-xs font-medium tracking-wider text-zinc-500">
                 <button onClick={() => onChangeSort('duration')} className="inline-flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-100">
                   Duration <span className="ml-1 text-zinc-400">{sort.by==='duration' ? (sort.dir==='asc' ? '▲' : '▼') : '↕'}</span>
                 </button>
-                <button onClick={() => onResetSort && onResetSort()} className="float-right inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to queue/last queued">
+                <button onClick={() => onResetSort && onResetSort()} className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-6 h-6 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" title="Reset sorting to queue/last queued">
                   {Icon.refresh('h-3.5 w-3.5')}
                 </button>
               </th>
@@ -379,9 +330,9 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                 <td className="px-2 py-3">
                   <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate" title={it.title || 'Untitled'}>{it.title || 'Untitled'}</div>
                 </td>
-                <td className="px-2 py-3 text-sm">
+                <td className="px-2 py-3 text-sm text-center align-middle">
                   <span className={
-                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
+                    'inline-flex items-center justify-center gap-1.5 rounded-full px-2 py-0.5 text-xs ' +
                     (it.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                      it.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
                      it.status === 'distilling' || it.status === 'extracting' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
@@ -390,7 +341,7 @@ function KBTable({ items, selected, toggle, sort, onChangeSort, onToggleAll, all
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {it.status}
                   </span>
                 </td>
-                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate">{formatDuration(it)}</td>
+                <td className="px-2 py-3 text-sm text-zinc-600 dark:text-zinc-300 truncate text-center align-middle">{formatDuration(it)}</td>
               </tr>
             ))}
           </tbody>
@@ -439,6 +390,8 @@ function SettingsSheet({ open, onClose, api }) {
   const [showKey, setShowKey] = useState(false);
   const [toast, setToast] = useState('');
   const [connStatus, setConnStatus] = useState(null); // 'ok' | 'fail' | null
+  const [offlineConnStatus, setOfflineConnStatus] = useState(null); // 'ok' | 'fail' | 'warn' | null
+  const [offlineConnMsg, setOfflineConnMsg] = useState('');
 
   useEffect(() => { if (open) api.getAiSettings().then(setSettings); }, [open]);
 
@@ -495,10 +448,21 @@ function SettingsSheet({ open, onClose, api }) {
     setTesting(true);
     try {
       if (settings.mode === 'offline') {
-        const ep = (settings.offline?.endpoint || '').replace(/\/$/, '');
-        const res = await fetch(ep + '/api/tags', { method: 'GET' });
-        if (!res.ok) throw new Error('Ollama not reachable');
-  // For offline we don't show inline status near API key; keep silent success
+        // Use ApiClient -> AIService test to get mixed-content awareness without direct blocked fetch here
+        const result = await api.testOllamaConnection({ endpoint: settings.offline?.endpoint });
+        if (result?.success) {
+          if (result.mixedContent) {
+            setOfflineConnStatus('warn');
+            setOfflineConnMsg('HTTPS app -> HTTP endpoint (mixed content). Prefer an HTTPS tunnel.');
+          } else {
+            setOfflineConnStatus('ok');
+            setOfflineConnMsg('');
+          }
+        } else {
+          setOfflineConnStatus('fail');
+          setOfflineConnMsg(result?.message || 'Connection failed');
+          throw new Error(result?.message || 'Ollama not reachable');
+        }
       } else {
         const p = settings.online?.provider;
         const key = settings.online?.apiKey;
@@ -516,8 +480,13 @@ function SettingsSheet({ open, onClose, api }) {
   setConnStatus('ok');
       }
     } catch (e) {
-      setConnStatus('fail');
-      alert(e?.message || 'Connection test failed');
+      if (settings.mode === 'offline') {
+        setOfflineConnStatus('fail');
+        alert(e?.message || 'Ollama connection test failed');
+      } else {
+        setConnStatus('fail');
+        alert(e?.message || 'Connection test failed');
+      }
     } finally { setTesting(false); }
   };
 
@@ -553,8 +522,22 @@ function SettingsSheet({ open, onClose, api }) {
                   <input value={settings.offline?.model || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, model: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="Enter a model name" />
                 </div>
                 <div>
-                  <label className="text-sm">Ollama endpoint</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm">Ollama endpoint</label>
+                    {offlineConnStatus && (
+                      <span className={
+                        (offlineConnStatus==='ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : offlineConnStatus==='warn' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300')
+                        + ' ml-2 inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs'
+                      }>
+                        <span className={(offlineConnStatus==='ok' ? 'bg-green-600' : offlineConnStatus==='warn' ? 'bg-yellow-600' : 'bg-red-600') + ' inline-block h-1.5 w-1.5 rounded-full'}></span>
+                        {offlineConnStatus==='ok' ? 'Connected' : offlineConnStatus==='warn' ? 'Connected (mixed)' : 'Not connected'}
+                      </span>
+                    )}
+                  </div>
                   <input value={settings.offline?.endpoint || ''} onChange={e => setSettings({ ...settings, offline: { ...settings.offline, endpoint: e.target.value } })} className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" placeholder="http://localhost:11434" />
+                  {offlineConnMsg && (
+                    <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">{offlineConnMsg}</div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
