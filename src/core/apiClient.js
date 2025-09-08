@@ -817,27 +817,95 @@ class ApiClient {
         // Generic fallback: derive from URL
         return this._titleFromUrl(url);
     }
+
+    // ----------
+    // LangChain helpers (browser ESM via CDN)
+    // ----------
+    async _ensureLangChainYouTube() {
+        if (this._lcYoutubeLoaderFactory) return this._lcYoutubeLoaderFactory;
+        // Try modern community package first, then legacy path
+        let mod = null;
+        try {
+            mod = await import('https://esm.sh/@langchain/community@0.2.31/document_loaders/web/youtube');
+        } catch {}
+        if (!mod) {
+            try {
+                mod = await import('https://esm.sh/langchain@0.2.18/document_loaders/web/youtube');
+            } catch {}
+        }
+        if (mod && (mod.YoutubeLoader || mod.YouTubeLoader)) {
+            this._lcYoutubeLoaderFactory = mod.YoutubeLoader || mod.YouTubeLoader;
+            return this._lcYoutubeLoaderFactory;
+        }
+        // As a last resort, try the main community bundle and access path
+        try {
+            const cm = await import('https://esm.sh/@langchain/community@0.2.31');
+            // Attempt property lookup if namespace export
+            if (cm?.document_loaders?.web?.youtube?.YoutubeLoader) {
+                this._lcYoutubeLoaderFactory = cm.document_loaders.web.youtube.YoutubeLoader;
+                return this._lcYoutubeLoaderFactory;
+            }
+        } catch {}
+        throw new Error('LangChain YouTube loader not available');
+    }
+
+    async _lcLoadYoutubeTranscript(videoUrlOrId) {
+        try {
+            const YoutubeLoader = await this._ensureLangChainYouTube();
+            const url = this._normalizeYoutubeUrl(videoUrlOrId);
+            const loader = new YoutubeLoader(url, { language: 'en', addVideoInfo: true });
+            const docs = await loader.load();
+            if (Array.isArray(docs) && docs.length) {
+                // Concatenate pageContent; prefer the first document
+                const content = docs.map(d => d.pageContent || '').join('\n').trim();
+                return content || '';
+            }
+        } catch {}
+        return '';
+    }
+
+    async _lcExpandPlaylistViaLC(playlistUrl) {
+        try {
+            const YoutubeLoader = await this._ensureLangChainYouTube();
+            const loader = new YoutubeLoader(this._normalizeYoutubeUrl(playlistUrl), { language: 'en', addVideoInfo: true });
+            const docs = await loader.load();
+            if (!Array.isArray(docs) || docs.length === 0) return [];
+            const urls = [];
+            for (const d of docs) {
+                const md = d?.metadata || {};
+                const id = md.videoId || md.id || null;
+                const src = md.source || md.url || null;
+                if (src && this._isYouTubeUrl(src) && !this._isYouTubePlaylist(src)) {
+                    urls.push(String(src));
+                } else if (id && /^[a-zA-Z0-9_-]{11}$/.test(String(id))) {
+                    urls.push(`https://www.youtube.com/watch?v=${id}`);
+                }
+            }
+            return Array.from(new Set(urls));
+        } catch {}
+        return [];
+    }
+
+    _normalizeYoutubeUrl(u) {
+        try {
+            const s = String(u);
+            if (/^https?:\/\//i.test(s)) return s;
+            if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return `https://www.youtube.com/watch?v=${s}`;
+            return s;
+        } catch { return String(u); }
+    }
     async _expandYouTubePlaylist(playlistUrl) {
         const id = this._extractYouTubePlaylistId(playlistUrl);
         if (!id) return [];
-        // 0) Prefer server extractor (LangChain-backed) when enabled for reliability
-        if (this._useServer()) {
-            try {
-                const res = await fetch(`${this.base}/url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: playlistUrl }) });
-                if (res.ok) {
-                    const payload = await this._json(res);
-                    const data = payload?.extraction || payload;
-                    const vids = data?.metadata?.videos;
-                    if (data?.contentType === 'youtube-playlist' && Array.isArray(vids) && vids.length) {
-                        return Array.from(new Set(vids.map(v => String(v))));
-                    }
-                }
-            } catch {}
-        }
-    // Prefer privacy-friendly JSON APIs proxied via server to avoid CORS; try multiple hosts then fall back to HTML scraping
+        // 0) Prefer LangChain YouTube loader (client-only)
+        try {
+            const list = await this._lcExpandPlaylistViaLC(playlistUrl);
+            if (Array.isArray(list) && list.length) return list;
+        } catch {}
+        // 1) Privacy-friendly JSON APIs via proxy; then fallback to HTML scraping
         const invHosts = ['yewtu.be','vid.puffyan.us','invidious.asir.dev','inv.bp.projectsegfau.lt','iv.melmac.space'];
         const pipedHosts = ['piped.video','pipedapi.kavin.rocks','piped.moomoo.me'];
-        // 1) Piped APIs (some instances use different paths)
+        // 1a) Piped APIs (some instances use different paths)
         for (const h of pipedHosts) {
             const endpoints = [
                 `https://${h}/api/v1/playlist?playlistId=${encodeURIComponent(id)}`,
@@ -858,7 +926,7 @@ class ApiClient {
                 } catch {}
             }
         }
-        // 2) Invidious APIs
+    // 1b) Invidious APIs
         for (const h of invHosts) {
             const ep = `https://${h}/api/v1/playlists/${encodeURIComponent(id)}`;
             try {
@@ -873,7 +941,7 @@ class ApiClient {
                 }
             } catch {}
         }
-        // 3) Fallback: proxy HTML scrape (may fail with 451 depending on region)
+    // 2) Fallback: proxy HTML scrape (may fail with 451 depending on region)
         try {
             const target = `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}`;
             const res = await this._proxyFetch(target, { method: 'GET' });
@@ -900,16 +968,18 @@ class ApiClient {
         // Normalize URL
         let target = String(url || '').trim();
         if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
-        // If YouTube video: use APIs to get accurate title/description without scraping blocked pages
+        // If YouTube video: try LangChain transcript first (client-only)
         if (this._isYouTubeUrl(target) && !this._isYouTubePlaylist(target)) {
             const videoId = this._extractYouTubeVideoId(target);
             // Title from prefetch (oEmbed/alt backends)
             let title = await this._prefetchTitle(target, 1600);
+            // 0) LangChain transcript
             let transcript = '';
+            try { transcript = await this._lcLoadYoutubeTranscript(target); } catch {}
             if (videoId) {
-                try {
-                    transcript = await this._fetchYouTubeTranscript(videoId);
-                } catch {}
+                if (!transcript || transcript.length < 120) {
+                    try { transcript = await this._fetchYouTubeTranscript(videoId); } catch {}
+                }
             }
             if (!transcript || transcript.length < 120) {
                 // Fallback to description via privacy-friendly backends
@@ -938,8 +1008,8 @@ class ApiClient {
                 text: transcript || `YouTube video: ${target}`,
                 title: (title || '').trim() || this._titleFromUrl(target),
                 contentType: 'youtube',
-                extractionMethod: transcript ? 'youtube-transcript' : 'youtube-meta',
-                fallbackUsed: true,
+                extractionMethod: transcript ? (transcript && transcript.length >= 120 ? 'langchain-youtube' : 'youtube-transcript') : 'youtube-meta',
+                fallbackUsed: false,
                 metadata: { url: target, videoId }
             };
         }
