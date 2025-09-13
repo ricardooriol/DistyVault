@@ -17,7 +17,10 @@
       apiKey: ''
     },
   concurrency: 1,
-    theme: localStorage.getItem('dv.theme') || 'system'
+    theme: localStorage.getItem('dv.theme') || 'system',
+    // OCR settings (used by file extractors); UI to configure may be added later
+    ocrLang: 'eng',
+    ocrMaxPages: 30
   };
 
   const state = {
