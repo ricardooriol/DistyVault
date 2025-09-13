@@ -343,11 +343,45 @@
   }
 
   function Table({ items, now, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort }){
-    function toggle(id){ setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]); }
+    const [expandedIds, setExpandedIds] = React.useState(new Set());
+    function toggle(id){
+      setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
+    }
+    function toggleExpand(id){
+      setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    }
     function displayDuration(it){
       const active = [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
       const base = active && it.startedAt ? (now - it.startedAt) : (it.durationMs || 0);
       return base > 0 ? formatDuration(base) : '-';
+    }
+
+    // Selection behavior for playlist parent-child
+    function onRowClick(e, item){
+      if (item.kind === 'playlist') {
+        // clicking anywhere toggles selection of the playlist and all children
+        const isSelected = selected.includes(item.id);
+        const childIds = items.filter(x => x.parentId === item.id).map(x => x.id);
+        if (isSelected) {
+          setSelected(prev => prev.filter(id => id !== item.id && !childIds.includes(id)));
+        } else {
+          setSelected(prev => Array.from(new Set([...prev, item.id, ...childIds])));
+        }
+      } else if (item.parentId) {
+        // toggle child and update parent selection accordingly
+        const isSelected = selected.includes(item.id);
+        const siblings = items.filter(x => x.parentId === item.parentId);
+        let next = selected.slice();
+        if (isSelected) next = next.filter(id => id !== item.id);
+        else next = Array.from(new Set([...next, item.id]));
+        // If any child is unselected, ensure parent is unselected; if all selected, parent selected.
+        const allSelected = siblings.every(s => next.includes(s.id));
+        if (allSelected) next = Array.from(new Set([...next, item.parentId]));
+        else next = next.filter(id => id !== item.parentId);
+        setSelected(next);
+      } else {
+        toggle(item.id);
+      }
     }
 
     return (
@@ -356,7 +390,7 @@
         <table className="w-full min-w-[720px] table-fixed rounded-2xl overflow-hidden">
           <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
             <tr>
-              <th className="w-[60%] p-2 text-left cursor-pointer" onClick={()=>onSort && onSort('title')}>Name</th>
+              <th className="w-[60%] p-2 pl-4 text-left cursor-pointer" onClick={()=>onSort && onSort('title')}>Name</th>
               <th className="w-[20%] p-2 text-center cursor-pointer" onClick={()=>onSort && onSort('status')}>Status</th>
               <th className="w-[20%] p-2 text-center relative">
                 <span className="cursor-pointer" onClick={()=>onSort && onSort('duration')}>Duration</span>
@@ -369,13 +403,15 @@
               <tr><td colSpan={3} className="p-6 text-center text-slate-600 dark:text-slate-300">Paste a URL or upload a document to get started</td></tr>
             )}
             {items.map(i => (
-              <tr key={i.id} onClick={()=>toggle(i.id)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '')}>
-                <td className="p-2 text-left">
+              <tr key={i.id} onClick={(e)=>onRowClick(e, i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '')}>
+                <td className="p-2 pl-4 text-left">
                   {i.kind === 'file' ? (
                     <div className="overflow-hidden">
                       <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
                     </div>
+                  ) : i.kind === 'playlist' ? (
+                    <PlaylistRowName i={i} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
                   ) : (
                     <div className="overflow-hidden">
                       <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
@@ -392,13 +428,40 @@
                   )}
                 </td>
                 <td className="p-2 text-center">
-                  <StatusChip status={i.status} onClick={(e)=>{ e.stopPropagation(); if (i.status===STATUS.ERROR) DV.bus.emit('ui:openError', i); }} />
+                  {i.kind === 'playlist' ? null : (
+                    <StatusChip status={i.status} onClick={(e)=>{ e.stopPropagation(); if (i.status===STATUS.ERROR) DV.bus.emit('ui:openError', i); }} />
+                  )}
                 </td>
-                <td className="p-2 text-sm text-slate-700 dark:text-slate-200 text-center">{displayDuration(i)}</td>
+                <td className="p-2 text-sm text-slate-700 dark:text-slate-200 text-center">{i.kind === 'playlist' ? '' : displayDuration(i)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
+      </div>
+    );
+  }
+
+  function PlaylistRowName({ i, expandedIds, setExpandedIds }){
+    const expanded = expandedIds && expandedIds.has(i.id);
+    return (
+      <div className="overflow-hidden flex items-start gap-2">
+        <button
+          className="mt-0.5 w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center"
+          title={expanded ? 'Collapse' : 'Expand'}
+          onClick={(e)=>{ e.stopPropagation(); setExpandedIds(prev=>{ const n=new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}
+        >
+          <span className="inline-block transform" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+            <Icon name="chevron-right" />
+          </span>
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
+          {i.url ? (
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
+          ) : (
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
+          )}
         </div>
       </div>
     );
@@ -669,13 +732,15 @@
         try {
           const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(url);
           if (isPlaylist) {
-            // Extract playlist items and enqueue each as a YouTube video
-            const { items: vids } = await DV.extractors.extractYouTubePlaylist(url);
+            // Extract playlist items and enqueue a parent playlist + children videos
+            const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(url);
             if (!vids || !vids.length) throw new Error('No videos found in playlist');
+            // Create parent playlist item (non-processing)
+            const parent = await DV.queue.addItem({ kind: 'playlist', url, title: plTitle || 'YouTube Playlist' });
             const LIMIT = 100;
             const list = vids.slice(0, LIMIT);
             for (const v of list) {
-              additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url }));
+              additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url, parentId: parent.id }));
             }
           } else {
             const isYt = DV.extractors.isYouTube(url);
@@ -1051,7 +1116,35 @@ a:hover{text-decoration:underline}
       if (k === 'queue') DV.queue.loadQueue();
     };
 
-    const visibleItems = filteredSorted();
+    const allItemsSorted = filteredSorted();
+    // Build a flattened list that expands playlist children only when expanded
+    const [expandedIds, setExpandedIds] = React.useState(new Set());
+    const byParent = React.useMemo(() => {
+      const map = new Map();
+      for (const it of allItemsSorted) {
+        if (it.parentId) {
+          if (!map.has(it.parentId)) map.set(it.parentId, []);
+          map.get(it.parentId).push(it);
+        }
+      }
+      return map;
+    }, [allItemsSorted]);
+    const visibleItems = React.useMemo(() => {
+      const out = [];
+      const seen = new Set();
+      for (const it of allItemsSorted) {
+        if (seen.has(it.id)) continue;
+        if (!it.parentId) {
+          out.push(it);
+          seen.add(it.id);
+          if (it.kind === 'playlist' && expandedIds.has(it.id)) {
+            const children = byParent.get(it.id) || [];
+            for (const ch of children) { out.push(ch); seen.add(ch.id); }
+          }
+        }
+      }
+      return out;
+    }, [allItemsSorted, expandedIds, byParent]);
     const anyActive = selected.some(id => {
       const it = items.find(x=> x.id===id);
       return it && [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
