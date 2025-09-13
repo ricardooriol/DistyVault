@@ -206,7 +206,6 @@
   async function extractYouTube(itemOrUrl) {
     const inputUrl = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl.url || '');
     if (!isYouTube(inputUrl)) throw new Error('Not a valid YouTube URL');
-    if (isYouTubePlaylist(inputUrl)) throw new Error('Got a playlist URL; use extractYouTubePlaylist for lists');
     const id = parseVideoId(inputUrl);
     if (!id) throw new Error('Could not parse YouTube video id');
 
@@ -296,7 +295,7 @@
         const videoId = v.videoId;
         const title = v.title?.runs ? textFromRuns(v.title.runs) : (v.title?.simpleText || 'Untitled');
         const isPlayable = !(v.isPlayable === false) && !!videoId;
-        const url = videoId ? ('https://www.youtube.com/watch?v=' + videoId + '&list=' + listId) : '';
+        const url = videoId ? ('https://www.youtube.com/watch?v=' + videoId) : '';
         return isPlayable && videoId ? { videoId, title: title || ('Video ' + videoId), url } : null;
       })
       .filter(Boolean);
