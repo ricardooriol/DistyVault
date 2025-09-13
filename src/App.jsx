@@ -677,8 +677,6 @@
             for (const v of list) {
               additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url }));
             }
-            if (vids.length > LIMIT) DV.toast(`Added ${list.length}/${vids.length} videos (truncated)`, { type: 'info' });
-            else DV.toast(`Added ${list.length} videos from playlist`, { type: 'success' });
           } else {
             const isYt = DV.extractors.isYouTube(url);
             const kind = isYt ? 'youtube' : 'url';
