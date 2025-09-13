@@ -530,18 +530,19 @@
   }
 
   function SettingsDrawer({ open, onClose, settings, setSettings }){
-  const [local, setLocal] = useState(settings);
+  const DEFAULTS = { ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 };
+  const [local, setLocal] = useState(settings || DEFAULTS);
     const [testing, setTesting] = useState(false);
     useEffect(()=> {
       // Deep clone to ensure Reset reliably reverts UI controls
-      const cloned = settings ? { ...settings, ai: { ...(settings.ai||{}) } } : { ai:{}, concurrency: 2 };
+      const cloned = settings ? { ...settings, ai: { ...(settings.ai||{}) } } : { ...DEFAULTS };
       setLocal(cloned);
     }, [settings]);
 
   function save(){ setSettings(local); DV.toast('Settings saved', { type: 'success' }); onClose(); }
     function reset(){
-      const cloned = settings ? { ...settings, ai: { ...(settings.ai||{}) } } : { ai:{}, concurrency: 2 };
-      setLocal(cloned);
+      // Restore default settings in the UI; user can click Save to persist
+      setLocal({ ...DEFAULTS });
       setTesting(false);
     }
     async function testKey(){
