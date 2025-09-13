@@ -31,13 +31,8 @@
     });
   }
 
-  // Optional configuration sourced from app settings
-  function getOcrLang(){
-    try { return (DV.queue && DV.queue.getSettings && (DV.queue.getSettings().ocrLang || 'eng')) || 'eng'; } catch { return 'eng'; }
-  }
-  function getOcrMaxPages(){
-    try { const n = DV.queue && DV.queue.getSettings && Number(DV.queue.getSettings().ocrMaxPages); return n>0?Math.min(200, n):30; } catch { return 30; }
-  }
+  // OCR configuration (hardcoded for browser feasibility)
+  const OCR_MAX_PAGES = 50; // limit OCR workload on large PDFs
 
   async function ensurePdfJs(){
     // pdf.js 3.x UMD
@@ -112,11 +107,12 @@
     }
   }
 
-  async function readImageWithOCR(file, ocrLang=getOcrLang()){
+  async function readImageWithOCR(file){
     await ensureTesseract();
     const blobUrl = URL.createObjectURL(file);
     try {
-      const { data } = await window.Tesseract.recognize(blobUrl, ocrLang, { logger: m => DV.bus && DV.bus.emit && DV.bus.emit('ocr:progress', { ...m, file: file.name }) });
+      // Do not force language; let Tesseract use its default behavior
+      const { data } = await window.Tesseract.recognize(blobUrl, undefined, { logger: m => DV.bus && DV.bus.emit && DV.bus.emit('ocr:progress', { ...m, file: file.name }) });
       return normalizeText(data?.text || '');
     } finally {
       setTimeout(()=> URL.revokeObjectURL(blobUrl), 3000);
@@ -138,13 +134,13 @@
     return normalizeText(out.join('\n\n'));
   }
 
-  async function readPdfWithOCR(pdfFile, ocrLang=getOcrLang(), maxPages=getOcrMaxPages()){
+  async function readPdfWithOCR(pdfFile){
     await ensurePdfJs();
     await ensureTesseract();
     const buf = await pdfFile.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
     const texts = [];
-    const pages = Math.min(pdf.numPages, maxPages);
+    const pages = Math.min(pdf.numPages, OCR_MAX_PAGES);
     for (let i=1; i<=pages; i++){
       const page = await pdf.getPage(i);
       const viewport = page.getViewport({ scale: 2 });
@@ -153,13 +149,13 @@
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
-      const { data } = await window.Tesseract.recognize(canvas, ocrLang, { logger: m => DV.bus && DV.bus.emit && DV.bus.emit('ocr:progress', { ...m, page: i, file: pdfFile.name }) });
+      const { data } = await window.Tesseract.recognize(canvas, undefined, { logger: m => DV.bus && DV.bus.emit && DV.bus.emit('ocr:progress', { ...m, page: i, file: pdfFile.name }) });
       texts.push(data?.text || '');
       // cleanup
       canvas.width = canvas.height = 0;
       await sleep(0);
     }
-    if (pdf.numPages > maxPages) texts.push(`\n[Truncated OCR at ${maxPages} pages of ${pdf.numPages}]`);
+    if (pdf.numPages > OCR_MAX_PAGES) texts.push(`\n[Truncated OCR at ${OCR_MAX_PAGES} pages of ${pdf.numPages}]`);
     return normalizeText(texts.join('\n\n'));
   }
 
