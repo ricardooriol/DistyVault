@@ -28,6 +28,14 @@
     return m ? m[1] : '';
   }
 
+  function isYouTubePlaylist(u=''){
+    try { const url = new URL(u); return ytHostRegex.test(url.hostname) && !!url.searchParams.get('list'); } catch { return /[?&]list=PL|[?&]list=LL|[?&]list=OL|[?&]list=UU|[?&]list=RD/.test(String(u)); }
+  }
+
+  function getPlaylistId(u=''){
+    try { const url = new URL(u); return url.searchParams.get('list') || ''; } catch { const m = String(u).match(/[?&]list=([^&#]+)/); return m ? decodeURIComponent(m[1]) : ''; }
+  }
+
   async function fetchWithTimeout(url, opts={}, ms=12000){
     const controller = new AbortController();
     const t = setTimeout(()=> controller.abort(), ms);
@@ -198,6 +206,7 @@
   async function extractYouTube(itemOrUrl) {
     const inputUrl = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl.url || '');
     if (!isYouTube(inputUrl)) throw new Error('Not a valid YouTube URL');
+    if (isYouTubePlaylist(inputUrl)) throw new Error('Got a playlist URL; use extractYouTubePlaylist for lists');
     const id = parseVideoId(inputUrl);
     if (!id) throw new Error('Could not parse YouTube video id');
 
@@ -234,9 +243,75 @@
     return { kind: 'youtube', url: inputUrl, title, text: textOut, videoId: id, language };
   }
 
+  // ---- Playlist extraction (first page only; large playlists may be truncated) ----
+  function extractYtInitialData(html=''){
+    const marker = 'ytInitialData';
+    const idx = html.indexOf(marker);
+    if (idx === -1) return null;
+    let i = html.indexOf('{', idx);
+    if (i === -1) return null;
+    let depth = 0, inStr=false, esc=false, end=-1;
+    for (; i<html.length; i++){
+      const ch = html[i];
+      if (inStr){
+        if (esc) esc=false; else if (ch==='\\') esc=true; else if (ch==='"') inStr=false;
+      } else {
+        if (ch==='"') inStr=true; else if (ch==='{' ) depth++; else if (ch==='}') { depth--; if (depth===0){ end=i+1; break; } }
+      }
+    }
+    if (end === -1) return null;
+    try { return JSON.parse(html.slice(html.indexOf('{', idx), end)); } catch { return null; }
+  }
+
+  function collectPlaylistVideoRenderers(node, out){
+    if (!node || typeof node !== 'object') return;
+    if (node.playlistVideoRenderer) { out.push(node.playlistVideoRenderer); return; }
+    for (const k in node){
+      const v = node[k];
+      if (Array.isArray(v)) v.forEach(x => collectPlaylistVideoRenderers(x, out));
+      else if (v && typeof v === 'object') collectPlaylistVideoRenderers(v, out);
+    }
+  }
+
+  function textFromRuns(runs){
+    if (!Array.isArray(runs)) return '';
+    return runs.map(r => r.text || '').join('').trim();
+  }
+
+  async function extractYouTubePlaylist(itemOrUrl){
+    const inputUrl = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl.url || '');
+    if (!isYouTube(inputUrl) || !isYouTubePlaylist(inputUrl)) throw new Error('Not a valid YouTube playlist URL');
+    const listId = getPlaylistId(inputUrl);
+    if (!listId) throw new Error('Could not parse playlist id');
+    const url = 'https://www.youtube.com/playlist?list=' + encodeURIComponent(listId) + '&hl=en';
+    const res = await fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 15000).catch(()=>null);
+    if (!res || !res.ok) throw new Error('Failed to load playlist page');
+    const html = await res.text();
+    const data = extractYtInitialData(html);
+    if (!data) throw new Error('Failed to parse playlist data');
+    const nodes = [];
+    collectPlaylistVideoRenderers(data, nodes);
+    const items = nodes
+      .map(v => {
+        const videoId = v.videoId;
+        const title = v.title?.runs ? textFromRuns(v.title.runs) : (v.title?.simpleText || 'Untitled');
+        const isPlayable = !(v.isPlayable === false) && !!videoId;
+        const url = videoId ? ('https://www.youtube.com/watch?v=' + videoId + '&list=' + listId) : '';
+        return isPlayable && videoId ? { videoId, title: title || ('Video ' + videoId), url } : null;
+      })
+      .filter(Boolean);
+    // Deduplicate by videoId and keep order
+    const seen = new Set();
+    const unique = [];
+    for (const it of items){ if (!seen.has(it.videoId)) { seen.add(it.videoId); unique.push(it); } }
+    return { listId, items: unique };
+  }
+
   window.DV = window.DV || {};
   window.DV.extractors = window.DV.extractors || {};
   window.DV.extractors.extractYouTube = extractYouTube;
   window.DV.extractors.isYouTube = isYouTube;
+  window.DV.extractors.isYouTubePlaylist = isYouTubePlaylist;
+  window.DV.extractors.extractYouTubePlaylist = extractYouTubePlaylist;
   window.DV.extractors.peekYouTubeTitle = peekYouTubeTitle;
 })();
