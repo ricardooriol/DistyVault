@@ -50,7 +50,8 @@ Then navigate to http://localhost:8080
 - PDF text extraction uses pdf.js and falls back to OCR when text content is sparse (e.g., scanned PDFs). For very large PDFs, OCR is truncated after ~30 pages.
 - Legacy Word .doc is not supported client-side.
 - YouTube/playlist extraction is placeholder (no transcript API yet).
- - YouTube transcript extraction uses captions when available (no Google API key needed). If a video has no captions, you'll see a notice. Playlists are not expanded yet.
+- YouTube transcript extraction uses captions when available (no Google API key needed). If a video has no captions, you'll see a notice.
+- YouTube playlists: paste a playlist URL to enqueue videos from the list (first page; up to ~100 videos added in one go). Each video will extract its own transcript.
 - PDF export renders plaintext from distilled HTML for broad compatibility.
 
 ### Client-side libs used (loaded lazily on demand)

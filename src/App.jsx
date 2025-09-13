@@ -372,16 +372,21 @@
               <tr key={i.id} onClick={()=>toggle(i.id)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '')}>
                 <td className="p-2 text-left">
                   {i.kind === 'file' ? (
-                    <div className="font-medium text-slate-900 dark:text-slate-100">{i.title}</div>
+                    <div className="overflow-hidden">
+                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
+                    </div>
                   ) : (
-                    <div>
-                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                    <div className="overflow-hidden">
+                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
                         {(i.title && i.title !== i.url) ? i.title : 
                          (i.status === STATUS.PENDING ? `Loading from ${i.title}...` : 
                           (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
                       </div>
-                      {i.url && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 break-all mt-1">{i.url}</div>
+                      {i.url ? (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
+                      ) : (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
                       )}
                     </div>
                   )}
@@ -661,25 +666,43 @@
     async function handleSubmit(url, files){
       const additions = [];
       if (url) {
-        const isYt = DV.extractors.isYouTube(url);
-        const kind = isYt ? 'youtube' : 'url';
-        // Extract domain name for a better initial title
-        const placeholder = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || url;
-        const recPromise = DV.queue.addItem({ kind, url, title: placeholder });
-        additions.push(recPromise);
-        // Fire-and-forget: quickly peek title and update the item once id is known
-        recPromise.then(async rec => {
-          try {
-            const peek = isYt
-              ? (DV.extractors.peekYouTubeTitle ? await DV.extractors.peekYouTubeTitle(url) : null)
-              : (DV.extractors.peekTitle ? await DV.extractors.peekTitle(url) : null);
-            if (peek && peek.title) await DV.queue.updateItem(rec.id, { title: peek.title, url: peek.url || url });
-          } catch {}
-        });
+        try {
+          const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(url);
+          if (isPlaylist) {
+            // Extract playlist items and enqueue each as a YouTube video
+            const { items: vids } = await DV.extractors.extractYouTubePlaylist(url);
+            if (!vids || !vids.length) throw new Error('No videos found in playlist');
+            const LIMIT = 100;
+            const list = vids.slice(0, LIMIT);
+            for (const v of list) {
+              additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url }));
+            }
+            if (vids.length > LIMIT) DV.toast(`Added ${list.length}/${vids.length} videos (truncated)`, { type: 'info' });
+            else DV.toast(`Added ${list.length} videos from playlist`, { type: 'success' });
+          } else {
+            const isYt = DV.extractors.isYouTube(url);
+            const kind = isYt ? 'youtube' : 'url';
+            // Extract domain name for a better initial title
+            const placeholder = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || url;
+            const recPromise = DV.queue.addItem({ kind, url, title: placeholder });
+            additions.push(recPromise);
+            // Fire-and-forget: quickly peek title and update the item once id is known
+            recPromise.then(async rec => {
+              try {
+                const peek = isYt
+                  ? (DV.extractors.peekYouTubeTitle ? await DV.extractors.peekYouTubeTitle(url) : null)
+                  : (DV.extractors.peekTitle ? await DV.extractors.peekTitle(url) : null);
+                if (peek && peek.title) await DV.queue.updateItem(rec.id, { title: peek.title, url: peek.url || url });
+              } catch {}
+            });
+          }
+        } catch (e) {
+          DV.toast(String(e && (e.message || e)), { type: 'error' });
+        }
       }
       for (const f of files) additions.push(DV.queue.addItem({ kind:'file', title: f.name, fileName: f.name, size: f.size, file: f, fileType: f.type }));
       await Promise.all(additions);
-      DV.toast('Added to queue', { type: 'success' });
+      if (!DV.extractors.isYouTubePlaylist || !DV.extractors.isYouTubePlaylist(url)) DV.toast('Added to queue', { type: 'success' });
     }
 
     async function htmlToPlainText(html=''){
