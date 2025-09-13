@@ -290,7 +290,7 @@
               value={search}
               onChange={e=>setSearch(e.target.value)}
               placeholder="Search…"
-              className="absolute left-0 top-0 h-9 w-full max-w-[600px] pl-12 pr-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none shadow z-20 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+              className="absolute left-0 top-0 h-9 w-full max-w-[600px] pl-12 pr-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none shadow z-40 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
             />
           )}
           <div className="relative z-20" ref={filterRef}>
@@ -502,6 +502,28 @@
               <Icon name="x" />
             </button>
           </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-sm font-medium mb-1">OCR Language</div>
+                <input
+                  value={local.ocrLang || 'eng'}
+                  onChange={e=> setLocal({ ...local, ocrLang: e.target.value || 'eng' })}
+                  placeholder="e.g. eng, spa, deu, fra"
+                  className="w-full h-10 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-slate-100 px-2"/>
+                <div className="text-xs text-slate-500 mt-1">Used by in-browser OCR. Default: eng</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium mb-1">OCR Max Pages (PDF)</div>
+                <input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={Number(local.ocrMaxPages || 30)}
+                  onChange={e=> setLocal({ ...local, ocrMaxPages: Math.max(1, Math.min(200, Number(e.target.value||30))) })}
+                  className="w-full h-10 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-slate-100 px-2"/>
+                <div className="text-xs text-slate-500 mt-1">Limits OCR work on large PDFs. Default: 30</div>
+              </div>
+            </div>
           <div className="space-y-4">
             <div>
               <div className="text-sm font-medium mb-1">AI Provider</div>
@@ -619,7 +641,7 @@
       const off2 = DV.bus.on('items:added', async ()=> setItems(await DV.db.getAll('items')));
       const off3 = DV.bus.on('items:updated', async ()=> setItems(await DV.db.getAll('items')));
       const off4 = DV.bus.on('ui:openError', setErrorItem);
-      DV.queue.loadSettings().then(()=> setSettings(prev=> ({...prev, ...DV.queue?.settings})));
+      DV.queue.loadSettings().then(()=> setSettings(DV.queue.getSettings()));
       DV.queue.loadQueue();
       return () => { off1(); off2(); off3(); off4(); };
     }, []);
