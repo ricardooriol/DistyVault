@@ -413,8 +413,10 @@
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow max-w-[95vw]">
         <div className="overflow-x-auto">
           <div className="inline-flex items-center gap-2 whitespace-nowrap">
-            {/* Actions first: View, Retry, (Stop), Download, Delete */}
-            <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>
+            {/* Actions first: View (only for single selection), Retry, (Stop), Download, Delete */}
+            {count === 1 && (
+              <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>
+            )}
             <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
             {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
             <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="download" /><span>Download</span></button>
@@ -921,7 +923,7 @@ a:hover{text-decoration:underline}
         }
       }
       const blob = await zip.generateAsync({ type:'blob' });
-      await saveBlob(blob, 'distyvault-completed.zip');
+      await saveBlob(blob, 'distyvault-bulk.zip');
     }
 
     function sanitize(s='') { return s.replace(/[^a-z0-9 _-]+/ig,'_').slice(0,80) || 'file'; }
@@ -1086,6 +1088,23 @@ a:hover{text-decoration:underline}
         setLoading(false);
       });
     }, [item?.id]);
+
+    // Ensure iframe theme matches parent immediately when loaded
+    useEffect(() => {
+      const fr = iframeRef.current;
+      if (!fr) return;
+      function sendTheme(){
+        try {
+          const isDark = document.documentElement.classList.contains('dark');
+          fr.contentWindow && fr.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*');
+        } catch {}
+      }
+      // Send when the iframe finishes loading the srcDoc
+      fr.addEventListener('load', sendTheme, { once: true });
+      // Also send after a short tick in case of delayed contentWindow
+      const t = setTimeout(sendTheme, 50);
+      return () => { clearTimeout(t); };
+    }, [html]);
 
     return (
       <Modal open={!!item} onClose={onClose} title={item?.title || 'Content'} hideHeader>
