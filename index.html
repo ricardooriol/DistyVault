@@ -89,6 +89,22 @@
           const pref = localStorage.getItem('dv.theme') || 'system';
           const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.classList.toggle('dark', isDark);
+          // If using system theme, listen for OS changes and sync automatically
+          const mq = window.matchMedia('(prefers-color-scheme: dark)');
+          function onChange(){
+            try {
+              const prefNow = localStorage.getItem('dv.theme') || 'system';
+              if (prefNow !== 'system') return;
+              const darkNow = mq.matches;
+              document.documentElement.classList.toggle('dark', darkNow);
+              // Notify any embedded iframes/viewers
+              const msg = { type: 'dv-theme', isDark: darkNow };
+              document.querySelectorAll('iframe').forEach(fr => { try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch {} });
+              window.postMessage(msg, '*');
+            } catch {}
+          }
+          if (mq && mq.addEventListener) mq.addEventListener('change', onChange);
+          else if (mq && mq.addListener) mq.addListener(onChange);
         } catch {}
       })();
       window.DV = { version: '0.1.0' };
