@@ -903,14 +903,14 @@ a:hover{text-decoration:underline}
     try { if (window && window.DV) window.DV.buildViewerHtml = buildViewerHtml; } catch {}
 
     async function downloadAllCompleted(){
-      const completed = items.filter(i=> i.status===STATUS.COMPLETED);
+  const completed = items.filter(i=> i.status===STATUS.COMPLETED);
       if (!completed.length) return;
       if (completed.length === 1) {
         const it = completed[0];
         const content = await DV.db.get('contents', it.id);
         if (content?.html) {
           const pdf = await makePdfBlobFromHtml(content.html, it.title || 'Document');
-          await saveBlob(pdf, `${sanitize(it.title)}.pdf`);
+          await saveBlob(pdf, pdfFileName(it.title));
         }
         return;
       }
@@ -920,7 +920,7 @@ a:hover{text-decoration:underline}
         const content = await DV.db.get('contents', it.id);
         if (content?.html) {
           const pdf = await makePdfBlobFromHtml(content.html, it.title || 'Document');
-          zip.file(`${sanitize(it.title)}.pdf`, pdf);
+          zip.file(pdfFileName(it.title), pdf);
         }
       }
       const blob = await zip.generateAsync({ type:'blob' });
@@ -928,6 +928,15 @@ a:hover{text-decoration:underline}
     }
 
     function sanitize(s='') { return s.replace(/[^a-z0-9 _-]+/ig,'_').slice(0,80) || 'file'; }
+    function stripExtLike(s=''){
+      let out = String(s||'').trim();
+      // Remove common dot extensions at end (case-insensitive)
+      out = out.replace(/\.(pdf|docx|doc|txt|md|rtf|html?|png|jpe?g|webp|gif|tiff?)$/i, '');
+      // Remove sanitized suffix variants like _pdf, _docx, etc.
+      out = out.replace(/_(pdf|docx|doc|txt|md|rtf|html?|png|jpe?g|webp|gif|tiff?)$/i, '');
+      return out.trim();
+    }
+    function pdfFileName(title){ return `${sanitize(stripExtLike(title || 'Document'))}.pdf`; }
 
     async function stopAll(){
       items.forEach(i => DV.queue.requestStop(i.id));
@@ -986,7 +995,7 @@ a:hover{text-decoration:underline}
         const content = await DV.db.get('contents', id);
         if (content?.html) {
           const pdf = await makePdfBlobFromHtml(content.html, item?.title || 'Document');
-          await saveBlob(pdf, `${sanitize(item?.title||id)}.pdf`);
+          await saveBlob(pdf, pdfFileName(item?.title||id));
         }
         return;
       }
@@ -997,7 +1006,7 @@ a:hover{text-decoration:underline}
         const content = await DV.db.get('contents', id);
         if (content?.html) {
           const pdf = await makePdfBlobFromHtml(content.html, item?.title || 'Document');
-          zip.file(`${sanitize(item?.title||id)}.pdf`, pdf);
+          zip.file(pdfFileName(item?.title||id), pdf);
         }
       }
       const blob = await zip.generateAsync({ type:'blob' });
