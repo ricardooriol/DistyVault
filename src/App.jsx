@@ -15,7 +15,7 @@
     });
   }
 
-  // Save helper: prefer File System Access API; fallback to anchor download (no Web Share)
+  // Save helper: prefer File System Access API; mobile-first: Web Share API; fallback to anchor download without navigating away
   async function saveBlob(blob, filename){
     // 1) Use the File System Access API when available (desktop Chromium). If cancelled, just return.
     try {
@@ -34,13 +34,37 @@
       if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return; // user canceled
     }
 
-    // 2) Fallback: anchor download. This may open a preview on some browsers but avoids hard navigation.
+    // 2) Mobile-friendly: Web Share API with files (iOS/Android). Avoids navigation & blank pages.
+    try {
+      const supportsFiles = typeof File !== 'undefined' && typeof navigator !== 'undefined' && navigator.share;
+      if (supportsFiles) {
+        const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename });
+          return;
+        }
+      }
+    } catch (e) {
+      // If the user cancels the share sheet, just stop quietly
+      const msg = String(e && (e.name || e.message || e));
+      if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
+      // otherwise continue to fallback
+    }
+
+    // 3) Fallbacks: FileSaver.js if present; else anchor with target _blank to avoid replacing the SPA
+    try {
+      if (typeof window.saveAs === 'function') {
+        window.saveAs(blob, filename);
+        return;
+      }
+    } catch {}
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.rel = 'noopener';
-    a.target = '_self';
+    a.target = '_blank'; // open in new tab to avoid blank/replaced SPA in mobile browsers
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
@@ -613,6 +637,16 @@
       localStorage.setItem('dv.theme', t);
       const isDark = t === 'dark' || (t==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.toggle('dark', isDark);
+      // Notify any embedded viewers to sync theme immediately
+      try {
+        const msg = { type: 'dv-theme', isDark };
+        // Broadcast to all iframes first
+        document.querySelectorAll('iframe').forEach(fr => {
+          try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch {}
+        });
+        // Also broadcast to same window listeners (if any)
+        window.postMessage(msg, '*');
+      } catch {}
     }
 
     function applySettings(s){
@@ -794,7 +828,7 @@
         const themeClass = isDark ? 'dark' : '';
         
         // Ultra-light viewer: optimized for speed with immediate theme application
-        const html = `<!doctype html><html class="${themeClass}"><head><meta charset="utf-8"/><meta name="color-scheme" content="light dark" /><style>
+  const html = `<!doctype html><html class="${themeClass}"><head><meta charset="utf-8"/><meta name="color-scheme" content="light dark" /><style>
 :root{color-scheme:light dark}
 *{box-sizing:border-box}
 body{margin:0;padding:16px;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.6;color:#0f172a;background:#ffffff;font-size:15px;transition:none}
@@ -830,17 +864,29 @@ a:hover{text-decoration:underline}
     // Initial sync
     syncTheme();
     
-    // Watch for theme changes
-    if(pd&&pd.classList){
-      var mo=new MutationObserver(syncTheme);
-      mo.observe(pd,{attributes:true,attributeFilter:['class']});
-    }
+    // Watch for theme changes in the parent (best effort; some browsers may not allow cross-document observers)
+    try {
+      if(pd&&pd.classList){
+        var mo=new MutationObserver(syncTheme);
+        mo.observe(pd,{attributes:true,attributeFilter:['class']});
+      }
+    } catch (e) {}
     
     // Also listen for storage events in case theme is synced via localStorage
     window.addEventListener('storage',function(e){
-      if(e.key==='theme'||e.key==='darkMode'){
+      if(e && (e.key==='dv.theme'||e.key==='theme'||e.key==='darkMode')){
         setTimeout(syncTheme,0);
       }
+    });
+    
+    // Listen for explicit theme messages from parent
+    window.addEventListener('message', function(e){
+      try {
+        var data = e && e.data;
+        if (data && data.type === 'dv-theme'){
+          if (data.isDark) d.classList.add('dark'); else d.classList.remove('dark');
+        }
+      } catch {}
     });
     
   }catch(e){}
