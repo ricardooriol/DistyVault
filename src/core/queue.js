@@ -55,6 +55,7 @@
     const record = {
       id,
       kind: item.kind, // 'url' | 'youtube' | 'file'
+      parentId: item.parentId || null,
       title: item.title || item.name || item.url || 'Untitled',
       url: item.url || null,
       fileName: item.fileName || null,
@@ -63,7 +64,8 @@
       hasFile: !!item.file,
       createdAt: now,
       updatedAt: now,
-      status: STATUS.PENDING,
+      // playlist is a grouping item; do not enqueue for processing and leave status blank
+      status: item.kind === 'playlist' ? null : STATUS.PENDING,
       error: null,
       durationMs: 0,
       queueIndex: state.queue.length,
@@ -155,7 +157,7 @@
     // get latest items from db to pick pending
     const items = await DV.db.getAll('items');
     const pending = items
-      .filter(i => i.status === STATUS.PENDING)
+      .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
       .sort((a,b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0));
 
     for (const itm of pending.slice(0, want)) {

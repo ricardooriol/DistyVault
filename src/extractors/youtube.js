@@ -288,6 +288,19 @@
     const html = await res.text();
     const data = extractYtInitialData(html);
     if (!data) throw new Error('Failed to parse playlist data');
+    // Try pull the playlist title
+    let title = '';
+    try {
+      // Common path: header.playlistHeaderRenderer.title.runs[].text
+      const header = data?.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.playlistVideoListRenderer?.title ||
+                     data?.header?.playlistHeaderRenderer?.title;
+      if (header?.runs) title = textFromRuns(header.runs);
+      else if (header?.simpleText) title = header.simpleText;
+    } catch {}
+    if (!title) {
+      // Fallback: try document title
+      try { const doc = new DOMParser().parseFromString(html, 'text/html'); title = (doc.querySelector('title')?.textContent || '').replace(/\s*-\s*YouTube\s*$/i,'').trim(); } catch {}
+    }
     const nodes = [];
     collectPlaylistVideoRenderers(data, nodes);
     const items = nodes
@@ -303,7 +316,7 @@
     const seen = new Set();
     const unique = [];
     for (const it of items){ if (!seen.has(it.videoId)) { seen.add(it.videoId); unique.push(it); } }
-    return { listId, items: unique };
+    return { listId, title: title || 'YouTube Playlist ' + listId, items: unique };
   }
 
   window.DV = window.DV || {};
