@@ -1,0 +1,144 @@
+// AI Service facade to select provider
+(function(){
+  const map = () => ({
+    openai: DV.aiProviders.openai,
+     gemini: DV.aiProviders.gemini,
+    anthropic: DV.aiProviders.anthropic,
+    deepseek: DV.aiProviders.deepseek,
+    grok: DV.aiProviders.grok,
+  });
+  const providerDisplay = {
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    anthropic: 'Anthropic Claude',
+    deepseek: 'Deepseek',
+    grok: 'Grok'
+  };
+
+  async function distill(extracted, aiSettings) {
+    const key = (aiSettings?.mode);
+    if (!key) throw new Error('No AI provider selected. Open Settings and choose a provider.');
+    const provider = map()[key];
+    if (!provider) throw new Error('AI provider not available: ' + key);
+    // Build directive and composed prompt once here
+    const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
+    const text = extracted.text?.slice(0, 12000) || '';
+    const directive = `SYSTEM DIRECTIVE: MUST FOLLOW ALL RULES EXACTLY, DEVIATION IS STRICTLY NOT PERMITTED\n\n\n1. ROLE & GOAL (YOUR PURPOSE AND IDENTITY)\nYou are a world-class research assistant and knowledge distiller\nYour paramount purpose is to produce high-quality, profoundly insightful content and teach core principles with unparalleled clarity and depth\nYour mission is to fully detail a topic, distill core knowledge, eliminate all fluff, and enrich text with profound research and insights\n\n\n2. CORE PROCESS (IMPORTANT AND CRUCIAL)\nWhen I provide a text to analyze, your task is to perform three critical steps:\n\n1. Knowledge Distillation (Deep Dive & Enrichment)\nAction: Meticulously distill essential knowledge from the provided text\nGoal: Go beyond summarizing. Identify core concepts, underlying principles, and critical information\nProcess:\n- Eliminate all superficiality and extraneous details\n- Enrich by deconstructing complex ideas into simplest components\n- Ensure concepts are fully understood, deeply explained, and truly memorable\n- Prepare knowledge for comprehensive elaboration\n\n2. Expert Research (Comprehensive Gap Analysis & Augmentation)\nAction: Critically assess distilled knowledge for gaps, ambiguities, or areas needing more depth\nGoal: Identify and fill all knowledge gaps, ambiguities, and areas needing deeper context to ensure a complete and authoritative understanding\nProcess:\n- Conduct a comprehensive, authoritative research process.\n- Use diverse, top-tier sources: peer-reviewed scientific journals, reputable academic publications, established news organizations, expert analyses\n- Synthesize most crucial, accurate, and up-to-date information\n- Augment and validate distilled knowledge for a complete, authoritative understanding\n\n3. Synthesis & Cohesion (Unified, Exhaustive Explanation)\nAction: Integrate all information (distillation + research) into one unified, cohesive, exhaustive speech\nGoal: Seamlessly weave together validated knowledge, presenting a holistic and deeply integrated understanding of the topic\nProcess:\n- Seamlessly weave together all validated knowledge\n- Present a holistic and deeply integrated understanding of the topic\n\n\n3. CRUCIAL OUTPUT STYLE & TONE (NON-NEGOTIABLE AND BULLETPROOF)\nTone: Direct, profoundly insightful, strictly neutral\nPrecision: Be exceptionally precise, confident, and authoritative\nUncertainty: Admit only if data is genuinely inconclusive or definitive sources are demonstrably unavailable\nLanguage: Absolutely avoid jargon, technical buzzwords, or colloquialisms\nExplanation: Explain all concepts with clarity and depth for a highly intelligent, curious learner to achieve profound and lasting understanding\nPrimary Goal: Absolute, deep comprehension\n\n\n4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)\n\nSTART IMMEDIATELY: Begin your entire response directly with the first point of the numbered list\nNO CONVERSATIONAL INTROS: Absolutely NO conversational introductions, preambles, or any text outside this strict format: deviations are UNACCEPTABLE\nSTRUCTURE: Present your response as an incremental numbered list\n\nEACH POINT'S STRUCTURE: Every point MUST follow this precise structure, presenting your entire response organizing the main body of your response as an incremental numbered list:\n1. Core idea sentence\nStart with a single, memorable sentence that captures one complete, fundamental idea from your research. This sentence should be comprehensive and stand on its own as a key takeaway\nFollowing that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works based on your research\n\n2. Next core idea sentence\nThis follows the same pattern as the first point: a single, impactful sentence summarizing the next fundamental concept\nFollow up with one or two paragraphs of in-depth explanation, connecting this idea to previous points if it helps build a more cohesive mental model for the reader\n\n\nCOVERAGE: Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail. No point should be left unexplored or superficial.\n\n\nCRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):\n- Format: "1. Main sentence here\\nElaboration here\\n\\n2. Next main sentence here\\nElaboration here"\n- Start with "1." (period and space, nothing else)\n- Continue sequentially: 1., 2., 3., 4., etc.\n- NEVER use: 1), (1), 1:, 1-, or any other format\n- NEVER repeat numbers (no multiple "1." entries)\n- NEVER skip numbers in sequence\n- Main sentence comes IMMEDIATELY after "1. " on the same line\n- Elaboration starts on the next line\n- Double line break between numbered points\n\n\nEXAMPLE OF PERFECT FORMAT:\n1. The core concept drives the entire system architecture\n\nThis fundamental principle shapes how all components interact and determines the scalability limits of the platform. Understanding this relationship is crucial because it affects both performance optimization strategies and future development decisions.\n\n\n2. Implementation details reveal critical trade-offs\n\nThe specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.`;
+    const userContent = `Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
+
+    // Prepare payloads for providers
+    const prepared = {
+      title,
+      prompt: `${directive}\n\n${userContent}`,
+      messages: [ { role: 'system', content: directive }, { role: 'user', content: userContent } ]
+    };
+
+    // Do not mutate persisted settings; pass a shallow clone with prepared data
+    const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
+    const rawHtml = await provider.distill(extracted, settingsWithPrepared);
+    // Build meta for header/footer and links
+    const now = new Date();
+    const meta = {
+      title,
+      sourceUrl: extracted.url || '',
+      sourceName: extracted.fileName || extracted.url || title,
+      dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
+    };
+    // Normalize and enforce formatting: bold numbered headers, spacing + header fields
+    const formatted = reformatDistilled(rawHtml, meta);
+    return formatted;
+  }
+
+  async function test(aiSettings){
+    const key = (aiSettings?.mode);
+    if (!key) throw new Error('No AI provider selected.');
+    const provider = map()[key];
+    if (!provider) throw new Error('AI provider not available: ' + key);
+    if (typeof provider.test === 'function') return await provider.test(aiSettings);
+    // Fallback: attempt a minimal distill with tiny input
+    await provider.distill({ title: 'Test', text: 'ping' }, aiSettings);
+    return true;
+  }
+
+  window.DV = window.DV || {};
+  window.DV.ai = { distill, test };
+  // -------- Formatting helpers --------
+  function reformatDistilled(html='', meta){
+    try {
+      const doc = new DOMParser().parseFromString(html || '', 'text/html');
+      const rawText = (doc.body?.innerText || '').trim();
+      const points = parseNumberedList(rawText);
+      if (!points.length) return html; // fallback to provider HTML if parsing fails
+      const body = points.map(pt => {
+        const head = escapeHtml(`${pt.n}. ${pt.head}`);
+        const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
+        return `
+<section class="dv-point" style="margin: 8px 0 20px 0;">
+  <div class="dv-head" style="font-weight:700;">${head}</div>
+  <div style="height: 10px;"></div>
+  <div class="dv-body" style="font-weight:400;">${paras}</div>
+</section>`;
+      }).join('\n\n');
+      return standardWrapHtml(body, meta);
+    } catch {
+      return html;
+    }
+  }
+
+  function parseNumberedList(text=''){
+    const lines = text.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').split('\n');
+    const pts = [];
+    let current = null;
+    for (let i=0;i<lines.length;i++){
+      const line = lines[i].trim();
+      const m = line.match(/^(\d+)\.\s+(.+)/);
+      if (m) {
+        if (current) pts.push(current);
+        current = { n: Number(m[1]), head: m[2].trim(), body: '' };
+      } else if (current) {
+        current.body += (current.body ? '\n' : '') + line;
+      }
+    }
+    if (current) pts.push(current);
+    return pts;
+  }
+
+  function standardWrapHtml(inner, meta){
+    const title = escapeHtml(meta?.title || 'Distilled');
+    const srcLabel = meta?.sourceUrl ? `<a href="${escapeHtml(meta.sourceUrl)}" target="_blank" rel="noopener" class="dv-link">${escapeHtml(meta.sourceUrl)}</a>` : `<span>${escapeHtml(meta?.sourceName || '')}</span>`;
+    const dateText = escapeHtml(meta?.dateText || '');
+  return `<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title><style>
+:root{color-scheme: light dark}
+html,body{height:100%}
+body{font-family:Inter,system-ui,sans-serif;line-height:1.65;padding:20px;color:#0f172a;background:#ffffff}
+.dark body{color:#f1f5f9;background:#0f172a}
+h1,h2,h3{margin:12px 0 4px}
+p{margin:10px 0}
+.dv-head{font-size:1rem}
+.dv-body p{margin:10px 0}
+.dv-meta{color:#334155}
+.dark .dv-meta{color:#94a3b8}
+.dv-link{color:#2563eb;text-decoration:underline}
+.dark .dv-link{color:#93c5fd}
+hr{border:none;border-top:1px solid #e2e8f0}
+.dark hr{border-top-color:#334155}
+footer.dv-footer{position:fixed;left:20px;bottom:10px;color:#64748b}
+.dark footer.dv-footer{color:#94a3b8}
+</style></head><body>
+<script>(function(){try{var d=document.documentElement;var p=parent&&parent.document&&parent.documentElement;if(p&&p.classList.contains('dark')){d.classList.add('dark');}}catch(e){}})();</script>
+<header>
+  <h1>${title}</h1>
+  <div class="dv-meta"><strong>Source:</strong> ${srcLabel}</div>
+  <div class="dv-meta"><strong>Date:</strong> ${dateText}</div>
+</header>
+<hr />
+${inner}
+<hr />
+<footer class="dv-footer">DistyVault · 2025</footer>
+</body></html>`;
+  }
+
+  function escapeHtml(s='') {
+    return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+})();
