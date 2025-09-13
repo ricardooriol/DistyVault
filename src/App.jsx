@@ -342,13 +342,9 @@
     return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
   }
 
-  function Table({ items, now, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort }){
-    const [expandedIds, setExpandedIds] = React.useState(new Set());
+  function Table({ items, allItems, now, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
     function toggle(id){
       setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
-    }
-    function toggleExpand(id){
-      setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
     }
     function displayDuration(it){
       const active = [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
@@ -361,7 +357,7 @@
       if (item.kind === 'playlist') {
         // clicking anywhere toggles selection of the playlist and all children
         const isSelected = selected.includes(item.id);
-        const childIds = items.filter(x => x.parentId === item.id).map(x => x.id);
+        const childIds = allItems.filter(x => x.parentId === item.id).map(x => x.id);
         if (isSelected) {
           setSelected(prev => prev.filter(id => id !== item.id && !childIds.includes(id)));
         } else {
@@ -370,7 +366,7 @@
       } else if (item.parentId) {
         // toggle child and update parent selection accordingly
         const isSelected = selected.includes(item.id);
-        const siblings = items.filter(x => x.parentId === item.parentId);
+        const siblings = allItems.filter(x => x.parentId === item.parentId);
         let next = selected.slice();
         if (isSelected) next = next.filter(id => id !== item.id);
         else next = Array.from(new Set([...next, item.id]));
@@ -447,11 +443,11 @@
     return (
       <div className="overflow-hidden flex items-start gap-2">
         <button
-          className="mt-0.5 w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center"
+          className="w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center"
           title={expanded ? 'Collapse' : 'Expand'}
           onClick={(e)=>{ e.stopPropagation(); setExpandedIds(prev=>{ const n=new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}
         >
-          <span className="inline-block transform" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          <span className={expanded ? 'rotate-90 transition-transform' : 'rotate-0 transition-transform'}>
             <Icon name="chevron-right" />
           </span>
         </button>
@@ -1116,9 +1112,9 @@ a:hover{text-decoration:underline}
       if (k === 'queue') DV.queue.loadQueue();
     };
 
-    const allItemsSorted = filteredSorted();
-    // Build a flattened list that expands playlist children only when expanded
-    const [expandedIds, setExpandedIds] = React.useState(new Set());
+  const allItemsSorted = filteredSorted();
+  // Build a flattened list that expands playlist children only when expanded
+  const [expandedIds, setExpandedIds] = React.useState(new Set());
     const byParent = React.useMemo(() => {
       const map = new Map();
       for (const it of allItemsSorted) {
@@ -1158,7 +1154,7 @@ a:hover{text-decoration:underline}
           <CapturePanel onSubmit={handleSubmit} onFilesSelected={()=>{}} />
           <StatsRow items={items} onDownloadAll={downloadAllCompleted} onStopAll={stopAll} onRetryFailed={retryFailed} />
           <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onExport={exportAll} onImport={importZip} sort={sort} setSort={setSort} />
-          <Table items={visibleItems} now={now} selected={selected} setSelected={setSelected} onSort={handleSort} />
+          <Table items={visibleItems} allItems={allItemsSorted} now={now} selected={selected} setSelected={setSelected} onSort={handleSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
           <SelectionDock
             count={selected.length}
             anyActive={anyActive}
