@@ -43,13 +43,11 @@
         // iPadOS masquerades as Mac
         ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)
       ));
-      const supportsShare = !!(ua && typeof ua.share === 'function');
-      if (isMobile && supportsShare) {
-        const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-        if (!ua.canShare || ua.canShare({ files: [file] })) {
-          await ua.share({ files: [file], title: filename });
-          return;
-        }
+      const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+      const supportsShareFiles = !!(ua && typeof ua.share === 'function' && ua.canShare && ua.canShare({ files: [file] }));
+      if (isMobile && supportsShareFiles) {
+        await ua.share({ files: [file], title: filename });
+        return;
       }
     } catch (e) {
       // If the user cancels the share sheet, just stop quietly
@@ -67,24 +65,24 @@
     } catch {}
 
     const url = URL.createObjectURL(blob);
+    // iOS Safari: avoid anchor+download which can create phantom .txt; open preview instead
+    try {
+      const ua = navigator;
+      const isIOS = !!(ua && (/iPad|iPhone|iPod/i.test(ua.userAgent || '') || ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)));
+      if (isIOS) {
+        window.open(url, '_blank');
+        setTimeout(()=> { URL.revokeObjectURL(url); }, 10000);
+        return;
+      }
+    } catch {}
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.rel = 'noopener';
-    // On desktop, avoid opening a blank tab. On mobile, keep _blank to avoid replacing the SPA/PWA.
-    try {
-      const ua = navigator;
-      const isMobile = !!(ua && (
-        (ua.userAgentData && ua.userAgentData.mobile) ||
-        /Android|iPhone|iPad|iPod/i.test(ua.userAgent || '') ||
-        ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)
-      ));
-      if (isMobile) a.target = '_blank';
-    } catch {}
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    setTimeout(()=> { URL.revokeObjectURL(url); a.remove(); }, 2000);
+    setTimeout(()=> { URL.revokeObjectURL(url); a.remove(); }, 4000);
   }
 
   // Lucide icon helper that re-renders on name changes without requiring a page reload
