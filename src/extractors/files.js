@@ -1,6 +1,6 @@
-// File extractors with local OCR and common formats (PDF/DOCX/TXT/HTML/Images)
+
 (function(){
-  // --- Utilities ---
+  
   function extOf(name=''){ return (String(name).split('.').pop() || '').toLowerCase(); }
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function normalizeText(s=''){
@@ -13,7 +13,7 @@
       .trim();
   }
 
-  // Lazy load external libs only when needed
+  
   const _once = {};
   function loadScriptOnce(url, check){
     return new Promise((resolve, reject) => {
@@ -31,11 +31,11 @@
     });
   }
 
-  // OCR configuration (hardcoded for browser feasibility)
-  const OCR_MAX_PAGES = 50; // limit OCR workload on large PDFs
+  
+  const OCR_MAX_PAGES = 50; 
 
   async function ensurePdfJs(){
-    // pdf.js 3.x UMD
+    
     await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.min.js', () => !!(window.pdfjsLib));
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
       try {
@@ -52,7 +52,7 @@
     await loadScriptOnce('https://unpkg.com/mammoth/mammoth.browser.min.js', () => !!window.mammoth);
   }
 
-  // --- Readers ---
+  
   async function readTextFile(file) {
     return await file.text();
   }
@@ -60,9 +60,9 @@
   function htmlToMainText(html){
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      // Remove scripts/styles and obvious non-content
+      
       doc.querySelectorAll('script,style,noscript,template,iframe,canvas,svg,form,header,footer,nav,aside,menu,dialog').forEach(n=>n.remove());
-      // heuristic: pick longest section/div by text length, else body
+      
       let best = doc.body, max = 0;
       doc.querySelectorAll('article, main, [role="main"], section, div').forEach(n => {
         const t = (n.innerText || '').trim();
@@ -91,11 +91,11 @@
     }
   }
 
-  // Very naive RTF-to-text fallback (won't handle complex formatting)
+  
   async function readRtf(file){
     try {
       const raw = await file.text();
-      // Remove RTF control words and groups
+      
       return normalizeText(raw
         .replace(/\\'[0-9a-fA-F]{2}/g, ' ')
         .replace(/\\par[d]?/g, '\n')

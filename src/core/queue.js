@@ -1,4 +1,4 @@
-// Concurrency-controlled queue for extraction + distillation
+
 (function(){
   const STATUS = {
     PENDING: 'pending',
@@ -11,7 +11,7 @@
 
   const defaultSettings = {
     ai: {
-      mode: '', // none selected by default
+      mode: '', 
       provider: '',
       model: '',
       apiKey: ''
@@ -24,7 +24,7 @@
     running: false,
   concurrency: 1,
     slots: 0,
-    queue: [], // array of item ids in order
+    queue: [], 
     processing: new Set(),
     stopRequested: new Set(),
     settings: defaultSettings
@@ -32,7 +32,7 @@
 
   function setSettings(newSettings) {
     state.settings = { ...state.settings, ...newSettings };
-    // persist in idb
+    
     DV.db.put('settings', { key: 'app', value: state.settings });
     DV.bus.emit('settings:update', state.settings);
   }
@@ -48,13 +48,13 @@
     DV.bus.emit('settings:update', state.settings);
   }
 
-  // Items lifecycle helpers
+  
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
     const record = {
       id,
-      kind: item.kind, // 'url' | 'youtube' | 'file'
+      kind: item.kind, 
       parentId: item.parentId || null,
       title: item.title || item.name || item.url || 'Untitled',
       url: item.url || null,
@@ -64,14 +64,14 @@
       hasFile: !!item.file,
       createdAt: now,
       updatedAt: now,
-      // playlist is a grouping item; do not enqueue for processing and leave status blank
+      
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
       error: null,
       durationMs: 0,
       queueIndex: state.queue.length,
     };
     await DV.db.put('items', record);
-    // Persist file blob if present for later extraction
+    
     if (item.file) {
       try {
         await DV.db.put('contents', { id: id + ':file', blob: item.file, name: item.file.name, type: item.file.type, size: item.file.size });
@@ -113,32 +113,32 @@
 
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
-  // Mark extracting start and reset timers
+  
   item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
 
-  // extract
+  
       const extracted = await DV.extractors.extract(item);
-      // Update item with extracted title/url ASAP so UI shows the real name
+      
       try {
         const newTitle = extracted?.title || item.title;
         const newUrl = extracted?.url || item.url;
         if (newTitle !== item.title || newUrl !== item.url) {
           item = await updateItem(id, { title: newTitle, url: newUrl });
         }
-      } catch (_) { /* non-blocking */ }
+      } catch (_) {  }
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
 
-  // distill
+  
       const html = await DV.ai.distill(extracted, state.settings.ai);
 
   const durationMs = Date.now() - (item.startedAt || start);
 
-  // If item was deleted during processing, do not write contents or update status
+  
   const stillExists = await DV.db.get('items', id);
   if (!stillExists) {
-    return; // finally will run to cleanup processing state
+    return; 
   }
 
   await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
@@ -155,12 +155,12 @@
   }
 
   async function tick() {
-    // fill available slots
+    
     const active = state.processing.size;
     const want = Math.max(0, state.concurrency - active);
     if (want <= 0) return;
 
-    // get latest items from db to pick pending
+    
     const items = await DV.db.getAll('items');
     const pending = items
       .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
@@ -179,7 +179,7 @@
     tick();
   }
 
-  // Remove content records that don't have a corresponding item (e.g., deleted items)
+  
   async function cleanupOrphans() {
     try {
       const [items, contents] = await Promise.all([DV.db.getAll('items'), DV.db.getAll('contents')]);
@@ -190,12 +190,12 @@
   }
 
   async function clearAll() {
-    // Clear entire stores to avoid leftover records (including ':file' blobs in contents)
+    
     await DV.db.clear('items');
     await DV.db.clear('contents');
     state.queue = [];
     DV.bus.emit('items:loaded', []);
-    // no orphans by definition, but keep invariant
+    
     cleanupOrphans();
   }
 
