@@ -1,19 +1,19 @@
-// URL extractor — fetch, sanitize, and pick main readable content (CORS permitting)
+
 (function(){
   function normalizeUrl(input=''){
     const s = String(input).trim();
     if (!s) return '';
-    // If no scheme, assume https
-    if (!/^https?:\/\//i.test(s) && !/^[a-z]+:\/\//i.test(s)) return 'https://' + s;
+    
+    if (!/^https?:\/\
     return s;
   }
 
   function cleanDoc(doc){
-    // Remove non-content elements
+    
     doc.querySelectorAll('script,style,noscript,template,iframe,canvas,svg,form,header,footer,nav,aside,menu,dialog').forEach(n=>n.remove());
-    // Remove hidden or aria-hidden nodes
+    
     doc.querySelectorAll('[hidden], [aria-hidden="true"], [style*="display:none" i], [style*="visibility:hidden" i]').forEach(n=>n.remove());
-    // Heuristic junk removal by class/id
+    
     const junk = ['ad','ads','advert','promo','subscribe','newsletter','cookie','banner','footer','header','nav','sidebar','social','share','breadcrumb','pagination'];
     doc.querySelectorAll('*').forEach(el => {
       const cls = (el.className || '').toString().toLowerCase();
@@ -26,12 +26,12 @@
   }
 
   function pickMainNode(doc){
-    // Prefer explicit content containers
+    
     const candidates = Array.from(doc.querySelectorAll('article, main, [role="main"], #content, .content, .post, .entry, .article, .main-content'));
     let best = null, max = 0;
     const score = (el) => {
       const text = (el.innerText || '').trim();
-      // Favor density: paragraphs and headings
+      
       const pCount = el.querySelectorAll('p').length;
       const hCount = el.querySelectorAll('h1,h2,h3').length;
       return text.length + pCount * 100 + hCount * 50;
@@ -42,7 +42,7 @@
     }
     if (best && (best.innerText || '').trim().length > 200) return best;
 
-    // Fallback: longest section/div by innerText length
+    
     best = doc.body; max = 0;
     doc.querySelectorAll('section, div').forEach(n => {
       const t = (n.innerText || '').trim();
@@ -55,7 +55,7 @@
     const mt = doc.querySelector('meta[property="og:title"], meta[name="twitter:title"]')?.content?.trim();
     const h1 = doc.querySelector('h1')?.textContent?.trim();
     let t = doc.querySelector('title')?.textContent?.trim();
-    // Clean common separators including site name
+    
     const clean = (s='') => s.replace(/\s*[|\-–—·•:]\s*.+$/, '').trim();
     const best = mt || h1 || t || url;
     return clean(best);
@@ -93,11 +93,11 @@
     } catch (err) {
       const msg = String(err?.message || err);
       if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL');
-      // Try proxy fallback on generic fetch error as well
+      
       res = null;
     }
     if (!res || !res.ok) {
-      // Fallback to serverless proxy (works on Vercel deploys). Same-origin in local dev if served under /
+      
       const proxied = '/api/fetch?url=' + encodeURIComponent(url);
       try {
         res = await fetchWithTimeout(proxied, { redirect: 'follow' });
@@ -113,14 +113,14 @@
     const ctype = (res.headers.get('content-type') || '').toLowerCase();
     const body = await res.text();
 
-    // Plain text response
+    
     if (ctype.includes('text/plain') || !/html/.test(ctype)) {
       const text = normalizeText(body);
       const title = finalUrl;
       return { kind: 'url', url: finalUrl, title, text };
     }
 
-    // HTML response
+    
     const doc = new DOMParser().parseFromString(body, 'text/html');
     cleanDoc(doc);
     const node = pickMainNode(doc);
@@ -132,7 +132,7 @@
     return { kind: 'url', url: finalUrl, title, text };
   }
 
-  // Quick title preview without full extraction; tries direct fetch then proxy
+  
   async function peekTitle(inputUrl){
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
