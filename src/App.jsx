@@ -118,15 +118,10 @@
 
   // ---------- Top Bar ----------
   function TopBar({ theme, setTheme, openSettings }) {
-    const [open, setOpen] = useState(false);
-    const btnRef = useRef(null);
-    useEffect(()=>{
-      function onDoc(e){ if (open && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false); }
-      document.addEventListener('click', onDoc);
-      return ()=> document.removeEventListener('click', onDoc);
-    }, [open]);
-
-    const themeIcon = theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor';
+    // Determine effective theme (if set to system, reflect OS preference)
+    const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+    const themeIcon = isDark ? 'moon' : 'sun';
 
     return (
       <div className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/70 border-b border-slate-300 dark:border-white/10">
@@ -139,19 +134,14 @@
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative" ref={btnRef}>
-              <button onClick={()=> setOpen(v=>!v)} title="Theme" aria-label="Theme"
-                className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-                <Icon name={themeIcon} />
-              </button>
-              {open && (
-                <div className="absolute right-0 mt-2 p-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg flex items-center gap-2 z-50">
-                  <button title="System" aria-label="System" onClick={()=> { setTheme('system'); setOpen(false); }} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white"><Icon name="monitor" /></button>
-                  <button title="Light" aria-label="Light" onClick={()=> { setTheme('light'); setOpen(false); }} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white"><Icon name="sun" /></button>
-                  <button title="Dark" aria-label="Dark" onClick={()=> { setTheme('dark'); setOpen(false); }} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white"><Icon name="moon" /></button>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={()=> setTheme(isDark ? 'light' : 'dark')}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+              className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800"
+            >
+              <Icon name={themeIcon} />
+            </button>
             <button onClick={openSettings} title="Settings" aria-label="Settings" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800">
               <Icon name="settings" />
             </button>
