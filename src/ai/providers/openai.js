@@ -1,5 +1,5 @@
-
-
+// OpenAI provider using fetch with user-supplied API key
+// Supports responses as HTML from model via prompt instruction
 (function(){
   const API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -47,7 +47,7 @@
   async function testOpenAI(settings){
     const { apiKey } = settings || {};
     if (!apiKey) throw new Error('OpenAI API key required');
-    const res = await fetch('https:
+    const res = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${apiKey}` } });
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }

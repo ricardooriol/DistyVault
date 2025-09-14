@@ -1,4 +1,4 @@
-
+// Concurrency-controlled queue for extraction + distillation
 (function(){
   const STATUS = {
     PENDING: 'pending',
@@ -11,7 +11,7 @@
 
   const defaultSettings = {
     ai: {
-      mode: '', 
+      mode: '', // none selected by default
       provider: '',
       model: '',
       apiKey: ''
@@ -24,7 +24,7 @@
     running: false,
   concurrency: 1,
     slots: 0,
-    queue: [], 
+    queue: [], // array of item ids in order
     processing: new Set(),
     stopRequested: new Set(),
     settings: defaultSettings
@@ -32,7 +32,7 @@
 
   function setSettings(newSettings) {
     state.settings = { ...state.settings, ...newSettings };
-    
+    // persist in idb
     DV.db.put('settings', { key: 'app', value: state.settings });
     DV.bus.emit('settings:update', state.settings);
   }
@@ -48,13 +48,13 @@
     DV.bus.emit('settings:update', state.settings);
   }
 
-  
+  // Items lifecycle helpers
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
     const record = {
       id,
-      kind: item.kind, 
+      kind: item.kind, // 'url' | 'youtube' | 'file'
       parentId: item.parentId || null,
       title: item.title || item.name || item.url || 'Untitled',
       url: item.url || null,
@@ -64,14 +64,14 @@
       hasFile: !!item.file,
       createdAt: now,
       updatedAt: now,
-      
+      // playlist is a grouping item; do not enqueue for processing and leave status blank
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
       error: null,
       durationMs: 0,
       queueIndex: state.queue.length,
     };
     await DV.db.put('items', record);
-    
+    // Persist file blob if present for later extraction
     if (item.file) {
       try {
         await DV.db.put('contents', { id: id + ':file', blob: item.file, name: item.file.name, type: item.file.type, size: item.file.size });
@@ -113,33 +113,27 @@
 
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
-  
+  // Mark extracting start and reset timers
   item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
 
-  
+      // extract
       const extracted = await DV.extractors.extract(item);
-      
+      // Update item with extracted title/url ASAP so UI shows the real name
       try {
         const newTitle = extracted?.title || item.title;
         const newUrl = extracted?.url || item.url;
         if (newTitle !== item.title || newUrl !== item.url) {
           item = await updateItem(id, { title: newTitle, url: newUrl });
         }
-      } catch (_) {  }
+      } catch (_) { /* non-blocking */ }
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
 
-  
+  // distill
       const html = await DV.ai.distill(extracted, state.settings.ai);
 
   const durationMs = Date.now() - (item.startedAt || start);
-
-  
-  const stillExists = await DV.db.get('items', id);
-  if (!stillExists) {
-    return; 
-  }
 
   await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
   await updateItem(id, { status: STATUS.COMPLETED, durationMs });
@@ -155,12 +149,12 @@
   }
 
   async function tick() {
-    
+    // fill available slots
     const active = state.processing.size;
     const want = Math.max(0, state.concurrency - active);
     if (want <= 0) return;
 
-    
+    // get latest items from db to pick pending
     const items = await DV.db.getAll('items');
     const pending = items
       .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
@@ -175,30 +169,17 @@
     const items = await DV.db.getAll('items');
     state.queue = items.sort((a,b)=> (a.queueIndex??0)-(b.queueIndex??0)).map(i=>i.id);
     DV.bus.emit('items:loaded', items);
-    cleanupOrphans();
     tick();
   }
 
-  
-  async function cleanupOrphans() {
-    try {
-      const [items, contents] = await Promise.all([DV.db.getAll('items'), DV.db.getAll('contents')]);
-      const ids = new Set(items.map(i => i.id).concat(items.map(i => i.id + ':file')));
-      const toDelete = contents.filter(c => !ids.has(c.id)).map(c => DV.db.del('contents', c.id));
-      if (toDelete.length) await Promise.allSettled(toDelete);
-    } catch {}
-  }
-
   async function clearAll() {
-    
-    await DV.db.clear('items');
-    await DV.db.clear('contents');
+    const items = await DV.db.getAll('items');
+    await Promise.all(items.map(i => DV.db.del('items', i.id)));
+    await Promise.all(items.map(i => DV.db.del('contents', i.id)));
     state.queue = [];
     DV.bus.emit('items:loaded', []);
-    
-    cleanupOrphans();
   }
 
   window.DV = window.DV || {};
-  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, cleanupOrphans };
+  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings };
 })();

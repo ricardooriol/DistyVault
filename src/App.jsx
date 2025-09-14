@@ -1,4 +1,4 @@
-
+/* global React, ReactDOM */
 (function(){
   const { useState, useEffect, useMemo, useRef } = React;
 
@@ -6,7 +6,7 @@
 
   function classNames(...arr){ return arr.filter(Boolean).join(' '); }
 
-  
+  // Yield to browser to keep UI responsive during heavy CPU tasks
   function yieldToBrowser(){
     return new Promise(resolve => {
       if (typeof window.requestIdleCallback === 'function') return window.requestIdleCallback(() => resolve());
@@ -15,9 +15,9 @@
     });
   }
 
-  
+  // Save helper: prefer File System Access API; mobile-first: Web Share API; fallback to anchor download without navigating away
   async function saveBlob(blob, filename){
-    
+    // 1) Use the File System Access API when available (desktop Chromium). If cancelled, just return.
     try {
       if (window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
@@ -31,10 +31,10 @@
       }
     } catch (e) {
       const msg = String(e && (e.name || e.message || e));
-      if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return; 
+      if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return; // user canceled
     }
 
-    
+    // 2) Mobile-friendly: Web Share API with files (iOS/Android). Avoids navigation & blank pages.
     try {
       const supportsFiles = typeof File !== 'undefined' && typeof navigator !== 'undefined' && navigator.share;
       if (supportsFiles) {
@@ -45,13 +45,13 @@
         }
       }
     } catch (e) {
-      
+      // If the user cancels the share sheet, just stop quietly
       const msg = String(e && (e.name || e.message || e));
       if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
-      
+      // otherwise continue to fallback
     }
 
-    
+    // 3) Fallbacks: FileSaver.js if present; else anchor with target _blank to avoid replacing the SPA
     try {
       if (typeof window.saveAs === 'function') {
         window.saveAs(blob, filename);
@@ -64,23 +64,23 @@
     a.href = url;
     a.download = filename;
     a.rel = 'noopener';
-    a.target = '_blank'; 
+    a.target = '_blank'; // open in new tab to avoid blank/replaced SPA in mobile browsers
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     setTimeout(()=> { URL.revokeObjectURL(url); a.remove(); }, 2000);
   }
 
-  
+  // Lucide icon helper that re-renders on name changes without requiring a page reload
   function Icon({ name, size = 20, className, strokeWidth = 2 }){
     const wrapRef = React.useRef(null);
     React.useEffect(() => {
       try {
         const wrap = wrapRef.current;
         if (!wrap) return;
-        
+        // Clear any previous SVG/icon
         wrap.innerHTML = '';
-        
+        // Create a fresh placeholder element
         const i = document.createElement('i');
         i.setAttribute('data-lucide', name);
         i.style.width = '100%';
@@ -95,7 +95,7 @@
           i.removeAttribute('data-lucide');
           window.feather.replace({ 'stroke-width': strokeWidth });
         }
-        
+        // Enforce centering and sizing on the generated SVG
         const svg = wrap.querySelector('svg');
         if (svg) {
           svg.setAttribute('width', String(size));
@@ -116,9 +116,9 @@
     });
   }
 
-  
+  // ---------- Top Bar ----------
   function TopBar({ theme, setTheme, openSettings }) {
-    
+    // Determine effective theme (if set to system, reflect OS preference)
     const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
     const themeIcon = isDark ? 'moon' : 'sun';
@@ -151,7 +151,7 @@
     );
   }
 
-  
+  // ---------- Capture Panel ----------
   function CapturePanel({ onSubmit, onFilesSelected }) {
     const [url, setUrl] = useState('');
     const [files, setFiles] = useState([]);
@@ -223,7 +223,7 @@
     );
   }
 
-  
+  // ---------- Stats Row ----------
   function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }){
     const completed = items.filter(i=> i.status===STATUS.COMPLETED).length;
     const inprog = items.filter(i=> [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
@@ -256,7 +256,7 @@
     );
   }
 
-  
+  // ---------- Command Bar ----------
   function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort }){
     const [expanded, setExpanded] = useState(false);
     const [filterOpen, setFilterOpen] = useState(false);
@@ -319,7 +319,7 @@
     );
   }
 
-  
+  // ---------- Table ----------
   function StatusChip({ status, onClick }){
     const map = {
       [STATUS.PENDING]: 'bg-slate-200 text-slate-700',
@@ -342,10 +342,10 @@
       return base > 0 ? formatDuration(base) : '-';
     }
 
-    
+    // Selection behavior for playlist parent-child
     function onRowClick(e, item){
       if (item.kind === 'playlist') {
-        
+        // clicking anywhere toggles selection of the playlist and all children
         const isSelected = selected.includes(item.id);
         const childIds = allItems.filter(x => x.parentId === item.id).map(x => x.id);
         if (isSelected) {
@@ -354,13 +354,13 @@
           setSelected(prev => Array.from(new Set([...prev, item.id, ...childIds])));
         }
       } else if (item.parentId) {
-        
+        // toggle child and update parent selection accordingly
         const isSelected = selected.includes(item.id);
         const siblings = allItems.filter(x => x.parentId === item.parentId);
         let next = selected.slice();
         if (isSelected) next = next.filter(id => id !== item.id);
         else next = Array.from(new Set([...next, item.id]));
-        
+        // If any child is unselected, ensure parent is unselected; if all selected, parent selected.
         const allSelected = siblings.every(s => next.includes(s.id));
         if (allSelected) next = Array.from(new Set([...next, item.parentId]));
         else next = next.filter(id => id !== item.parentId);
@@ -460,14 +460,14 @@
     return `${m}m ${r}s`;
   }
 
-  
+  // ---------- Selection Dock ----------
   function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }){
     if (!count) return null;
     return (
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow max-w-[95vw]">
         <div className="overflow-x-auto">
           <div className="inline-flex items-center gap-2 whitespace-nowrap">
-            {}
+            {/* Actions first: View (only for single selection), Retry, (Stop), Download, Delete */}
             {count === 1 && (
               <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>
             )}
@@ -475,9 +475,9 @@
             {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
             <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="download" /><span>Download</span></button>
             <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
-            {}
+            {/* Separator */}
             <span className="mx-2 h-5 w-px bg-slate-300/60 dark:bg-white/20" />
-            {}
+            {/* Selection summary at the end */}
             <div className="text-sm">{count} selected</div>
             {!allSelected && (
               <button onClick={onSelectAll} className="text-sm text-slate-900 dark:text-white inline-flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-400 dark:border-white/30">
@@ -495,7 +495,7 @@
     );
   }
 
-  
+  // ---------- Modals ----------
   function Modal({ open, onClose, title, children, hideHeader }){
     if (!open) return null;
     return (
@@ -524,14 +524,14 @@
   const [local, setLocal] = useState(settings || DEFAULTS);
     const [testing, setTesting] = useState(false);
     useEffect(()=> {
-      
+      // Deep clone to ensure Reset reliably reverts UI controls
       const cloned = settings ? { ...settings, ai: { ...(settings.ai||{}) } } : { ...DEFAULTS };
       setLocal(cloned);
     }, [settings]);
 
   function save(){ setSettings(local); DV.toast('Settings saved', { type: 'success' }); onClose(); }
     function reset(){
-      
+      // Restore default settings in the UI; user can click Save to persist
       setLocal({ ...DEFAULTS });
       setTesting(false);
     }
@@ -557,7 +557,7 @@
               <Icon name="x" />
             </button>
           </div>
-            {}
+            {/* OCR settings removed; hardcoded in extractor for browser feasibility */}
           <div className="space-y-4">
             <div>
               <div className="text-sm font-medium mb-1">AI Provider</div>
@@ -573,7 +573,7 @@
                 <option value="openai">OpenAI</option>
               </select>
             </div>
-            {}
+            {/* Provider-specific model dropdowns and API keys */}
             {local.ai.mode && (
               <>
                 <div>
@@ -628,7 +628,7 @@
                       <span>{testing ? 'Testing…' : 'Test'}</span>
                     </button>
                   </div>
-                  {}
+                  {/* Test feedback moved to toast */}
                 </div>
               </>
             )}
@@ -656,7 +656,7 @@
     );
   }
 
-  
+  // ---------- Main App ----------
   function App(){
     const [items, setItems] = useState([]);
     const [selected, setSelected] = useState([]);
@@ -682,10 +682,10 @@
 
     useEffect(()=> { localStorage.setItem('dv.sort', sort); }, [sort]);
 
-    
+    // Live clock: update every second only when any item is active
     useEffect(() => {
       const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
-      if (!active) return; 
+      if (!active) return; // no timer needed
       const id = setInterval(() => setNow(Date.now()), 1000);
       return () => clearInterval(id);
     }, [items]);
@@ -695,14 +695,14 @@
       localStorage.setItem('dv.theme', t);
       const isDark = t === 'dark' || (t==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.toggle('dark', isDark);
-      
+      // Notify any embedded viewers to sync theme immediately
       try {
         const msg = { type: 'dv-theme', isDark };
-        
+        // Broadcast to all iframes first
         document.querySelectorAll('iframe').forEach(fr => {
           try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch {}
         });
-        
+        // Also broadcast to same window listeners (if any)
         window.postMessage(msg, '*');
       } catch {}
     }
@@ -719,10 +719,10 @@
         try {
           const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(url);
           if (isPlaylist) {
-            
+            // Extract playlist items and enqueue a parent playlist + children videos
             const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(url);
             if (!vids || !vids.length) throw new Error('No videos found in playlist');
-            
+            // Create parent playlist item (non-processing)
             const parent = await DV.queue.addItem({ kind: 'playlist', url, title: plTitle || 'YouTube Playlist' });
             const LIMIT = 100;
             const list = vids.slice(0, LIMIT);
@@ -732,11 +732,11 @@
           } else {
             const isYt = DV.extractors.isYouTube(url);
             const kind = isYt ? 'youtube' : 'url';
-            
+            // Extract domain name for a better initial title
             const placeholder = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || url;
             const recPromise = DV.queue.addItem({ kind, url, title: placeholder });
             additions.push(recPromise);
-            
+            // Fire-and-forget: quickly peek title and update the item once id is known
             recPromise.then(async rec => {
               try {
                 const peek = isYt
@@ -787,7 +787,7 @@
     async function makePdfBlobFromHtml(html, title='Document'){
       const { jsPDF } = window.jspdf || {};
       if (!jsPDF) {
-        
+        // Fallback: return HTML blob
         return new Blob([html], { type: 'text/html' });
       }
       const points = parseFormattedPoints(html);
@@ -797,16 +797,16 @@
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 40;
-      const footerSpace = 40; 
+      const footerSpace = 40; // reserve space so content doesn't overlap footer/page numbers
       const usableBottom = () => pageHeight - margin - footerSpace;
       const maxWidth = pageWidth - margin * 2;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(16);
-      
+      // Title bold
       doc.setFont('helvetica', 'bold');
       doc.text(meta.h1 || title, margin, margin);
       doc.setFontSize(11);
-      
+      // Labels bold, values normal with wrapping
       function drawLabelValue(label, value, y){
         const labelText = String(label || '') + ' ';
         const lblW = doc.getTextWidth(labelText);
@@ -825,7 +825,7 @@
       let yy = margin + 16;
       if (meta.srcText) yy = drawLabelValue('Source:', meta.srcText, yy);
       if (meta.dateText) yy = drawLabelValue('Date:', meta.dateText, yy);
-      
+      // Separator line
       doc.setDrawColor(180);
       doc.line(margin, yy + 4, pageWidth - margin, yy + 4);
       doc.setFontSize(12);
@@ -833,7 +833,7 @@
       const lineHeight = 16;
       if (points && points.length) {
         for (const pt of points) {
-          
+          // Bold heading
           doc.setFont('helvetica', 'bold');
           const headLines = doc.splitTextToSize(pt.head, maxWidth);
           for (const line of headLines) {
@@ -841,8 +841,8 @@
             doc.text(line, margin, y);
             y += lineHeight;
           }
-          y += 8; 
-          
+          y += 8; // empty line after head
+          // Body paragraphs
           doc.setFont('helvetica', 'normal');
           for (const para of pt.paras) {
             const plines = doc.splitTextToSize(para, maxWidth);
@@ -853,7 +853,7 @@
             }
             y += 8;
           }
-          y += 16; 
+          y += 16; // extra gap between points
         }
       } else {
         const lines = doc.splitTextToSize(text || '(No content)', maxWidth);
@@ -863,11 +863,11 @@
           y += lineHeight;
         }
       }
-      
+      // Closing separator
       doc.setDrawColor(180);
       const sepY = Math.min(y + 8, usableBottom() - 8);
       if (sepY > margin) doc.line(margin, sepY, pageWidth - margin, sepY);
-      
+      // Footer with year and page numbers on every page
       const pageCount = doc.getNumberOfPages();
       doc.setFontSize(10);
       for (let i=1;i<=pageCount;i++){
@@ -884,7 +884,7 @@
 
     function buildViewerHtml(savedHtml=''){
       try {
-        
+        // Fast path: pull out dv-point sections with a lightweight regex to avoid re-parsing large HTML
         let inner = '';
         try {
           const re = /<section\s+class=["']dv-point["'][\s\S]*?<\/section>/gi;
@@ -1087,12 +1087,7 @@ a:hover{text-decoration:underline}
     }
 
     async function deleteSelected(){
-      for (const id of selected) {
-        await DV.db.del('items', id);
-        await DV.db.del('contents', id);
-        // Remove any file blobs associated to this item (saved as `${id}:file`)
-        try { await DV.db.del('contents', id + ':file'); } catch {}
-      }
+      for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); }
       setSelected([]);
       DV.queue.loadQueue();
     }

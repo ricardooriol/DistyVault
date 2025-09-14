@@ -1,4 +1,4 @@
-
+// Anthropic Claude provider using Messages API
 (function(){
   const API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -41,7 +41,7 @@
   async function testAnthropic(settings){
     const apiKey = settings?.apiKey;
     if (!apiKey) throw new Error('Anthropic API key required');
-    
+    // Minimal probe: small request
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: {

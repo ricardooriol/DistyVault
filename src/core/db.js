@@ -1,5 +1,5 @@
-
-
+// IndexedDB wrapper for DistyVault
+// Stores: items (sources), contents (distilled html/pdf), settings
 (function() {
   const DB_NAME = 'distyvault';
   const DB_VER = 1;
@@ -75,23 +75,13 @@
     });
   }
 
-  async function clear(store) {
-    const t = await tx([store], 'readwrite');
-    await new Promise((res, rej) => {
-      const r = t.objectStore(store).clear();
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
-    });
-    await new Promise(res => t.oncomplete = res);
-  }
-
   async function exportAllToZip() {
     const zip = new JSZip();
     const [items, contents, settings] = await Promise.all([
       getAll('items'), getAll('contents'), getAll('settings')
     ]);
     zip.file('items.json', JSON.stringify(items, null, 2));
-    
+    // contents: move blobs into files and write a manifest
     const manifest = [];
     for (const c of contents) {
       const entry = { ...c };
@@ -144,5 +134,5 @@
   }
 
   window.DV = window.DV || {};
-  window.DV.db = { open, put, get, del, getAll, clear, exportAllToZip, importFromZip, uid };
+  window.DV.db = { open, put, get, del, getAll, exportAllToZip, importFromZip, uid };
 })();

@@ -1,8 +1,8 @@
-
+// Simple pub/sub event bus for local communication
 window.DV = window.DV || {};
 
 (function() {
-  const listeners = new Map(); 
+  const listeners = new Map(); // event -> Set<fn>
 
   function on(event, fn) {
     if (!listeners.has(event)) listeners.set(event, new Set());

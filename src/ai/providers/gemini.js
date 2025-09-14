@@ -1,7 +1,7 @@
-
+// Google Gemini provider using Generative Language API with Web Search enabled
 (function(){
   function endpoint(model){
-    const m = (model || 'gemini-2.5-flash'); 
+    const m = (model || 'gemini-2.5-flash'); // Updated to use a newer model
     return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`;
   }
 
@@ -12,7 +12,7 @@
 
   async function distillGemini(extracted, settings){
     const apiKey = settings?.apiKey;
-    const model = settings?.model || 'gemini-2.5-flash'; 
+    const model = settings?.model || 'gemini-2.5-flash'; // Updated to use a newer model
     if (!apiKey) throw new Error('Gemini API key required');
 
     const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
@@ -20,7 +20,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
-        tools: [{ google_search: {} }], 
+        tools: [{ google_search: {} }], // Added web search tool
         generationConfig: { temperature: 0.3 }
       })
     });
