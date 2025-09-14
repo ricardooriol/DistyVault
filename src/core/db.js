@@ -1,9 +1,26 @@
 (function() {
+  /**
+   * IndexedDB utility module providing a simple CRUD API and import/export helpers
+   * for DistyVault data. Encapsulates database versioning, object stores, and
+   * schema initialization. All methods return Promises and are safe to call from
+   * the main thread.
+   */
   const DB_NAME = 'distyvault';
   const DB_VER = 1;
 
   let dbPromise;
 
+  /**
+   * Open (and lazily initialize) the IndexedDB database. Reuses a shared promise
+   * to ensure at-most-one open sequence is active and to avoid races.
+   *
+   * Stores:
+   * - items: primary entity list, keyPath 'id'; indexes by status, createdAt, title.
+   * - contents: HTML/files associated with items, keyPath 'id'.
+   * - settings: application settings, keyPath 'key'.
+   *
+   * @returns {Promise<IDBDatabase>}
+   */
   function open() {
     if (!dbPromise) {
       dbPromise = new Promise((resolve, reject) => {
@@ -30,10 +47,24 @@
     return dbPromise;
   }
 
+  /**
+   * Start a transaction over one or more stores.
+   * @param {string[]} storeNames
+   * @param {'readonly'|'readwrite'} [mode='readonly']
+   * @returns {Promise<IDBTransaction>}
+   */
   function tx(storeNames, mode = 'readonly') {
     return open().then(db => db.transaction(storeNames, mode));
   }
 
+  /**
+   * Upsert a value into a store by keyPath.
+   * Resolves when the transaction completes to ensure durability.
+   * @template T
+   * @param {string} store
+   * @param {T} value
+   * @returns {Promise<T>}
+   */
   async function put(store, value) {
     const t = await tx([store], 'readwrite');
     await new Promise((res, rej) => {
@@ -45,6 +76,12 @@
     return value;
   }
 
+  /**
+   * Retrieve a single value by key from a store.
+   * @param {string} store
+   * @param {IDBValidKey} key
+   * @returns {Promise<any|null>}
+   */
   async function get(store, key) {
     const t = await tx([store]);
     return await new Promise((res, rej) => {
@@ -54,6 +91,13 @@
     });
   }
 
+  /**
+   * Delete a single record by key.
+   * Resolves when the transaction completes.
+   * @param {string} store
+   * @param {IDBValidKey} key
+   * @returns {Promise<void>}
+   */
   async function del(store, key) {
     const t = await tx([store], 'readwrite');
     await new Promise((res, rej) => {
@@ -64,6 +108,11 @@
     await new Promise(res => t.oncomplete = res);
   }
 
+  /**
+   * Retrieve all records from a store.
+   * @param {string} store
+   * @returns {Promise<any[]>}
+   */
   async function getAll(store) {
     const t = await tx([store]);
     return await new Promise((res, rej) => {
@@ -73,6 +122,12 @@
     });
   }
 
+  /**
+   * Export all stores into a ZIP archive. Large binary blobs from 'contents' are written
+   * as separate files under blobs/ and referenced in contents.json via blobPath; the
+   * JSON manifest omits the blob object to keep the metadata light.
+   * @returns {Promise<Blob>} A ZIP file Blob suitable for download.
+   */
   async function exportAllToZip() {
     const zip = new JSZip();
     const [items, contents, settings] = await Promise.all([
@@ -95,6 +150,13 @@
     return await zip.generateAsync({ type: 'blob' });
   }
 
+  /**
+   * Import a ZIP previously exported by exportAllToZip(). Recreates records across
+   * items/contents/settings and reattaches Blob data from blobs/ entries.
+   * The import is executed in a single readwrite transaction to maintain consistency.
+   * @param {Blob|ArrayBuffer} file ZIP archive
+   * @returns {Promise<void>}
+   */
   async function importFromZip(file) {
     const zip = await JSZip.loadAsync(file);
     const parse = async (name) => zip.file(name) ? JSON.parse(await zip.file(name).async('string')) : [];
@@ -126,6 +188,11 @@
     await new Promise(res => t.oncomplete = res);
   }
 
+  /**
+   * Generate a compact unique id suitable as a keyPath for IndexedDB records.
+   * Combines a random base36 suffix with a base36 timestamp to minimize collision risk.
+   * @returns {string}
+   */
   function uid() {
     return 'id_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
   }

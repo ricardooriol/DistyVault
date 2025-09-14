@@ -1,4 +1,5 @@
 (function(){
+  /** Ensure URL has a scheme, defaulting to https. */
   function normalizeUrl(input=''){
     const s = String(input).trim();
     if (!s) return '';
@@ -6,6 +7,7 @@
     return s;
   }
 
+  /** Remove non-content elements and obvious chrome/junk by classname/id heuristics. */
   function cleanDoc(doc){
     doc.querySelectorAll('script,style,noscript,template,iframe,canvas,svg,form,header,footer,nav,aside,menu,dialog').forEach(n=>n.remove());
     doc.querySelectorAll('[hidden], [aria-hidden="true"], [style*="display:none" i], [style*="visibility:hidden" i]').forEach(n=>n.remove());
@@ -20,6 +22,10 @@
     });
   }
 
+  /**
+   * Heuristic selection of the main content node. Prefers semantic containers,
+   * otherwise falls back to the largest text block.
+   */
   function pickMainNode(doc){
     const candidates = Array.from(doc.querySelectorAll('article, main, [role="main"], #content, .content, .post, .entry, .article, .main-content'));
     let best = null, max = 0;
@@ -43,6 +49,7 @@
     return best || doc.body;
   }
 
+  /** Determine a clean page title from meta and markup. */
   function metaTitle(doc, url){
     const mt = doc.querySelector('meta[property="og:title"], meta[name="twitter:title"]')?.content?.trim();
     const h1 = doc.querySelector('h1')?.textContent?.trim();
@@ -52,6 +59,7 @@
     return clean(best);
   }
 
+  /** Normalize whitespace and invisible chars in extracted text. */
   function normalizeText(s=''){
     return s
       .replace(/\u00a0/g, ' ')
@@ -62,6 +70,7 @@
       .trim();
   }
 
+  /** Fetch with an abort timeout; does not swallow non-timeout errors. */
   async function fetchWithTimeout(url, opts={}, ms=15000){
     const controller = new AbortController();
     const t = setTimeout(()=> controller.abort(), ms);
@@ -73,6 +82,11 @@
     }
   }
 
+  /**
+   * Extract main readable text from a URL. Attempts direct CORS fetch first, then
+   * falls back to server-side proxy at /api/fetch. Returns plain text when content-type
+   * is non-HTML.
+   */
   async function extractFromUrl(itemOrUrl) {
     let url = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl?.url || '');
     url = normalizeUrl(url);
@@ -119,6 +133,10 @@
     return { kind: 'url', url: finalUrl, title, text };
   }
 
+  /**
+   * Lightweight title peek without full extraction. Uses direct fetch, then proxy, and
+   * attempts to parse title from HTML when content-type permits.
+   */
   async function peekTitle(inputUrl){
     let url = normalizeUrl(inputUrl);
     if (!url) return null;

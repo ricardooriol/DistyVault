@@ -1,3 +1,15 @@
+/**
+ * DistyVault — React application shell and UI logic
+ *
+ * This file is intentionally plain React (UMD) executed via Babel-in-browser.
+ * It wires the UI to DV core modules available on window.DV (db, queue, bus, ai, extractors, toast).
+ *
+ * Design notes:
+ * - No build step: loaded in index.html using <script type="text/babel">; avoid syntax or APIs that won't transpile.
+ * - All side effects live inside this IIFE to avoid polluting global scope; only React root render is emitted.
+ * - Dark mode is controlled by a class on <html>; we mirror theme state into iframes via postMessage for parity.
+ * - For long-running UI tasks (PDF generation, ZIP creation) we yield to the browser to keep the UI responsive.
+ */
 (function(){
   const { useState, useEffect, useMemo, useRef } = React;
 
@@ -5,6 +17,12 @@
 
   function classNames(...arr){ return arr.filter(Boolean).join(' '); }
 
+  /**
+   * Yield control to the browser so rendering/painting can catch up.
+   *
+   * Uses requestIdleCallback if present, otherwise falls back to rAF or setTimeout.
+   * Handy when iterating over large lists (e.g., bulk ZIP/PDF) to avoid jank.
+   */
   function yieldToBrowser(){
     return new Promise(resolve => {
       if (typeof window.requestIdleCallback === 'function') return window.requestIdleCallback(() => resolve());
@@ -13,6 +31,20 @@
     });
   }
 
+  /**
+   * Save a Blob to disk with best-effort UX across environments.
+   *
+   * Strategy (first that succeeds wins):
+   * - File System Access API (showSaveFilePicker) on modern desktop browsers (not iOS)
+   * - Web Share API with files on mobile (if supported)
+   * - iOS: open Blob URL in a new tab (download attribute is ignored by Safari iOS)
+   * - Fallback: programmatic <a download> click
+   *
+   * All branches are wrapped defensively to ignore user cancelation errors.
+   *
+   * @param {Blob} blob - The data to persist
+   * @param {string} filename - Suggested filename
+   */
   async function saveBlob(blob, filename){
     const ua = typeof navigator !== 'undefined' ? navigator : null;
     const isMobile = !!(ua && (
@@ -78,6 +110,12 @@
     setTimeout(()=> { URL.revokeObjectURL(url); a.remove(); }, 4000);
   }
 
+  /**
+   * Icon — wrapper for lucide/feather UMD icon sets.
+   *
+   * We inject the desired icon name into a <span> and ask lucide/feather to replace it with an SVG.
+   * Size is enforced post-render by directly sizing the resulting SVG node.
+   */
   function Icon({ name, size = 20, className, strokeWidth = 2 }){
     const wrapRef = React.useRef(null);
     React.useEffect(() => {
@@ -119,6 +157,10 @@
     });
   }
 
+  /**
+   * TopBar — app header with logo and quick actions.
+   * @param {{theme: 'light'|'dark'|'system', setTheme: (t:string)=>void, openSettings: ()=>void}} props
+   */
   function TopBar({ theme, setTheme, openSettings }) {
     const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
@@ -153,6 +195,12 @@
     );
   }
 
+  /**
+   * CapturePanel — entry for URLs and file uploads (drag/drop + picker).
+   *
+   * The component keeps a local list of selected files until submission.
+   * Keyboard focus behavior: input is standard; drag-and-drop focuses the drop zone visually.
+   */
   function CapturePanel({ onSubmit, onFilesSelected }) {
     const [url, setUrl] = useState('');
     const [files, setFiles] = useState([]);
@@ -224,6 +272,10 @@
     );
   }
 
+  /**
+   * StatsRow — summary cards for queue state (completed/in-progress/errors).
+   * Actions are contextual (disabled when the count is zero).
+   */
   function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }){
     const completed = items.filter(i=> i.status===STATUS.COMPLETED).length;
     const inprog = items.filter(i=> [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
@@ -256,6 +308,12 @@
     );
   }
 
+  /**
+   * CommandBar — filter/search/sort and import/export controls.
+   *
+   * Search input appears inline and auto-focuses when toggled.
+   * Filter menu closes on outside click via a document-level listener.
+   */
   function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort }){
     const [expanded, setExpanded] = useState(false);
     const [filterOpen, setFilterOpen] = useState(false);
@@ -318,6 +376,9 @@
     );
   }
 
+  /**
+   * StatusChip — colored badge representing queue state.
+   */
   function StatusChip({ status, onClick }){
     const map = {
       [STATUS.PENDING]: 'bg-slate-200 text-slate-700',
@@ -330,6 +391,14 @@
     return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
   }
 
+  /**
+   * Table — main items list with selection, status and duration.
+   *
+   * Selection model rules:
+   * - Clicking a playlist toggles selection of the playlist and all its children as a group.
+   * - Clicking a child toggles itself; if all siblings are selected, the parent playlist becomes selected.
+   * - Selection state is lifted via setSelected so the Dock can act on it.
+   */
   function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
@@ -429,6 +498,9 @@
     );
   }
 
+  /**
+   * PlaylistRowName — name cell for playlist rows with expand/collapse affordance.
+   */
   function PlaylistRowName({ i, expandedIds, setExpandedIds }){
     const expanded = expandedIds && expandedIds.has(i.id);
     return (
@@ -454,6 +526,9 @@
     );
   }
 
+  /**
+   * formatDuration — render milliseconds as Xm Ys.
+   */
   function formatDuration(ms){
     const s = Math.round(ms/1000);
     if (s < 60) return `${s}s`;
@@ -461,6 +536,11 @@
     return `${m}m ${r}s`;
   }
 
+  /**
+   * SelectionDock — floating actions for the current selection.
+   *
+   * Appears only when at least one item is selected. "View" is offered only when exactly one item is selected.
+   */
   function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }){
     if (!count) return null;
     return (
@@ -492,6 +572,11 @@
     );
   }
 
+  /**
+   * Modal — accessible dialog with optional headerless style.
+   *
+   * Close affordance: overlay click, explicit close button; Escape is handled globally in App for selection only.
+   */
   function Modal({ open, onClose, title, children, hideHeader }){
     if (!open) return null;
     return (
@@ -515,6 +600,12 @@
     );
   }
 
+  /**
+   * SettingsDrawer — provider/model/key configuration + concurrency.
+   *
+   * All edits are staged locally and committed via setSettings() on Save.
+   * The Test button calls DV.ai.test() for the selected provider using the given API key.
+   */
   function SettingsDrawer({ open, onClose, settings, setSettings }){
   const DEFAULTS = { ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 };
   const [local, setLocal] = useState(settings || DEFAULTS);
@@ -647,6 +738,15 @@
     );
   }
 
+  /**
+   * App — main application component.
+   *
+   * Responsibilities:
+   * - Subscribe to DV.bus events to keep the UI synchronized with queue/db mutations
+   * - Drive theme toggling and propagate theme to child iframes
+   * - Orchestrate item creation (URLs, files, YouTube, playlists) and previews
+   * - Provide bulk actions (export/import, retry/stop, download/delete)
+   */
   function App(){
     const [items, setItems] = useState([]);
     const [selected, setSelected] = useState([]);
@@ -673,6 +773,10 @@
     useEffect(()=> { localStorage.setItem('dv.sort', sort); }, [sort]);
 
 
+    /**
+     * Apply theme preference and propagate to iframes.
+     * Uses class on <html> and postMessage to embedded viewers for live sync.
+     */
     function setTheme(t){
       setThemeState(t);
       localStorage.setItem('dv.theme', t);
@@ -687,12 +791,22 @@
       } catch {}
     }
 
+    /**
+     * Persist settings to DV.queue and update local state.
+     */
     function applySettings(s){
       setSettings(s);
       DV.queue.setConcurrency(s.concurrency);
       DV.queue.setSettings(s);
     }
 
+    /**
+     * Handle submissions from CapturePanel.
+     *
+     * - URLs: Detect playlist vs single video vs page; add parent then children for playlists
+     * - Files: Add records with File blobs so extractor can read them later
+     * - Optimistically peek title for URLs/YouTube to improve UX while extraction runs
+     */
     async function handleSubmit(url, files){
       const additions = [];
       if (url) {
@@ -731,11 +845,16 @@
       if (!DV.extractors.isYouTubePlaylist || !DV.extractors.isYouTubePlaylist(url)) DV.toast('Added to queue', { type: 'success' });
     }
 
+    /** Convert HTML fragment into plain text using DOMParser. */
     async function htmlToPlainText(html=''){
       const doc = new DOMParser().parseFromString(html, 'text/html');
       return (doc.body?.innerText || '').trim();
     }
 
+    /**
+     * Parse distilled HTML points back into a structured representation.
+     * Returns null if the content is not using the dv-point markup.
+     */
     function parseFormattedPoints(html=''){
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -749,6 +868,7 @@
       } catch { return null; }
     }
 
+    /** Extract header metadata (title, source, date) from distilled HTML. */
     function parseHeaderMeta(html=''){
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -760,6 +880,13 @@
       } catch { return { h1: title, srcText: '', dateText: '' }; }
     }
 
+    /**
+     * Render distilled HTML into a PDF Blob using jsPDF (if present),
+     * otherwise fall back to returning the original HTML as a text/html Blob.
+     *
+     * The layout aims for legible A4 pages with margins and simple headers.
+     * Theme is not applied in PDF; colors are neutral for readability.
+     */
     async function makePdfBlobFromHtml(html, title='Document'){
       const { jsPDF } = window.jspdf || {};
       if (!jsPDF) {
@@ -850,6 +977,13 @@
       return doc.output('blob');
     }
 
+    /**
+     * buildViewerHtml — wrap distilled HTML points into a minimal, theme-aware HTML document.
+     *
+     * - Extracts just the distilled <section.dv-point> blocks if present; otherwise embeds full body.
+     * - Synchronizes dark mode with the parent document via MutationObserver and postMessage.
+     * - Avoids external CSS/JS for portability; styles are embedded for consistency.
+     */
     function buildViewerHtml(savedHtml=''){
       try {
         let inner = '';
@@ -934,6 +1068,11 @@ a:hover{text-decoration:underline}
     }
     try { if (window && window.DV) window.DV.buildViewerHtml = buildViewerHtml; } catch {}
 
+    /**
+     * Download all completed items:
+     * - Single item: generate and download one PDF
+     * - Many items: generate PDFs and ZIP them into one archive
+     */
     async function downloadAllCompleted(){
   const completed = items.filter(i=> i.status===STATUS.COMPLETED);
       if (!completed.length) return;
@@ -959,7 +1098,9 @@ a:hover{text-decoration:underline}
       await saveBlob(blob, 'distyvault-bulk.zip');
     }
 
+    /** Sanitize filename to a safe subset. */
     function sanitize(s='') { return s.replace(/[^a-z0-9 _-]+/ig,'_').slice(0,80) || 'file'; }
+    /** Strip common document/image extensions from a name-like string. */
     function stripExtLike(s=''){
       let out = String(s||'').trim();
       out = out.replace(/\.(pdf|docx|doc|txt|md|rtf|html?|png|jpe?g|webp|gif|tiff?)$/i, '');
@@ -968,11 +1109,13 @@ a:hover{text-decoration:underline}
     }
     function pdfFileName(title){ return `${sanitize(stripExtLike(title || 'Document'))}.pdf`; }
 
+    /** Request all active items to stop (best-effort; safe stop is honored in pipeline). */
     async function stopAll(){
       items.forEach(i => DV.queue.requestStop(i.id));
       DV.toast('Stop requested for all in progress');
     }
 
+    /** Find failed/stopped items, reset their state, and requeue. */
     async function retryFailed(){
       const failed = items.filter(i=> i.status===STATUS.ERROR || i.status===STATUS.STOPPED);
       for (const it of failed) await DV.queue.updateItem(it.id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
@@ -980,6 +1123,9 @@ a:hover{text-decoration:underline}
       DV.toast('Retry queued');
     }
 
+    /**
+     * Apply current filter/search/sort to items and return a derived array.
+     */
     function filteredSorted(){
       const q = search.toLowerCase();
       let arr = items.filter(i=>
@@ -994,18 +1140,21 @@ a:hover{text-decoration:underline}
       return arr;
     }
 
+    /** Export entire database (items, contents, settings) as a portable ZIP. */
     async function exportAll(){
       await yieldToBrowser();
       const blob = await DV.db.exportAllToZip();
       await saveBlob(blob, 'distyvault-export.zip');
     }
 
+    /** Import a previously exported ZIP, then reload the queue. */
     async function importZip(file){
       await DV.db.importFromZip(file);
       DV.queue.loadQueue();
       DV.toast('Imported');
     }
 
+    /** Open the content viewer for the single selected item. */
     async function viewSelected(){
       if (selected.length !== 1) return;
       const id = selected[0];
@@ -1013,11 +1162,13 @@ a:hover{text-decoration:underline}
       setViewItem(item || null);
     }
 
+    /** Reset selected items to PENDING to retry processing. */
     async function retrySelected(){
       for (const id of selected) await DV.queue.updateItem(id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
       DV.queue.loadQueue();
     }
 
+    /** Download selected items as one or many PDFs (ZIP for many). */
     async function downloadSelected(){
       if (selected.length === 1) {
         const id = selected[0];
@@ -1043,6 +1194,7 @@ a:hover{text-decoration:underline}
       await saveBlob(blob, `distyvault-bulk-download.zip`);
     }
 
+    /** Delete selected items from both items and contents stores. */
     async function deleteSelected(){
       for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); }
       setSelected([]);
@@ -1056,6 +1208,7 @@ a:hover{text-decoration:underline}
       return () => window.removeEventListener('keydown', onKey);
     }, []);
 
+    /** Update sort mode; when switching to queue-order, reload to re-compute indices. */
     const handleSort = (k) => {
       setSort(k);
       if (k === 'queue') DV.queue.loadQueue();
@@ -1126,6 +1279,12 @@ a:hover{text-decoration:underline}
     );
   }
 
+  /**
+   * ContentModal — sandboxed viewer for distilled HTML.
+   *
+   * The content is embedded via srcDoc to avoid cross-origin issues and to keep the viewer static.
+   * On load, theme is synchronized with the parent through postMessage.
+   */
   function ContentModal({ item, onClose }){
     const [html, setHtml] = useState('');
     const [loading, setLoading] = useState(false);
@@ -1194,6 +1353,7 @@ a:hover{text-decoration:underline}
     );
   }
 
+  /** Simple error modal presenting the captured error text for an item. */
   function ErrorModal({ item, onClose }){
     return (
       <Modal open={!!item} onClose={onClose} title={item ? 'Error — ' + (item.title||'') : 'Error'}>
@@ -1202,6 +1362,7 @@ a:hover{text-decoration:underline}
     );
   }
 
+  // Mount the React root into #root once scripts have loaded.
   const root = ReactDOM.createRoot(document.getElementById('root'));
   root.render(<App />);
 })();

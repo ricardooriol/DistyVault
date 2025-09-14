@@ -1,4 +1,10 @@
 (function(){
+  /**
+   * Main extraction dispatcher. Routes items to file, URL, or YouTube extractors.
+   * For file items, attempts to load the saved blob from IndexedDB when missing.
+   * @param {{id:string,kind:'file'|'url'|'youtube',file?:File,fileName?:string,fileType?:string,title?:string,url?:string}} item
+   * @returns {Promise<{title:string,text:string,[k:string]:any}>}
+   */
   async function extract(item){
     if (item.kind === 'file') {
       let file = item.file;

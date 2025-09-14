@@ -1,4 +1,19 @@
 (function(){
+  /**
+   * Remove common leading indentation from template literals or strings while preserving
+   * embedded expressions. Useful for embedding large multi-line system prompts in code
+   * without carrying indentation noise into the final payload.
+   *
+   * Behavior:
+   * - Unwraps escaped newlines (\\\n) inserted by tagged templates.
+   * - Strips a single leading and trailing newline if present to allow neat code formatting.
+   * - Computes the minimal indent across non-empty lines and removes it from all lines.
+   * - Leaves relative indentation intact.
+   *
+   * @param {TemplateStringsArray|string} strings Raw template strings or string input
+   * @param {...any} values Interpolated values for template literals
+   * @returns {string} De-indented string
+   */
   function dedent(strings, ...values) {
     const raw = typeof strings === 'string' ? [strings] : strings.raw || strings;
     let result = '';
@@ -18,6 +33,12 @@
     return lines.map(l => l.slice(Math.min(min, l.length))).join('\n');
   }
 
+  /**
+   * Map of provider keys to their respective client objects exposed on the global `DV`.
+   * Indirection allows lazy binding to providers loaded on the page and isolates lookups
+   * in a single place.
+   * @returns {{[key:string]: { distill: Function, test?: Function }}}
+   */
   const map = () => ({
     openai: DV.aiProviders.openai,
      gemini: DV.aiProviders.gemini,
@@ -25,6 +46,7 @@
     deepseek: DV.aiProviders.deepseek,
     grok: DV.aiProviders.grok,
   });
+  /** Human-friendly labels for provider selection UIs. */
   const providerDisplay = {
     openai: 'OpenAI',
     gemini: 'Google Gemini',
@@ -33,13 +55,36 @@
     grok: 'Grok'
   };
 
+  /**
+   * Orchestrate AI-based distillation for extracted content using the selected provider.
+   * Prepares a rigorous system directive and user content, then delegates to the provider
+   * `distill` method. The provider returns HTML which is post-processed into a standardized
+   * document format for consistent display.
+   *
+   * Contract:
+   * - Input `extracted`: { title?, fileName?, url?, text? }.
+   * - Input `aiSettings`: { mode: 'openai'|'gemini'|'anthropic'|'deepseek'|'grok', apiKey?, model? }.
+   * - Output: HTML string with standardized wrapper and formatting.
+   * - Throws: when provider missing/unavailable or the downstream provider rejects.
+   *
+   * Notes:
+   * - Truncates input text to ~12,000 chars to avoid request size limits.
+   * - Injects `__prepared` into settings for providers to reuse the exact prompt/messages.
+   * - If a global `dayjs` exists, it is used for consistent date formatting.
+   *
+   * @param {{title?:string, fileName?:string, url?:string, text?:string}} extracted
+   * @param {{mode:string, apiKey?:string, model?:string, [k:string]:any}} aiSettings
+   * @returns {Promise<string>} Standardized HTML document containing the distilled content
+   */
   async function distill(extracted, aiSettings) {
     const key = (aiSettings?.mode);
     if (!key) throw new Error('No AI provider selected. Open Settings and choose a provider.');
     const provider = map()[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
     const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
+    // Limit text size to control token usage and stay within provider payload limits
     const text = extracted.text?.slice(0, 12000) || '';
+    // High-specificity system directive that enforces the output format for downstream parsing
     const directive = dedent`
       SYSTEM DIRECTIVE: MUST FOLLOW ALL RULES EXACTLY, DEVIATION IS STRICTLY NOT PERMITTED
 
@@ -129,6 +174,7 @@
 
       The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.
     `;
+    // Separate system directive from user content to support providers that accept role-based messages
     const userContent = `Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
 
     const prepared = {
@@ -137,6 +183,7 @@
       messages: [ { role: 'system', content: directive }, { role: 'user', content: userContent } ]
     };
 
+    // Pass through prepared prompt/messages for providers that need a single prompt or a role-separated chat
     const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
     const rawHtml = await provider.distill(extracted, settingsWithPrepared);
     const now = new Date();
@@ -144,12 +191,20 @@
       title,
       sourceUrl: extracted.url || '',
       sourceName: extracted.fileName || extracted.url || title,
+      // Prefer dayjs when present for deterministic formatting; fall back to locale string otherwise
       dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
     };
     const formatted = reformatDistilled(rawHtml, meta);
     return formatted;
   }
 
+  /**
+   * Lightweight connectivity test for selected provider.
+   * Uses provider-specific `test` if available; otherwise attempts a minimal `distill` call
+   * to validate credentials and reachability.
+   * @param {{mode:string, apiKey?:string, model?:string}} aiSettings
+   * @returns {Promise<boolean>} true if the provider is reachable/authorized
+   */
   async function test(aiSettings){
     const key = (aiSettings?.mode);
     if (!key) throw new Error('No AI provider selected.');
@@ -162,6 +217,14 @@
 
   window.DV = window.DV || {};
   window.DV.ai = { distill, test };
+  /**
+   * Try to parse a strict numbered-list response and transform it into a structured
+   * HTML document with consistent styling and metadata. Falls back to the original
+   * provider HTML if parsing fails.
+   * @param {string} html Raw provider HTML/string
+   * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
+   * @returns {string}
+   */
   function reformatDistilled(html='', meta){
     try {
       const doc = new DOMParser().parseFromString(html || '', 'text/html');
@@ -184,6 +247,12 @@
     }
   }
 
+  /**
+   * Parse a strict 1., 2., ... numbered list from plain text into a structured array.
+   * Lines that do not start a new point are appended to the current point's body.
+   * @param {string} [text]
+   * @returns {Array<{n:number, head:string, body:string}>}
+   */
   function parseNumberedList(text=''){
     const lines = text.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').split('\n');
     const pts = [];
@@ -202,6 +271,13 @@
     return pts;
   }
 
+  /**
+   * Wrap the distilled inner HTML with a minimal, self-contained page shell and metadata.
+   * Provides light/dark support via parent document class probing.
+   * @param {string} inner
+   * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
+   * @returns {string}
+   */
   function standardWrapHtml(inner, meta){
     const title = escapeHtml(meta?.title || 'Distilled');
     const srcLabel = meta?.sourceUrl ? `<a href="${escapeHtml(meta.sourceUrl)}" target="_blank" rel="noopener" class="dv-link">${escapeHtml(meta.sourceUrl)}</a>` : `<span>${escapeHtml(meta?.sourceName || '')}</span>`;
@@ -237,6 +313,11 @@ ${inner}
 </body></html>`;
   }
 
+  /**
+   * Escape a string for safe inclusion in HTML text nodes or attributes.
+   * @param {string} [s]
+   * @returns {string}
+   */
   function escapeHtml(s='') {
     return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
