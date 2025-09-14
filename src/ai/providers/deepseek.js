@@ -1,6 +1,12 @@
 (function(){
   const API_URL = 'https://api.deepseek.com/chat/completions';
 
+  /**
+   * Send a chat completion request to Deepseek with prepared messages.
+   * @param {{title?:string,fileName?:string,url?:string}} extracted
+   * @param {{apiKey?:string, model?:string, __prepared?:{messages?:any[]}}} settings
+   * @returns {Promise<string>}
+   */
   async function distillDeepseek(extracted, settings){
     const apiKey = settings?.apiKey;
     const model = settings?.model || 'deepseek-chat';
@@ -22,6 +28,11 @@
     return wrapHtml(content, title);
   }
 
+  /**
+   * Lightweight credential/access test using the models endpoint.
+   * @param {{apiKey?:string}} settings
+   * @returns {Promise<boolean>}
+   */
   async function testDeepseek(settings){
     const { apiKey } = settings || {};
     if (!apiKey) throw new Error('Deepseek API key required');
@@ -30,6 +41,12 @@
     return true;
   }
 
+  /**
+   * Simple HTML wrapper for display.
+   * @param {string} inner
+   * @param {string} [title]
+   * @returns {string}
+   */
   function wrapHtml(inner, title='Distilled') {
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
   }

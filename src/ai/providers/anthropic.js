@@ -1,6 +1,12 @@
 (function(){
   const API_URL = 'https://api.anthropic.com/v1/messages';
 
+  /**
+   * Build an Anthropic Messages API payload from prepared prompts.
+   * Uses system for the directive and user content as a single text part.
+   * @param {{model?:string, __prepared?:{prompt?:string, messages?:Array}}} settings
+   * @returns {object}
+   */
   function buildPayload(settings){
     const prepared = settings?.__prepared || {};
     return {
@@ -13,6 +19,13 @@
     };
   }
 
+  /**
+   * Call Anthropic Messages API to perform distillation.
+   * Validates API key, handles error bodies, and wraps the response in HTML.
+   * @param {{title?:string,fileName?:string,url?:string}} extracted
+   * @param {{apiKey?:string, model?:string, __prepared?:any}} settings
+   * @returns {Promise<string>}
+   */
   async function distillAnthropic(extracted, settings){
     const apiKey = settings?.apiKey;
     if (!apiKey) throw new Error('Anthropic API key required');
@@ -37,6 +50,11 @@
     return wrapHtml(text, title);
   }
 
+  /**
+   * Minimal connectivity test to verify API key and model accessibility.
+   * @param {{apiKey?:string, model?:string}} settings
+   * @returns {Promise<boolean>}
+   */
   async function testAnthropic(settings){
     const apiKey = settings?.apiKey;
     if (!apiKey) throw new Error('Anthropic API key required');

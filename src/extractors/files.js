@@ -1,6 +1,12 @@
 (function(){
+  /**
+   * Utility extractors for local files. Supports OCR for images and PDFs,
+   * textual extraction for common document types, and HTML main-content stripping.
+   * External libraries are loaded lazily once per page to minimize startup cost.
+   */
   function extOf(name=''){ return (String(name).split('.').pop() || '').toLowerCase(); }
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+  /** Normalize spacing and remove non-printable characters. */
   function normalizeText(s=''){
     return String(s)
       .replace(/\u00a0/g, ' ')
@@ -12,6 +18,13 @@
   }
 
   const _once = {};
+  /**
+   * Load an external script at most once, with an optional readiness check.
+   * Resolves when the script loads, or immediately if `check()` returns true.
+   * @param {string} url
+   * @param {() => boolean} [check]
+   * @returns {Promise<void>}
+   */
   function loadScriptOnce(url, check){
     return new Promise((resolve, reject) => {
       try {
@@ -30,6 +43,7 @@
 
   const OCR_MAX_PAGES = 50;
 
+  /** Ensure pdf.js is loaded and worker is configured. */
   async function ensurePdfJs(){
     await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.min.js', () => !!(window.pdfjsLib));
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
@@ -39,18 +53,25 @@
     }
   }
 
+  /** Load Tesseract.js on demand for OCR. */
   async function ensureTesseract(){
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js', () => !!window.Tesseract);
   }
 
+  /** Load Mammoth for DOCX extraction (client-side). */
   async function ensureMammoth(){
     await loadScriptOnce('https://unpkg.com/mammoth/mammoth.browser.min.js', () => !!window.mammoth);
   }
 
+  /** Read a plain text file via the File API. */
   async function readTextFile(file) {
     return await file.text();
   }
 
+  /**
+   * Extract primary visible text from HTML by stripping noisy elements and
+   * selecting the largest content container as a heuristic fallback.
+   */
   function htmlToMainText(html){
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -67,11 +88,13 @@
     }
   }
 
+  /** Read and reduce an HTML file to its main text content. */
   async function readHtml(file){
     const html = await file.text();
     return htmlToMainText(html);
   }
 
+  /** Extract raw text from DOCX using Mammoth; return a diagnostic on failure. */
   async function readDocx(file){
     try {
       await ensureMammoth();
@@ -83,6 +106,7 @@
     }
   }
 
+  /** Very lightweight RTF text approximation. */
   async function readRtf(file){
     try {
       const raw = await file.text();
@@ -97,6 +121,7 @@
     }
   }
 
+  /** OCR an image to text using Tesseract.js and report progress via DV.bus. */
   async function readImageWithOCR(file){
     await ensureTesseract();
     const blobUrl = URL.createObjectURL(file);
@@ -108,6 +133,7 @@
     }
   }
 
+  /** Extract embedded text from PDF with pdf.js, yielding between pages. */
   async function readPdfWithText(pdfFile){
     await ensurePdfJs();
     const buf = await pdfFile.arrayBuffer();
@@ -123,6 +149,7 @@
     return normalizeText(out.join('\n\n'));
   }
 
+  /** Render pages to canvas and OCR them; limited to OCR_MAX_PAGES for cost. */
   async function readPdfWithOCR(pdfFile){
     await ensurePdfJs();
     await ensureTesseract();
@@ -147,6 +174,10 @@
     return normalizeText(texts.join('\n\n'));
   }
 
+  /**
+   * Read a PDF by preferring embedded text, falling back to OCR on low-density text
+   * or failure paths. Returns diagnostic messages when both strategies fail.
+   */
   async function readPdf(file){
     try {
       const text = await readPdfWithText(file);
@@ -162,6 +193,12 @@
     }
   }
 
+  /**
+   * Entrypoint for file extraction, dispatching by mime/extension, with helpful
+   * diagnostics for unsupported formats. Returns a normalized item object.
+   * @param {File} file
+   * @returns {Promise<{kind:'file', title:string, fileName:string, fileType:string, size:number, text:string}>>}
+   */
   async function extractFromFile(file) {
     const ext = extOf(file.name);
     const type = (file.type || '').toLowerCase();

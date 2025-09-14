@@ -1,6 +1,12 @@
 (function() {
   const containerId = 'dv-toasts';
 
+  /**
+   * Ensure a single toast container exists in the DOM and return it.
+   * Positions in the bottom-right using utility classes; style integration is
+   * left to the consumer (Tailwind classes used here by default).
+   * @returns {HTMLElement}
+   */
   function ensureContainer() {
     let el = document.getElementById(containerId);
     if (!el) {
@@ -12,6 +18,12 @@
     return el;
   }
 
+  /**
+   * Render a transient toast message.
+   * @param {string} message Text content for the toast
+   * @param {{type?: 'info'|'success'|'error', ttl?: number}} [opts]
+   * @returns {() => void} A disposer that removes the toast immediately
+   */
   function toast(message, opts = {}) {
     const el = ensureContainer();
   const node = document.createElement('div');

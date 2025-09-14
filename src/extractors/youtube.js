@@ -1,10 +1,12 @@
 (function(){
   const ytHostRegex = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i;
 
+  /** Determine whether a URL is a YouTube link (watch/shorts/embed/just host). */
   function isYouTube(u=''){
     try { const url = new URL(u); return ytHostRegex.test(url.hostname); } catch { return /youtu\.?be|youtube\.com/i.test(String(u)); }
   }
 
+  /** Parse a YouTube video ID from multiple supported URL shapes, with fallback regex. */
   function parseVideoId(u=''){
     try {
       const url = new URL(u);
@@ -22,14 +24,17 @@
     return m ? m[1] : '';
   }
 
+  /** Check if a URL is a YouTube playlist and parse list id if so. */
   function isYouTubePlaylist(u=''){
     try { const url = new URL(u); return ytHostRegex.test(url.hostname) && !!url.searchParams.get('list'); } catch { return /[?&]list=PL|[?&]list=LL|[?&]list=OL|[?&]list=UU|[?&]list=RD/.test(String(u)); }
   }
 
+  /** Extract playlist id from URL query or fallback regex. */
   function getPlaylistId(u=''){
     try { const url = new URL(u); return url.searchParams.get('list') || ''; } catch { const m = String(u).match(/[?&]list=([^&#]+)/); return m ? decodeURIComponent(m[1]) : ''; }
   }
 
+  /** Fetch with timeout helper. */
   async function fetchWithTimeout(url, opts={}, ms=12000){
     const controller = new AbortController();
     const t = setTimeout(()=> controller.abort(), ms);
@@ -39,6 +44,7 @@
     } finally { clearTimeout(t); }
   }
 
+  /** Add or update a query param on a URL, preserving other params. */
   function addQueryParam(u, key, value){
     try {
       const url = new URL(u);
@@ -48,6 +54,7 @@
     } catch { return u + (u.includes('?') ? '&' : '?') + encodeURIComponent(key) + '=' + encodeURIComponent(String(value ?? '')); }
   }
 
+  /** Try to peek a video title via oEmbed; falls back through the proxy when needed. */
   async function peekYouTubeTitle(inputUrl){
     try {
       if (!isYouTube(inputUrl)) return null;
@@ -67,6 +74,7 @@
     return null;
   }
 
+  /** Extract ytInitialPlayerResponse JSON from watch page HTML safely. */
   function extractPlayerResponseFromHtml(html=''){
     const marker = 'ytInitialPlayerResponse';
     const idx = html.indexOf(marker);
@@ -94,6 +102,10 @@
     try { return JSON.parse(jsonText); } catch { return null; }
   }
 
+  /**
+   * Choose the best caption track, preferring human-authored English when available,
+   * then any English, then any human, finally first track.
+   */
   function pickBestCaptionTrack(tracks){
     if (!Array.isArray(tracks) || !tracks.length) return null;
     const isHuman = t => t && t.kind !== 'asr';
@@ -106,6 +118,7 @@
     return best || tracks[0];
   }
 
+  /** Decode HTML entities using DOMParser. */
   function decodeEntities(html){
     try {
       const doc = new DOMParser().parseFromString(html || '', 'text/html');
@@ -113,6 +126,7 @@
     } catch { return html; }
   }
 
+  /** Normalize whitespace and strip invisible characters. */
   function normalizeSpaces(s=''){
     return String(s)
       .replace(/\u00a0/g, ' ')
@@ -124,6 +138,7 @@
       .trim();
   }
 
+  /** Convert YouTube timed text XML to plain text, merging segments into paragraphs. */
   function parseTimedTextXml(xmlString){
     try {
       const xml = new DOMParser().parseFromString(xmlString, 'text/xml');
@@ -161,6 +176,7 @@
     }
   }
 
+  /** Fetch captions from a track; optionally request English translation via tlang. */
   async function fetchTranscriptFromTrack(baseUrl, forceEnIfTranslatable=false){
     let url = baseUrl;
     if (forceEnIfTranslatable && !/[?&]tlang=/.test(url)) url = addQueryParam(url, 'tlang', 'en');
@@ -183,6 +199,11 @@
     return normalizeSpaces(decodeEntities(body));
   }
 
+  /**
+   * Extract text from a single YouTube video: fetch watch page via proxy, parse player
+   * response, select captions track, fetch transcript (optionally translated), and
+   * return normalized text with metadata.
+   */
   async function extractYouTube(itemOrUrl) {
     const inputUrl = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl.url || '');
     if (!isYouTube(inputUrl)) throw new Error('Not a valid YouTube URL');
@@ -217,6 +238,7 @@
     return { kind: 'youtube', url: inputUrl, title, text: textOut, videoId: id, language };
   }
 
+  /** Extract `ytInitialData` JSON from playlist page. */
   function extractYtInitialData(html=''){
     const marker = 'ytInitialData';
     const idx = html.indexOf(marker);
@@ -236,6 +258,7 @@
     try { return JSON.parse(html.slice(html.indexOf('{', idx), end)); } catch { return null; }
   }
 
+  /** DFS over nested objects/arrays to collect playlistVideoRenderer nodes. */
   function collectPlaylistVideoRenderers(node, out){
     if (!node || typeof node !== 'object') return;
     if (node.playlistVideoRenderer) { out.push(node.playlistVideoRenderer); return; }
@@ -246,11 +269,16 @@
     }
   }
 
+  /** Join `runs` text nodes into a string. */
   function textFromRuns(runs){
     if (!Array.isArray(runs)) return '';
     return runs.map(r => r.text || '').join('').trim();
   }
 
+  /**
+   * Extract a YouTube playlist: fetch page via proxy, parse initial data, collect
+   * video renderers, de-dupe, and return ordered items with titles and URLs.
+   */
   async function extractYouTubePlaylist(itemOrUrl){
     const inputUrl = typeof itemOrUrl === 'string' ? itemOrUrl : (itemOrUrl.url || '');
     if (!isYouTube(inputUrl) || !isYouTubePlaylist(inputUrl)) throw new Error('Not a valid YouTube playlist URL');

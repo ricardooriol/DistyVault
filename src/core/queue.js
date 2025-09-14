@@ -1,4 +1,7 @@
 (function(){
+  /**
+   * Queue status codes for items. Only non-playlist items progress through these states.
+   */
   const STATUS = {
     PENDING: 'pending',
     EXTRACTING: 'extracting',
@@ -8,6 +11,9 @@
     STOPPED: 'stopped'
   };
 
+  /**
+   * Default application settings persisted to IndexedDB and mirrored in memory.
+   */
   const defaultSettings = {
     ai: {
       mode: '',
@@ -19,6 +25,10 @@
     theme: localStorage.getItem('dv.theme') || 'system'
   };
 
+  /**
+   * In-memory queue and runtime state. `processing` tracks currently active item IDs to
+   * avoid duplicate work; `stopRequested` is an advisory set to abort politely.
+   */
   const state = {
     running: false,
   concurrency: 1,
@@ -29,6 +39,12 @@
     settings: defaultSettings
   };
 
+  /**
+   * Compute aggregate counts for UI summary and quick metrics.
+   * Playlists are counted separately and excluded from progress states.
+   * @param {Array<any>} items
+   * @returns {{total:number,completed:number,inProgress:number,pending:number,extracting:number,distilling:number,errors:number,stopped:number,playlists:number}}
+   */
   function computeCounts(items){
     const c = { total: 0, completed: 0, inProgress: 0, pending: 0, extracting: 0, distilling: 0, errors: 0, stopped: 0, playlists: 0 };
     for (const it of items) {
@@ -46,6 +62,11 @@
     return c;
   }
 
+  /**
+   * Persist a lightweight summary to localStorage for quick dashboard reads without
+   * hitting IndexedDB, handling quota failures gracefully.
+   * @param {Array<any>} [itemsArg]
+   */
   async function syncLocalSummary(itemsArg){
     try {
       const items = itemsArg || await DV.db.getAll('items');
@@ -59,14 +80,19 @@
     }
   }
 
+  /** Update settings both in memory and durable storage, and notify listeners. */
   function setSettings(newSettings) {
     state.settings = { ...state.settings, ...newSettings };
     DV.db.put('settings', { key: 'app', value: state.settings });
     DV.bus.emit('settings:update', state.settings);
   }
 
+  /** Get the current effective settings. */
   function getSettings() { return state.settings; }
 
+  /**
+   * Load persisted settings at startup and emit an update. Normalizes concurrency.
+   */
   async function loadSettings() {
     const s = await DV.db.get('settings', 'app');
     if (s && s.value) {
@@ -76,6 +102,12 @@
     DV.bus.emit('settings:update', state.settings);
   }
 
+  /**
+   * Enqueue a new item and persist it. For file-backed items, stores the Blob under
+   * contents with an id-suffixed key. Emits items:added and kicks the scheduler.
+   * @param {{id?:string,kind:string,parentId?:string,title?:string,name?:string,url?:string,file?:File,fileName?:string,fileType?:string,size?:number}} item
+   * @returns {Promise<any>}
+   */
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
@@ -109,6 +141,12 @@
     return record;
   }
 
+  /**
+   * Patch an existing item atomically and emit an update.
+   * @param {string} id
+   * @param {object} patch
+   * @returns {Promise<any|undefined>}
+   */
   async function updateItem(id, patch) {
     const existing = await DV.db.get('items', id);
     if (!existing) return;
@@ -119,10 +157,19 @@
     return updated;
   }
 
+  /**
+   * Request graceful stop for a specific item. The request is honored at safe points
+   * in the pipeline (between extract/distill).
+   * @param {string} id
+   */
   function requestStop(id) {
     state.stopRequested.add(id);
   }
 
+  /**
+   * Adjust concurrency (1..10), persist the new value, and prompt the scheduler.
+   * @param {number} n
+   */
   function setConcurrency(n) {
     state.concurrency = Math.max(1, Math.min(10, Number(n||1)));
     state.settings.concurrency = state.concurrency;
@@ -130,6 +177,11 @@
     tick();
   }
 
+  /**
+   * Process a single item through extract → distill, handling user stop requests and
+   * error capture. Always emits progress and schedules the next tick on completion.
+   * @param {string} id
+   */
   async function processOne(id) {
     if (state.processing.has(id)) return;
     state.processing.add(id);
@@ -170,6 +222,9 @@
     }
   }
 
+  /**
+   * Scheduler: fills available concurrency slots with oldest pending items.
+   */
   async function tick() {
     const active = state.processing.size;
     const want = Math.max(0, state.concurrency - active);
@@ -185,6 +240,9 @@
     }
   }
 
+  /**
+   * Load items, rebuild the in-memory queue order, notify listeners, and schedule work.
+   */
   async function loadQueue() {
     const items = await DV.db.getAll('items');
     state.queue = items.sort((a,b)=> (a.queueIndex??0)-(b.queueIndex??0)).map(i=>i.id);
@@ -193,6 +251,9 @@
     tick();
   }
 
+  /**
+   * Clear all items and contents from storage, reset local summary, and notify listeners.
+   */
   async function clearAll() {
     const items = await DV.db.getAll('items');
     await Promise.all(items.map(i => DV.db.del('items', i.id)));
