@@ -1,5 +1,3 @@
-// OpenAI provider using fetch with user-supplied API key
-// Supports responses as HTML from model via prompt instruction
 (function(){
   const API_URL = 'https://api.openai.com/v1/chat/completions';
 

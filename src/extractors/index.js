@@ -1,4 +1,3 @@
-// Extractor router
 (function(){
   async function extract(item){
     if (item.kind === 'file') {
