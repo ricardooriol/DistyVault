@@ -65,7 +65,7 @@ Architecture overview
 - src/ai
 	- service: prompt prep and provider orchestration
 	- providers: OpenAI, Gemini, Anthropic, Deepseek, Grok
-- api/fetch.js: tiny proxy with CORS, allow‑listed protocols, timeouts, and response size caps
+- src/core/fetch.js: tiny proxy with CORS, allow‑listed protocols, timeouts, and response size caps (exposed at /api/fetch)
 
 Contributing
 ------------
