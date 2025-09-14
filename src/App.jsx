@@ -333,7 +333,15 @@
     return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
   }
 
-  function Table({ items, allItems, now, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
+  function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
+    // Local ticking clock for duration display; avoids re-rendering the whole App every second
+  // Removed global ticking clock; durations tick locally within Table to avoid app-wide re-renders
+    useEffect(() => {
+      const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
+      if (!active) return; // no timer needed if nothing is active
+      const id = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(id);
+    }, [items]);
     function toggle(id){
       setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
     }
@@ -683,13 +691,7 @@
 
     useEffect(()=> { localStorage.setItem('dv.sort', sort); }, [sort]);
 
-    // Live clock: update every second only when any item is active
-    useEffect(() => {
-      const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
-      if (!active) return; // no timer needed
-      const id = setInterval(() => setNow(Date.now()), 1000);
-      return () => clearInterval(id);
-    }, [items]);
+    // Live clock removed from App; handled inside Table
 
     function setTheme(t){
       setThemeState(t);
@@ -1148,7 +1150,7 @@ a:hover{text-decoration:underline}
           <CapturePanel onSubmit={handleSubmit} onFilesSelected={()=>{}} />
           <StatsRow items={items} onDownloadAll={downloadAllCompleted} onStopAll={stopAll} onRetryFailed={retryFailed} />
           <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onExport={exportAll} onImport={importZip} sort={sort} setSort={setSort} />
-          <Table items={visibleItems} allItems={allItemsSorted} now={now} selected={selected} setSelected={setSelected} onSort={handleSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
+          <Table items={visibleItems} allItems={allItemsSorted} selected={selected} setSelected={setSelected} onSort={handleSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
           <SelectionDock
             count={selected.length}
             anyActive={anyActive}
