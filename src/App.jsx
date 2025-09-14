@@ -165,7 +165,7 @@
     const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
     const themeIcon = isDark ? 'moon' : 'sun';
-    const logoSrc = isDark ? 'styles/logos/logo_no_bg_w.png' : 'styles/logos/logo_no_bg_b.png';
+    const logoSrc = isDark ? 'logos/logo_no_bg_w.png' : 'logos/logo_no_bg_b.png';
 
     return (
       <div className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/70 border-b border-slate-300 dark:border-white/10">
