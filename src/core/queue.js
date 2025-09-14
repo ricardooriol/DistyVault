@@ -1,4 +1,3 @@
-// Concurrency-controlled queue for extraction + distillation
 (function(){
   const STATUS = {
     PENDING: 'pending',
@@ -11,7 +10,7 @@
 
   const defaultSettings = {
     ai: {
-      mode: '', // none selected by default
+      mode: '',
       provider: '',
       model: '',
       apiKey: ''
@@ -24,13 +23,12 @@
     running: false,
   concurrency: 1,
     slots: 0,
-    queue: [], // array of item ids in order
+    queue: [],
     processing: new Set(),
     stopRequested: new Set(),
     settings: defaultSettings
   };
 
-  // Maintain a lightweight localStorage mirror of item ids and counts so UI and storage stay in sync
   function computeCounts(items){
     const c = { total: 0, completed: 0, inProgress: 0, pending: 0, extracting: 0, distilling: 0, errors: 0, stopped: 0, playlists: 0 };
     for (const it of items) {
@@ -57,15 +55,12 @@
       localStorage.setItem('dv.items.counts', JSON.stringify(counts));
       localStorage.setItem('dv.items.updatedAt', String(Date.now()));
     } catch (e) {
-      // best effort; ignore quota or serialization errors
-      // Optionally clean up if quota exceeded
       try { if (e && /quota|storage/i.test(String(e))) localStorage.removeItem('dv.items.ids'); } catch {}
     }
   }
 
   function setSettings(newSettings) {
     state.settings = { ...state.settings, ...newSettings };
-    // persist in idb
     DV.db.put('settings', { key: 'app', value: state.settings });
     DV.bus.emit('settings:update', state.settings);
   }
@@ -81,13 +76,12 @@
     DV.bus.emit('settings:update', state.settings);
   }
 
-  // Items lifecycle helpers
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
     const record = {
       id,
-      kind: item.kind, // 'url' | 'youtube' | 'file'
+      kind: item.kind,
       parentId: item.parentId || null,
       title: item.title || item.name || item.url || 'Untitled',
       url: item.url || null,
@@ -97,14 +91,12 @@
       hasFile: !!item.file,
       createdAt: now,
       updatedAt: now,
-      // playlist is a grouping item; do not enqueue for processing and leave status blank
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
       error: null,
       durationMs: 0,
       queueIndex: state.queue.length,
     };
     await DV.db.put('items', record);
-    // Persist file blob if present for later extraction
     if (item.file) {
       try {
         await DV.db.put('contents', { id: id + ':file', blob: item.file, name: item.file.name, type: item.file.type, size: item.file.size });
@@ -112,7 +104,6 @@
     }
     state.queue.push(id);
     DV.bus.emit('items:added', record);
-    // Update localStorage mirror
     syncLocalSummary();
     tick();
     return record;
@@ -124,7 +115,6 @@
     const updated = { ...existing, ...patch, updatedAt: Date.now() };
     await DV.db.put('items', updated);
     DV.bus.emit('items:updated', updated);
-    // Update localStorage mirror
     syncLocalSummary();
     return updated;
   }
@@ -150,12 +140,9 @@
 
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
-  // Mark extracting start and reset timers
   item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
 
-      // extract
       const extracted = await DV.extractors.extract(item);
-      // Update item with extracted title/url ASAP so UI shows the real name
       try {
         const newTitle = extracted?.title || item.title;
         const newUrl = extracted?.url || item.url;
@@ -166,8 +153,6 @@
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
-
-  // distill
       const html = await DV.ai.distill(extracted, state.settings.ai);
 
   const durationMs = Date.now() - (item.startedAt || start);
@@ -186,12 +171,10 @@
   }
 
   async function tick() {
-    // fill available slots
     const active = state.processing.size;
     const want = Math.max(0, state.concurrency - active);
     if (want <= 0) return;
 
-    // get latest items from db to pick pending
     const items = await DV.db.getAll('items');
     const pending = items
       .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
@@ -206,7 +189,6 @@
     const items = await DV.db.getAll('items');
     state.queue = items.sort((a,b)=> (a.queueIndex??0)-(b.queueIndex??0)).map(i=>i.id);
     DV.bus.emit('items:loaded', items);
-    // Ensure localStorage mirror reflects current DB contents
     syncLocalSummary(items);
     tick();
   }
@@ -217,7 +199,6 @@
     await Promise.all(items.map(i => DV.db.del('contents', i.id)));
     state.queue = [];
     DV.bus.emit('items:loaded', []);
-    // Wipe localStorage mirror
     try {
       localStorage.removeItem('dv.items.ids');
       localStorage.setItem('dv.items.counts', JSON.stringify({ total:0, completed:0, inProgress:0, pending:0, extracting:0, distilling:0, errors:0, stopped:0, playlists:0 }));

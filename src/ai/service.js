@@ -1,6 +1,4 @@
-// AI Service facade to select provider
 (function(){
-  // Helper: trim common indentation from multi-line template literals
   function dedent(strings, ...values) {
     const raw = typeof strings === 'string' ? [strings] : strings.raw || strings;
     let result = '';
@@ -8,17 +6,15 @@
       result += raw[i].replace(/\\\n/g, '\n');
       if (i < values.length) result += values[i];
     }
-    // Remove leading/trailing first/last newline for cleaner templates
     result = result.replace(/^\n/, '').replace(/\n$/, '');
     const lines = result.split('\n');
-    // Compute minimum indentation across non-empty lines
     let min = Infinity;
     for (const l of lines) {
       if (!l.trim()) continue;
       const m = l.match(/^\s*/)[0].length;
       if (m < min) min = m;
     }
-    if (!isFinite(min)) return result; // all blank
+    if (!isFinite(min)) return result;
     return lines.map(l => l.slice(Math.min(min, l.length))).join('\n');
   }
 
@@ -42,7 +38,6 @@
     if (!key) throw new Error('No AI provider selected. Open Settings and choose a provider.');
     const provider = map()[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
-    // Build directive and composed prompt once here
     const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
     const text = extracted.text?.slice(0, 12000) || '';
     const directive = dedent`
@@ -136,17 +131,14 @@
     `;
     const userContent = `Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
 
-    // Prepare payloads for providers
     const prepared = {
       title,
       prompt: `${directive}\n\n${userContent}`,
       messages: [ { role: 'system', content: directive }, { role: 'user', content: userContent } ]
     };
 
-    // Do not mutate persisted settings; pass a shallow clone with prepared data
     const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
     const rawHtml = await provider.distill(extracted, settingsWithPrepared);
-    // Build meta for header/footer and links
     const now = new Date();
     const meta = {
       title,
@@ -154,7 +146,6 @@
       sourceName: extracted.fileName || extracted.url || title,
       dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
     };
-    // Normalize and enforce formatting: bold numbered headers, spacing + header fields
     const formatted = reformatDistilled(rawHtml, meta);
     return formatted;
   }
@@ -165,20 +156,18 @@
     const provider = map()[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
     if (typeof provider.test === 'function') return await provider.test(aiSettings);
-    // Fallback: attempt a minimal distill with tiny input
     await provider.distill({ title: 'Test', text: 'ping' }, aiSettings);
     return true;
   }
 
   window.DV = window.DV || {};
   window.DV.ai = { distill, test };
-  // -------- Formatting helpers --------
   function reformatDistilled(html='', meta){
     try {
       const doc = new DOMParser().parseFromString(html || '', 'text/html');
       const rawText = (doc.body?.innerText || '').trim();
       const points = parseNumberedList(rawText);
-      if (!points.length) return html; // fallback to provider HTML if parsing fails
+      if (!points.length) return html;
       const body = points.map(pt => {
         const head = escapeHtml(`${pt.n}. ${pt.head}`);
         const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');

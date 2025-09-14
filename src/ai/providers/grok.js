@@ -1,4 +1,3 @@
-// Grok (xAI) provider
 (function(){
   const API_URL = 'https://api.x.ai/v1/chat/completions';
 

@@ -1,5 +1,3 @@
-// IndexedDB wrapper for DistyVault
-// Stores: items (sources), contents (distilled html/pdf), settings
 (function() {
   const DB_NAME = 'distyvault';
   const DB_VER = 1;
@@ -80,8 +78,7 @@
     const [items, contents, settings] = await Promise.all([
       getAll('items'), getAll('contents'), getAll('settings')
     ]);
-    zip.file('items.json', JSON.stringify(items, null, 2));
-    // contents: move blobs into files and write a manifest
+  zip.file('items.json', JSON.stringify(items, null, 2));
     const manifest = [];
     for (const c of contents) {
       const entry = { ...c };

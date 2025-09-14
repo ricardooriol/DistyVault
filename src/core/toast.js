@@ -1,4 +1,3 @@
-// Toast notifications - lightweight
 (function() {
   const containerId = 'dv-toasts';
 
