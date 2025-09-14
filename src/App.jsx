@@ -351,7 +351,8 @@
 
   function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
     // Local ticking clock for duration display; avoids re-rendering the whole App every second
-  // Removed global ticking clock; durations tick locally within Table to avoid app-wide re-renders
+    const [now, setNow] = useState(Date.now());
+    // Removed global ticking clock; durations tick locally within Table to avoid app-wide re-renders
     useEffect(() => {
       const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
       if (!active) return; // no timer needed if nothing is active
