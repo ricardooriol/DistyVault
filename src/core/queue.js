@@ -116,7 +116,7 @@
   // Mark extracting start and reset timers
   item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
 
-      // extract
+  // extract
       const extracted = await DV.extractors.extract(item);
       // Update item with extracted title/url ASAP so UI shows the real name
       try {
@@ -134,6 +134,12 @@
       const html = await DV.ai.distill(extracted, state.settings.ai);
 
   const durationMs = Date.now() - (item.startedAt || start);
+
+  // If item was deleted during processing, do not write contents or update status
+  const stillExists = await DV.db.get('items', id);
+  if (!stillExists) {
+    return; // finally will run to cleanup processing state
+  }
 
   await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
   await updateItem(id, { status: STATUS.COMPLETED, durationMs });
@@ -169,17 +175,30 @@
     const items = await DV.db.getAll('items');
     state.queue = items.sort((a,b)=> (a.queueIndex??0)-(b.queueIndex??0)).map(i=>i.id);
     DV.bus.emit('items:loaded', items);
+    cleanupOrphans();
     tick();
   }
 
+  // Remove content records that don't have a corresponding item (e.g., deleted items)
+  async function cleanupOrphans() {
+    try {
+      const [items, contents] = await Promise.all([DV.db.getAll('items'), DV.db.getAll('contents')]);
+      const ids = new Set(items.map(i => i.id).concat(items.map(i => i.id + ':file')));
+      const toDelete = contents.filter(c => !ids.has(c.id)).map(c => DV.db.del('contents', c.id));
+      if (toDelete.length) await Promise.allSettled(toDelete);
+    } catch {}
+  }
+
   async function clearAll() {
-    const items = await DV.db.getAll('items');
-    await Promise.all(items.map(i => DV.db.del('items', i.id)));
-    await Promise.all(items.map(i => DV.db.del('contents', i.id)));
+    // Clear entire stores to avoid leftover records (including ':file' blobs in contents)
+    await DV.db.clear('items');
+    await DV.db.clear('contents');
     state.queue = [];
     DV.bus.emit('items:loaded', []);
+    // no orphans by definition, but keep invariant
+    cleanupOrphans();
   }
 
   window.DV = window.DV || {};
-  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings };
+  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, cleanupOrphans };
 })();

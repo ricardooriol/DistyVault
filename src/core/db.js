@@ -75,6 +75,16 @@
     });
   }
 
+  async function clear(store) {
+    const t = await tx([store], 'readwrite');
+    await new Promise((res, rej) => {
+      const r = t.objectStore(store).clear();
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
+    await new Promise(res => t.oncomplete = res);
+  }
+
   async function exportAllToZip() {
     const zip = new JSZip();
     const [items, contents, settings] = await Promise.all([
@@ -134,5 +144,5 @@
   }
 
   window.DV = window.DV || {};
-  window.DV.db = { open, put, get, del, getAll, exportAllToZip, importFromZip, uid };
+  window.DV.db = { open, put, get, del, getAll, clear, exportAllToZip, importFromZip, uid };
 })();
