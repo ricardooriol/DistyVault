@@ -1089,6 +1089,8 @@ a:hover{text-decoration:underline}
     async function deleteSelected(){
       for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); }
       setSelected([]);
+      // Ensure localStorage stays in sync to avoid stale counts
+      try { if (DV.queue && DV.queue.syncLocalSummary) await DV.queue.syncLocalSummary(); } catch {}
       DV.queue.loadQueue();
     }
 

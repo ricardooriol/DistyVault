@@ -30,6 +30,39 @@
     settings: defaultSettings
   };
 
+  // Maintain a lightweight localStorage mirror of item ids and counts so UI and storage stay in sync
+  function computeCounts(items){
+    const c = { total: 0, completed: 0, inProgress: 0, pending: 0, extracting: 0, distilling: 0, errors: 0, stopped: 0, playlists: 0 };
+    for (const it of items) {
+      c.total++;
+      if (it.kind === 'playlist') { c.playlists++; continue; }
+      switch (it.status) {
+        case STATUS.COMPLETED: c.completed++; break;
+        case STATUS.PENDING: c.pending++; c.inProgress++; break;
+        case STATUS.EXTRACTING: c.extracting++; c.inProgress++; break;
+        case STATUS.DISTILLING: c.distilling++; c.inProgress++; break;
+        case STATUS.ERROR: c.errors++; break;
+        case STATUS.STOPPED: c.stopped++; break;
+      }
+    }
+    return c;
+  }
+
+  async function syncLocalSummary(itemsArg){
+    try {
+      const items = itemsArg || await DV.db.getAll('items');
+      const ids = items.map(i => i.id);
+      const counts = computeCounts(items);
+      localStorage.setItem('dv.items.ids', JSON.stringify(ids));
+      localStorage.setItem('dv.items.counts', JSON.stringify(counts));
+      localStorage.setItem('dv.items.updatedAt', String(Date.now()));
+    } catch (e) {
+      // best effort; ignore quota or serialization errors
+      // Optionally clean up if quota exceeded
+      try { if (e && /quota|storage/i.test(String(e))) localStorage.removeItem('dv.items.ids'); } catch {}
+    }
+  }
+
   function setSettings(newSettings) {
     state.settings = { ...state.settings, ...newSettings };
     // persist in idb
@@ -79,6 +112,8 @@
     }
     state.queue.push(id);
     DV.bus.emit('items:added', record);
+    // Update localStorage mirror
+    syncLocalSummary();
     tick();
     return record;
   }
@@ -89,6 +124,8 @@
     const updated = { ...existing, ...patch, updatedAt: Date.now() };
     await DV.db.put('items', updated);
     DV.bus.emit('items:updated', updated);
+    // Update localStorage mirror
+    syncLocalSummary();
     return updated;
   }
 
@@ -169,6 +206,8 @@
     const items = await DV.db.getAll('items');
     state.queue = items.sort((a,b)=> (a.queueIndex??0)-(b.queueIndex??0)).map(i=>i.id);
     DV.bus.emit('items:loaded', items);
+    // Ensure localStorage mirror reflects current DB contents
+    syncLocalSummary(items);
     tick();
   }
 
@@ -178,8 +217,14 @@
     await Promise.all(items.map(i => DV.db.del('contents', i.id)));
     state.queue = [];
     DV.bus.emit('items:loaded', []);
+    // Wipe localStorage mirror
+    try {
+      localStorage.removeItem('dv.items.ids');
+      localStorage.setItem('dv.items.counts', JSON.stringify({ total:0, completed:0, inProgress:0, pending:0, extracting:0, distilling:0, errors:0, stopped:0, playlists:0 }));
+      localStorage.setItem('dv.items.updatedAt', String(Date.now()));
+    } catch {}
   }
 
   window.DV = window.DV || {};
-  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings };
+  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, syncLocalSummary };
 })();
