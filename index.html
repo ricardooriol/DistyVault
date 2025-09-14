@@ -6,7 +6,9 @@
     <title>DistyVault</title>
     <meta name="description" content="Gather, distill and control your knowledge" />
 
+  <!-- System fonts only (removed Google Fonts to avoid Safari preconnect errors) -->
 
+    <!-- Tailwind Play CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -26,18 +28,23 @@
       }
     </script>
 
+  <!-- Icons -->
   <link rel="icon" href="styles/logos/logo_no_bg.png" type="image/png" />
   <link rel="apple-touch-icon" href="styles/logos/logo_no_bg.png" />
 
+  <!-- React 18 UMD + Babel Standalone -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Utilities -->
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- Lucide Icons UMD -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- Optional Feather Icons fallback -->
   <script src="https://unpkg.com/feather-icons"></script>
 
     <style>
@@ -46,19 +53,19 @@
         backdrop-filter: saturate(180%) blur(12px);
         -webkit-backdrop-filter: saturate(180%) blur(12px);
       }
-  
+  /* Theme switch: change instantly to avoid mismatched timing */
   .theme-transition * { transition: none; }
-  
+  /* Stronger default contrast for form controls */
   input::placeholder { color: #64748b; opacity: 1; }
   .dark input::placeholder { color: #94a3b8; }
-  
+  /* Improve range input visibility */
   input[type="range"] { accent-color: #4f46e5; }
-  
+  /* Ensure lucide icons inherit color from their parent for strong contrast */
   .dv-icon svg { color: currentColor; stroke: currentColor; }
   .dark .dv-icon svg { color: currentColor; stroke: currentColor; }
     </style>
     <script>
-      
+      // Polyfill requestIdleCallback (avoids extension errors in browsers lacking it)
       (function(){
         if (typeof window !== 'undefined') {
           if (!('requestIdleCallback' in window)) {
@@ -76,13 +83,13 @@
       })();
     </script>
     <script>
-      
+      // Theme bootstrap (persisted: system|light|dark)
       (function() {
         try {
           const pref = localStorage.getItem('dv.theme') || 'system';
           const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.classList.toggle('dark', isDark);
-          
+          // If using system theme, listen for OS changes and sync automatically
           const mq = window.matchMedia('(prefers-color-scheme: dark)');
           function onChange(){
             try {
@@ -90,7 +97,7 @@
               if (prefNow !== 'system') return;
               const darkNow = mq.matches;
               document.documentElement.classList.toggle('dark', darkNow);
-              
+              // Notify any embedded iframes/viewers
               const msg = { type: 'dv-theme', isDark: darkNow };
               document.querySelectorAll('iframe').forEach(fr => { try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch {} });
               window.postMessage(msg, '*');
@@ -106,13 +113,13 @@
   <body class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
     <div id="root"></div>
 
-    
+    <!-- Core modules -->
     <script type="text/babel" src="src/core/eventBus.js"></script>
     <script type="text/babel" src="src/core/toast.js"></script>
     <script type="text/babel" src="src/core/db.js"></script>
     <script type="text/babel" src="src/core/queue.js"></script>
 
-  
+  <!-- AI -->
   <script type="text/babel" src="src/ai/providers/openai.js"></script>
   <script type="text/babel" src="src/ai/providers/gemini.js"></script>
   <script type="text/babel" src="src/ai/providers/anthropic.js"></script>
@@ -120,16 +127,16 @@
   <script type="text/babel" src="src/ai/providers/grok.js"></script>
     <script type="text/babel" src="src/ai/service.js"></script>
 
-    
+    <!-- Extractors -->
     <script type="text/babel" src="src/extractors/files.js"></script>
     <script type="text/babel" src="src/extractors/url.js"></script>
     <script type="text/babel" src="src/extractors/youtube.js"></script>
   <script type="text/babel" src="src/extractors/index.js"></script>
 
-    
+    <!-- App -->
     <script type="text/babel" src="src/App.jsx"></script>
     <script>
-      
+      // Initialize Lucide icons on first load and on DOM changes caused by React
       document.addEventListener('DOMContentLoaded', function(){
         if (window.lucide && window.lucide.createIcons) {
           window.lucide.createIcons();
