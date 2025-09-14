@@ -122,12 +122,13 @@
     const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
     const themeIcon = isDark ? 'moon' : 'sun';
+    const logoSrc = isDark ? 'styles/logos/logo_no_bg_b.png' : 'styles/logos/logo_no_bg_w.png';
 
     return (
       <div className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/70 border-b border-slate-300 dark:border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="styles/logos/logo_no_bg.png" alt="DistyVault" className="w-8 h-8 rounded-full shadow"/>
+            <img src={logoSrc} alt="DistyVault" className="w-8 h-8 rounded-full shadow"/>
             <div>
               <div className="font-semibold text-slate-900 dark:text-slate-100">DistyVault</div>
               <div className="text-xs text-slate-600 dark:text-slate-300">Gather, distill and control your knowledge</div>
