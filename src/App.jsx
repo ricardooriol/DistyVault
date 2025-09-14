@@ -34,13 +34,20 @@
       if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return; // user canceled
     }
 
-    // 2) Mobile-friendly: Web Share API with files (iOS/Android). Avoids navigation & blank pages.
+    // 2) Mobile-friendly: Web Share API with files (iOS/Android) ONLY on mobile. Avoids navigation & blank pages.
     try {
-      const supportsFiles = typeof File !== 'undefined' && typeof navigator !== 'undefined' && navigator.share;
-      if (supportsFiles) {
+      const ua = typeof navigator !== 'undefined' ? navigator : null;
+      const isMobile = !!(ua && (
+        (ua.userAgentData && ua.userAgentData.mobile) ||
+        /Android|iPhone|iPad|iPod/i.test(ua.userAgent || '') ||
+        // iPadOS masquerades as Mac
+        ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)
+      ));
+      const supportsShare = !!(ua && typeof ua.share === 'function');
+      if (isMobile && supportsShare) {
         const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: filename });
+        if (!ua.canShare || ua.canShare({ files: [file] })) {
+          await ua.share({ files: [file], title: filename });
           return;
         }
       }
@@ -51,7 +58,7 @@
       // otherwise continue to fallback
     }
 
-    // 3) Fallbacks: FileSaver.js if present; else anchor with target _blank to avoid replacing the SPA
+    // 3) Fallbacks: FileSaver.js if present; else anchor download.
     try {
       if (typeof window.saveAs === 'function') {
         window.saveAs(blob, filename);
@@ -64,7 +71,16 @@
     a.href = url;
     a.download = filename;
     a.rel = 'noopener';
-    a.target = '_blank'; // open in new tab to avoid blank/replaced SPA in mobile browsers
+    // On desktop, avoid opening a blank tab. On mobile, keep _blank to avoid replacing the SPA/PWA.
+    try {
+      const ua = navigator;
+      const isMobile = !!(ua && (
+        (ua.userAgentData && ua.userAgentData.mobile) ||
+        /Android|iPhone|iPad|iPod/i.test(ua.userAgent || '') ||
+        ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)
+      ));
+      if (isMobile) a.target = '_blank';
+    } catch {}
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
