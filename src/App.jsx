@@ -1087,7 +1087,12 @@ a:hover{text-decoration:underline}
     }
 
     async function deleteSelected(){
-      for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); }
+      for (const id of selected) {
+        await DV.db.del('items', id);
+        await DV.db.del('contents', id);
+        // Remove any file blobs associated to this item (saved as `${id}:file`)
+        try { await DV.db.del('contents', id + ':file'); } catch {}
+      }
       setSelected([]);
       DV.queue.loadQueue();
     }
