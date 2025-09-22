@@ -1118,9 +1118,10 @@ a:hover{text-decoration:underline}
     }
     function pdfFileName(title){ return `${sanitize(stripExtLike(title || 'Document'))}.pdf`; }
 
-    /** Request all active items to stop (best-effort; safe stop is honored in pipeline). */
+    /** Request all in-progress items to stop and reload queue. */
     async function stopAll(){
-      items.forEach(i => DV.queue.requestStop(i.id));
+      items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).forEach(i => DV.queue.requestStop(i.id));
+      DV.queue.loadQueue();
       DV.toast('Stop requested for all in progress');
     }
 
@@ -1272,7 +1273,15 @@ a:hover{text-decoration:underline}
             allSelected={allSelected}
             onView={viewSelected}
             onRetry={retrySelected}
-            onStop={()=> selected.forEach(id => DV.queue.requestStop(id))}
+            onStop={()=> {
+              selected.forEach(id => {
+                const item = items.find(i => i.id === id);
+                if (item && [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(item.status)) {
+                  DV.queue.requestStop(id);
+                }
+              });
+              DV.queue.loadQueue();
+            }}
             onDownload={downloadSelected}
             onDelete={deleteSelected}
             onSelectAll={()=> setSelected(visibleItems.map(i=>i.id))}
