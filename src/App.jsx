@@ -401,6 +401,11 @@
    * - Selection state is lifted via setSelected so the Dock can act on it.
    */
   function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }){
+    // Helper to determine if item is a child of a playlist
+    function isPlaylistChild(item) {
+      const parent = allItems.find(x => x.id === item.parentId);
+      return parent && parent.kind === 'playlist';
+    }
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
       const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
@@ -460,8 +465,8 @@
               <tr><td colSpan={3} className="p-6 text-center text-slate-600 dark:text-slate-300">Paste a URL or upload a document to get started</td></tr>
             )}
             {items.map(i => (
-              <tr key={i.id} onClick={(e)=>onRowClick(e, i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '')}>
-                <td className="p-2 pl-4 text-left">
+              <tr key={i.id} onClick={(e)=>onRowClick(e, i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '', isPlaylistChild(i) ? 'pl-8' : '')}>
+                <td className={classNames('p-2 pl-4 text-left', isPlaylistChild(i) ? 'pl-8' : '')}>
                   {i.kind === 'file' ? (
                     <div className="overflow-hidden">
                       <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
