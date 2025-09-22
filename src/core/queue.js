@@ -163,7 +163,10 @@
    * @param {string} id
    */
   function requestStop(id) {
-    state.stopRequested.add(id);
+  state.stopRequested.add(id);
+  // Immediately update item status to STOPPED for UI feedback
+  updateItem(id, { status: STATUS.STOPPED });
+  DV.bus.emit('queue:progress');
   }
 
   /**
