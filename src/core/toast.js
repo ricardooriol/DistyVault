@@ -12,7 +12,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = containerId;
-      el.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2'
+  el.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2'
       document.body.appendChild(el);
     }
     return el;
