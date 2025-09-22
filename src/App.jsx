@@ -301,7 +301,7 @@
 
     return (
       <div className="max-w-6xl mx-auto mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card label="Completed" count={completed} action={completed?onDownloadAll:null} actionText={<Icon name="download" />} />
+  <Card label="Completed" count={completed} action={completed?onDownloadAll:null} actionText={<Icon name="arrow-down-to-line" />} />
         <Card label="In Progress" count={inprog} action={inprog?onStopAll:null} actionText={<Icon name="square" />} />
         <Card label="Errors" count={errors} action={errors?onRetryFailed:null} actionText={<Icon name="refresh-ccw" />} />
       </div>
@@ -366,8 +366,8 @@
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-              <button onClick={onImport} title="Import" aria-label="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="arrow-down-to-line" /></button>
-              <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="arrow-up-to-line" /></button>
+              <button onClick={onImport} title="Import" aria-label="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="download" /></button>
+              <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><span style={{display:'inline-block',transform:'rotate(180deg)'}}><Icon name="download" /></span></button>
               <label className="hidden">
                 <input type="file" className="hidden" accept="application/zip" onChange={e=> e.target.files?.[0] && onImport(e.target.files[0])} />
               </label>
@@ -505,9 +505,9 @@
   function PlaylistRowName({ i, expandedIds, setExpandedIds }){
     const expanded = expandedIds && expandedIds.has(i.id);
     return (
-      <div className="overflow-hidden flex items-start gap-2">
+      <div className="overflow-hidden flex items-center gap-2">
         <button
-          className="w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center"
+          className="w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center self-center"
           title={expanded ? 'Collapse' : 'Expand'}
           onClick={(e)=>{ e.stopPropagation(); setExpandedIds(prev=>{ const n=new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}
         >
@@ -516,11 +516,11 @@
           </span>
         </button>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
+          <div className="font-medium text-slate-900 dark:text-slate-100 truncate ml-1">{i.title}</div>
           {i.url ? (
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate ml-1">{i.url}</div>
           ) : (
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none ml-1">placeholder</div>
           )}
         </div>
       </div>
@@ -544,16 +544,24 @@
    */
   function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }){
     if (!count) return null;
+    // Disable view/download if any selected item is in process/error/stopped
+    const disableViewDownload = (items, selected) => {
+      return selected.some(id => {
+        const item = items.find(i => i.id === id);
+        return item && [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING, STATUS.ERROR, STATUS.STOPPED].includes(item.status);
+      });
+    };
+    const isDisabled = disableViewDownload(window.DV.queue.items || [], window.DV.queue.selected || []);
     return (
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow max-w-[95vw]">
         <div className="overflow-x-auto">
           <div className="inline-flex items-center gap-2 whitespace-nowrap">
             {count === 1 && (
-              <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>
+              <button onClick={onView} disabled={isDisabled} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="eye" /><span>View</span></button>
             )}
             <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
             {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
-            <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="download" /><span>Download</span></button>
+            <button onClick={onDownload} disabled={isDisabled} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="arrow-down-to-line" /><span>Download</span></button>
             <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
             <span className="mx-2 h-5 w-px bg-slate-300/60 dark:bg-white/20" />
             <div className="text-sm">{count} selected</div>
@@ -1163,10 +1171,11 @@ a:hover{text-decoration:underline}
       setViewItem(item || null);
     }
 
-    /** Reset selected items to PENDING to retry processing. */
+    /** Reset selected items to PENDING to retry processing and unselect them. */
     async function retrySelected(){
       for (const id of selected) await DV.queue.updateItem(id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
       DV.queue.loadQueue();
+      setSelected([]);
     }
 
     /** Download selected items as one or many PDFs (ZIP for many). */
