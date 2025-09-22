@@ -521,15 +521,21 @@
           </span>
         </button>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-slate-900 dark:text-slate-100 truncate ml-3">{i.title}</div>
+          <div className="font-medium text-slate-900 dark:text-slate-100 truncate ml-1">{i.title}</div>
           {i.url ? (
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate ml-3">{i.url}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate ml-1">{i.url}</div>
           ) : (
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none ml-3">placeholder</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none ml-1">placeholder</div>
           )}
         </div>
       </div>
     );
+}
+
+// Helper to determine if item is a YouTube playlist
+function isYouTubePlaylist(item) {
+  return item.kind === 'playlist' && item.title && (typeof item.title === 'string') && /youtube/i.test(item.title);
+}
   }
 
   /**
@@ -1143,9 +1149,12 @@ a:hover{text-decoration:underline}
      */
     function filteredSorted(){
       const q = search.toLowerCase();
-      let arr = items.filter(i=>
-        (filter==='all' || i.kind===filter) &&
-        (!q || (i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q)))
+      let arr = items.filter(i=> {
+        if (filter === 'all') return true;
+        if (filter === 'youtube') return i.kind === 'youtube' || isYouTubePlaylist(i);
+        return i.kind === filter;
+      }).filter(i=>
+        !q || (i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q))
       );
       if (sort === 'title') arr.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
       else if (sort === 'status') arr.sort((a,b)=> (a.status||'').localeCompare(b.status||''));
