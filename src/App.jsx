@@ -346,7 +346,7 @@
               <Icon name={filter === 'all' ? 'asterisk' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : filter === 'file' ? 'file' : 'asterisk'} />
             </button>
             {filterOpen && (
-              <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50 flex gap-2">
+              <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50 flex flex-col gap-2">
                 {[
                   {k:'all', icon:'asterisk', label:'All'},
                   {k:'url', icon:'link', label:'URL'},
@@ -366,8 +366,8 @@
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-              <button onClick={onImport} title="Import" aria-label="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="arrow-down" /></button>
-              <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="arrow-up" /></button>
+              <button onClick={onImport} title="Import" aria-label="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="log-in" /></button>
+              <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="log-out" /></button>
               <label className="hidden">
                 <input type="file" className="hidden" accept="application/zip" onChange={e=> e.target.files?.[0] && onImport(e.target.files[0])} />
               </label>
