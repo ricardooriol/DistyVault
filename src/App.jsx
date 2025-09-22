@@ -6,11 +6,9 @@
  *
  * Design notes:
  * - No build step: loaded in index.html using <script type="text/babel">; avoid syntax or APIs that won't transpile.
- * - All side effects live inside this IIFE to avoid polluting global scope; only React root render is emitted.
  * - Dark mode is controlled by a class on <html>; we mirror theme state into iframes via postMessage for parity.
  * - For long-running UI tasks (PDF generation, ZIP creation) we yield to the browser to keep the UI responsive.
  */
-(function(){
   const { useState, useEffect, useMemo, useRef } = React;
 
   const STATUS = DV.queue.STATUS;
@@ -536,29 +534,28 @@
 function isYouTubePlaylist(item) {
   return item.kind === 'playlist' && item.title && (typeof item.title === 'string') && /youtube/i.test(item.title);
 }
-  }
 
-  /**
-   * formatDuration — render milliseconds as Xm Ys.
-   */
-  function formatDuration(ms){
-    const s = Math.round(ms/1000);
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s/60), r = s%60;
-    return `${m}m ${r}s`;
-  }
+/**
+ * formatDuration — render milliseconds as Xm Ys.
+ */
+function formatDuration(ms){
+  const s = Math.round(ms/1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s/60), r = s%60;
+  return `${m}m ${r}s`;
+}
 
-  /**
-   * SelectionDock — floating actions for the current selection.
-   *
-   * Appears only when at least one item is selected. "View" is offered only when exactly one item is selected.
-   */
-  function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }){
-    if (!count) return null;
-    // Disable view/download if any selected item is in process/error/stopped
-    const disableViewDownload = (items, selected) => {
-      return selected.some(id => {
-        const item = items.find(i => i.id === id);
+/**
+ * SelectionDock — floating actions for the current selection.
+ *
+ * Appears only when at least one item is selected. "View" is offered only when exactly one item is selected.
+ */
+function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }){
+  if (!count) return null;
+  // Disable view/download if any selected item is in process/error/stopped
+  const disableViewDownload = (items, selected) => {
+    return selected.some(id => {
+      const item = items.find(i => i.id === id);
         return item && [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING, STATUS.ERROR, STATUS.STOPPED].includes(item.status);
       });
     };
@@ -1308,17 +1305,19 @@ a:hover{text-decoration:underline}
         <SettingsDrawer open={settingsOpen} onClose={()=> setSettingsOpen(false)} settings={settings} setSettings={applySettings} />
 
   <footer className="mt-10 py-2 text-center text-xs text-slate-600 dark:text-slate-300">DistyVault · {new Date().getFullYear()}</footer>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
-  /**
-   * ContentModal — sandboxed viewer for distilled HTML.
-   *
-   * The content is embedded via srcDoc to avoid cross-origin issues and to keep the viewer static.
-   * On load, theme is synchronized with the parent through postMessage.
-   */
-  function ContentModal({ item, onClose }){
+// Mount the React root into #root once scripts have loaded.
+
+/**
+ * ContentModal — sandboxed viewer for distilled HTML.
+ *
+ * The content is embedded via srcDoc to avoid cross-origin issues and to keep the viewer static.
+ * On load, theme is synchronized with the parent through postMessage.
+ */
+function ContentModal({ item, onClose }){
     const [html, setHtml] = useState('');
     const [loading, setLoading] = useState(false);
     const iframeRef = useRef(null);
@@ -1384,7 +1383,7 @@ a:hover{text-decoration:underline}
         </div>
       </Modal>
     );
-  }
+}
 
   /** Simple error modal presenting the captured error text for an item. */
   function ErrorModal({ item, onClose }){
@@ -1393,9 +1392,9 @@ a:hover{text-decoration:underline}
         <div className="text-sm text-rose-700 dark:text-rose-300 whitespace-pre-wrap">{item?.error || 'Unknown error'}</div>
       </Modal>
     );
-  }
+}
 
-  // Mount the React root into #root once scripts have loaded.
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(<App />);
-})();
+// All components and helpers above
+// Mount the React root into #root once scripts have loaded.
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
