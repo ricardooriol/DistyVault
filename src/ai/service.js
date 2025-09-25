@@ -130,7 +130,7 @@
       Uncertainty: Admit only if data is genuinely inconclusive or definitive sources are demonstrably unavailable
       Language: Absolutely avoid jargon, technical buzzwords, or colloquialisms
       Explanation: Explain all concepts with clarity and depth for a highly intelligent, curious learner to achieve profound and lasting understanding
-      Primary Goal: Absolute, deep comprehension
+      Primary Goal: Absolute, deep comprehension of all topics and concepts, even if the input is long, if necessay output more than 20 points
 
 
       4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)
