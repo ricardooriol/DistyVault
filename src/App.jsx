@@ -364,7 +364,28 @@
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-              <button onClick={onImport} title="Import" aria-label="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="download" /></button>
+              <input
+                type="file"
+                accept="application/zip"
+                style={{ display: 'none' }}
+                ref={ref => { CommandBar.importInput = ref; }}
+                onChange={e => {
+                  const file = e.target.files && e.target.files[0];
+                  if (file) onImport(file);
+                  // Reset value so selecting the same file again will trigger onChange
+                  e.target.value = '';
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (CommandBar.importInput) CommandBar.importInput.click();
+                }}
+                title="Import"
+                aria-label="Import"
+                className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"
+              >
+                <Icon name="download" />
+              </button>
               <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><span style={{display:'inline-block',transform:'rotate(180deg)'}}><Icon name="download" /></span></button>
               <label className="hidden">
                 <input type="file" className="hidden" accept="application/zip" onChange={e=> e.target.files?.[0] && onImport(e.target.files[0])} />
