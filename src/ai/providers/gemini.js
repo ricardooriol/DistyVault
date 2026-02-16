@@ -1,11 +1,11 @@
-(function(){
+(function () {
   /**
    * Build the Gemini generateContent endpoint for a given model.
    * @param {string} model
    * @returns {string}
    */
-  function endpoint(model){
-    const m = (model || 'gemini-2.5-flash');
+  function endpoint(model) {
+    const m = (model || 'gemini-3-flash-preview');
     return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`;
   }
 
@@ -15,7 +15,7 @@
    * @param {{__prepared?:{prompt?:string}}} settings
    * @returns {string}
    */
-  function buildInput(extracted, settings){
+  function buildInput(extracted, settings) {
     const prepared = settings?.__prepared;
     return prepared?.prompt || '';
   }
@@ -27,9 +27,9 @@
    * @param {{apiKey?:string, model?:string, __prepared?:any}} settings
    * @returns {Promise<string>}
    */
-  async function distillGemini(extracted, settings){
+  async function distillGemini(extracted, settings) {
     const apiKey = settings?.apiKey;
-    const model = settings?.model || 'gemini-2.5-flash';
+    const model = settings?.model || 'gemini-3-flash-preview';
     if (!apiKey) throw new Error('Gemini API key required');
 
     const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
@@ -44,7 +44,7 @@
 
     if (!res.ok) {
       let msg = `${res.status} ${res.statusText}`;
-      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch {}
+      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
       throw new Error('Gemini API error: ' + msg);
     }
 
@@ -59,37 +59,27 @@
    * @param {string} [title]
    * @returns {string}
    */
-  function wrapHtml(inner, title='Distilled') {
+  function wrapHtml(inner, title = 'Distilled') {
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
   }
 
-  function escapeHtml(s='') { 
-    return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); 
+  function escapeHtml(s = '') {
+    return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
 
   window.DV = window.DV || {};
   window.DV.aiProviders = window.DV.aiProviders || {};
-  
+
   /**
    * Validate API key/model access by sending a trivial prompt.
    * @param {{apiKey?:string, model?:string}} settings
    * @returns {Promise<boolean>}
    */
-  async function testGemini(settings){
+  async function testGemini(settings) {
     const apiKey = settings?.apiKey;
-    const model = settings?.model || 'gemini-2.5-flash';
+    const model = settings?.model || 'gemini-3-flash-preview';
     if (!apiKey) throw new Error('Gemini API key required');
-    
-    const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        contents: [{ role: 'user', parts: [{ text: 'ping' }] }], 
-        tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0 } 
-      })
-    });
-    
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`);
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }
