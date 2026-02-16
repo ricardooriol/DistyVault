@@ -1,78 +1,79 @@
-DistyVault
-==========
+# DistyVault
 
-A lightweight, browser-based tool to gather, distill, and control knowledge from URLs, YouTube links, and local files. No local setup required—use the hosted app.
+Turn any source into structured knowledge. DistyVault extracts content from web pages, YouTube videos, playlists, and local files, then distills it into clear, concise summaries using the AI provider of your choice. Everything runs in your browser. No server, no signup, no data leaves your device except the API call you control.
 
-Live app
---------
+**Live app:** https://distyvault.vercel.app
 
-- https://distyvault.vercel.app
+## Why
 
-What it does
-------------
+Most content is buried in noise. Long articles, hour-long videos, dense PDFs. DistyVault pulls the signal out. You point it at a source, pick a model, and get back structured key points that are actually useful. Your API key, your data, your exports.
 
-- Capture content
-	- Paste a web URL (article, blog post, documentation)
-	- Paste a YouTube URL (single video) or playlist URL (adds entries per video)
-	- Drop or select local files (PDF, DOCX, images for OCR, etc.)
-- Distill with AI
-	- Choose your provider (OpenAI, Gemini, Anthropic, Deepseek, Grok) and model
-	- Provide your own API key; keys are used from your browser only
-	- Generates concise, structured summaries with key points
-- Manage and export
-	- Queue processing with per-item status and timing
-	- Retry/stop, search, filter, and bulk select
-	- Export content as PDF (single or bulk ZIP) and full database backup as ZIP
+## How it works
 
-At a glance: how it works
--------------------------
+**Capture** anything by pasting a URL, a YouTube link (single video or full playlist), or dropping local files (PDF, DOCX, images, HTML, plain text).
 
-- Everything runs client-side in your browser. The app uses React (UMD) and loads modules directly via script tags.
-- Content extraction
-	- URLs: fetch page HTML, extract main content heuristically; use a small proxy endpoint for cross-origin when needed
-	- YouTube: parse metadata and fetch transcripts when available; playlists expand to multiple items
-	- Files: PDF (text layer preferred, OCR fallback), DOCX (Mammoth), images (Tesseract OCR)
-- Distillation: prompts are prepared uniformly, then sent to your selected AI provider using your API key (no server-side storage)
-- Persistence: IndexedDB stores items, distilled HTML, and settings; export/import uses a ZIP manifest
-- Eventing/queue: a small in-browser scheduler processes items with configurable concurrency
+**Distill** using your own API key with any of five providers: OpenAI, Google Gemini, Anthropic Claude, DeepSeek, or Grok. The app prepares a structured prompt, sends your content to the provider, and formats the response into a clean, readable document with numbered key points.
 
-Privacy and data handling
--------------------------
+**Manage** your queue with search, filters, sorting, bulk selection, retry, and stop controls. Export individual results as PDF or download everything as a ZIP archive. Import and export your full database for backup or portability.
 
-- API keys: stored in browser storage and sent only to the selected AI provider from your device
-- Content: extracted text and distilled output live in your browser’s IndexedDB; export/import under your control
-- Network proxy: a minimal fetch endpoint is used only for cross-origin reads when necessary, with size and timeout limits
+## Supported sources
 
-Limits and guardrails
----------------------
+- **Web pages**: articles, blog posts, documentation, any public URL
+- **YouTube**: single videos (transcript extraction) and playlists (auto-expands up to 100 entries)
+- **Local files**: PDF (text layer with OCR fallback), DOCX, images (Tesseract OCR), HTML, plain text
 
-- AI input is trimmed to a safe length for provider limits
-- Network requests have timeouts and response size caps
-- YouTube playlists are capped (e.g., first 100 items) for responsiveness
+## Supported providers
 
-Architecture overview
----------------------
+| Provider | Default model |
+|---|---|
+| Google Gemini | Gemini 3 Flash |
+| OpenAI | GPT-5 Mini |
+| Anthropic Claude | Claude Sonnet 4.5 |
+| DeepSeek | DeepSeek Chat |
+| Grok (xAI) | Grok 4 |
 
-- index.html: loads everything (Tailwind via CDN, React UMD, Babel stand‑alone)
-- src/core
-	- eventBus: simple pub/sub for UI and processing events
-	- db: IndexedDB schema and ZIP import/export
-	- queue: item lifecycle, scheduling, concurrency, status
-	- toast: minimal notifications
-- src/extractors
-	- url, youtube, files: content extraction pipelines with graceful fallbacks
-	- index: dispatcher by item type
-- src/ai
-	- service: prompt prep and provider orchestration
-	- providers: OpenAI, Gemini, Anthropic, Deepseek, Grok
-- src/core/fetch.js: tiny proxy with CORS, allow‑listed protocols, timeouts, and response size caps (exposed at /api/fetch)
+You can select any available model from the settings panel.
 
-Contributing
-------------
+## Privacy
 
-This repo is designed to run from static hosting with in‑browser transpilation. If you plan larger contributions (new extractors/providers, UX, or packaging), open an issue first to coordinate design and scope.
+- API keys are stored in your browser and sent directly to the provider you select. They never touch any intermediary server.
+- All extracted content and distilled output lives in your browser's IndexedDB. Nothing is stored remotely.
+- A minimal proxy endpoint (`/api/fetch`) is used only when a target URL blocks cross-origin requests. It enforces protocol restrictions, timeouts, and response size limits.
 
-License
--------
+## Architecture
 
-Copyright © 2025. All rights reserved.
+The app is a single-page client-side application with no build step. It loads React (UMD) and Babel standalone via CDN, transpiling JSX at runtime.
+
+```
+index.html              Entry point, script loading, theme init
+src/
+  App.jsx               UI components and application state
+  core/
+    db.js               IndexedDB operations, ZIP import/export
+    queue.js            Item lifecycle, scheduling, concurrency
+    eventBus.js         Pub/sub for inter-module communication
+    toast.js            Transient notifications
+  extractors/
+    index.js            Dispatcher by item type
+    url.js              Web page content extraction
+    youtube.js          YouTube video/playlist handling
+    files.js            PDF, DOCX, image, and text extraction
+  ai/
+    service.js          Prompt preparation, provider orchestration
+    providers/
+      openai.js         OpenAI chat completions
+      gemini.js         Google Gemini generateContent
+      anthropic.js      Anthropic Claude messages
+      deepseek.js       DeepSeek chat completions
+      grok.js           xAI Grok chat completions
+api/
+  fetch.js              CORS proxy with protocol/size/timeout guards
+```
+
+## Contributing
+
+The project runs from static hosting with in-browser transpilation. For larger contributions (new extractors, providers, or packaging changes), open an issue first to discuss scope and design.
+
+## License
+
+Copyright 2025. All rights reserved.
