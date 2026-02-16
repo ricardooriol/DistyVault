@@ -76,4 +76,4 @@ The project runs from static hosting with in-browser transpilation. For larger c
 
 ## License
 
-Copyright 2025. All rights reserved.
+Copyright 2026. All rights reserved.
