@@ -1,4 +1,4 @@
-(function(){
+(function () {
   /**
    * Remove common leading indentation from template literals or strings while preserving
    * embedded expressions. Useful for embedding large multi-line system prompts in code
@@ -41,19 +41,11 @@
    */
   const map = () => ({
     openai: DV.aiProviders.openai,
-     gemini: DV.aiProviders.gemini,
+    gemini: DV.aiProviders.gemini,
     anthropic: DV.aiProviders.anthropic,
     deepseek: DV.aiProviders.deepseek,
     grok: DV.aiProviders.grok,
   });
-  /** Human-friendly labels for provider selection UIs. */
-  const providerDisplay = {
-    openai: 'OpenAI',
-    gemini: 'Google Gemini',
-    anthropic: 'Anthropic Claude',
-    deepseek: 'Deepseek',
-    grok: 'Grok'
-  };
 
   /**
    * Orchestrate AI-based distillation for extracted content using the selected provider.
@@ -180,7 +172,7 @@
     const prepared = {
       title,
       prompt: `${directive}\n\n${userContent}`,
-      messages: [ { role: 'system', content: directive }, { role: 'user', content: userContent } ]
+      messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
     };
 
     // Pass through prepared prompt/messages for providers that need a single prompt or a role-separated chat
@@ -205,7 +197,7 @@
    * @param {{mode:string, apiKey?:string, model?:string}} aiSettings
    * @returns {Promise<boolean>} true if the provider is reachable/authorized
    */
-  async function test(aiSettings){
+  async function test(aiSettings) {
     const key = (aiSettings?.mode);
     if (!key) throw new Error('No AI provider selected.');
     const provider = map()[key];
@@ -225,7 +217,7 @@
    * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
    * @returns {string}
    */
-  function reformatDistilled(html='', meta){
+  function reformatDistilled(html = '', meta) {
     try {
       const doc = new DOMParser().parseFromString(html || '', 'text/html');
       const rawText = (doc.body?.innerText || '').trim();
@@ -253,11 +245,11 @@
    * @param {string} [text]
    * @returns {Array<{n:number, head:string, body:string}>}
    */
-  function parseNumberedList(text=''){
-    const lines = text.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').split('\n');
+  function parseNumberedList(text = '') {
+    const lines = text.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').split('\n');
     const pts = [];
     let current = null;
-    for (let i=0;i<lines.length;i++){
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const m = line.match(/^(\d+)\.\s+(.+)/);
       if (m) {
@@ -278,11 +270,11 @@
    * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
    * @returns {string}
    */
-  function standardWrapHtml(inner, meta){
+  function standardWrapHtml(inner, meta) {
     const title = escapeHtml(meta?.title || 'Distilled');
     const srcLabel = meta?.sourceUrl ? `<a href="${escapeHtml(meta.sourceUrl)}" target="_blank" rel="noopener" class="dv-link">${escapeHtml(meta.sourceUrl)}</a>` : `<span>${escapeHtml(meta?.sourceName || '')}</span>`;
     const dateText = escapeHtml(meta?.dateText || '');
-  return `<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title><style>
+    return `<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title><style>
 :root{color-scheme: light dark}
 html,body{height:100%}
 body{font-family:Inter,system-ui,sans-serif;line-height:1.65;padding:20px;color:#0f172a;background:#ffffff}
@@ -318,7 +310,7 @@ ${inner}
    * @param {string} [s]
    * @returns {string}
    */
-  function escapeHtml(s='') {
-    return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function escapeHtml(s = '') {
+    return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
 })();

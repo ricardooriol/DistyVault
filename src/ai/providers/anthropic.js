@@ -1,4 +1,4 @@
-(function(){
+(function () {
   const API_URL = 'https://api.anthropic.com/v1/messages';
 
   /**
@@ -7,13 +7,14 @@
    * @param {{model?:string, __prepared?:{prompt?:string, messages?:Array}}} settings
    * @returns {object}
    */
-  function buildPayload(settings){
+  function buildPayload(settings) {
     const prepared = settings?.__prepared || {};
     return {
-      model: settings?.model || 'claude-3-7-sonnet-latest',
+      model: settings?.model || 'claude-sonnet-4.5-latest',
+      max_tokens: 16384,
       system: prepared.messages?.[0]?.content || '',
       messages: [
-        { role: 'user', content: [ { type: 'text', text: prepared.messages?.[1]?.content || prepared.prompt || 'Here is the text to distill.' } ] }
+        { role: 'user', content: [{ type: 'text', text: prepared.messages?.[1]?.content || prepared.prompt || 'Here is the text to distill.' }] }
       ],
       temperature: 0.3
     };
@@ -26,7 +27,7 @@
    * @param {{apiKey?:string, model?:string, __prepared?:any}} settings
    * @returns {Promise<string>}
    */
-  async function distillAnthropic(extracted, settings){
+  async function distillAnthropic(extracted, settings) {
     const apiKey = settings?.apiKey;
     if (!apiKey) throw new Error('Anthropic API key required');
     const payload = buildPayload(settings);
@@ -35,13 +36,14 @@
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
       let msg = `${res.status} ${res.statusText}`;
-      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch {}
+      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
       throw new Error('Anthropic API error: ' + msg);
     }
     const data = await res.json();
@@ -55,26 +57,24 @@
    * @param {{apiKey?:string, model?:string}} settings
    * @returns {Promise<boolean>}
    */
-  async function testAnthropic(settings){
+  async function testAnthropic(settings) {
     const apiKey = settings?.apiKey;
     if (!apiKey) throw new Error('Anthropic API key required');
-    const res = await fetch(API_URL, {
-      method: 'POST',
+    const res = await fetch('https://api.anthropic.com/v1/models', {
       headers: {
-        'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({ model: settings?.model || 'claude-3-7-sonnet-latest', messages: [ { role:'user', content:[{type:'text', text:'ping'}] } ] })
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      }
     });
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }
 
-  function wrapHtml(inner, title='Distilled') {
+  function wrapHtml(inner, title = 'Distilled') {
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
   }
-  function escapeHtml(s='') { return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function escapeHtml(s = '') { return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
   window.DV = window.DV || {};
   window.DV.aiProviders = window.DV.aiProviders || {};

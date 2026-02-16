@@ -1,4 +1,4 @@
-(function(){
+(function () {
   const API_URL = 'https://api.x.ai/v1/chat/completions';
 
   /**
@@ -7,9 +7,9 @@
    * @param {{apiKey?:string, model?:string, __prepared?:{messages?:any[]}}} settings
    * @returns {Promise<string>}
    */
-  async function distillGrok(extracted, settings){
+  async function distillGrok(extracted, settings) {
     const apiKey = settings?.apiKey;
-    const model = settings?.model || 'grok-3';
+    const model = settings?.model || 'grok-4';
     if (!apiKey) throw new Error('Grok API key required');
     const prepared = settings?.__prepared;
     const res = await fetch(API_URL, {
@@ -19,7 +19,7 @@
     });
     if (!res.ok) {
       let msg = `${res.status} ${res.statusText}`;
-      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch {}
+      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
       throw new Error('Grok API error: ' + msg);
     }
     const data = await res.json();
@@ -33,7 +33,7 @@
    * @param {{apiKey?:string}} settings
    * @returns {Promise<boolean>}
    */
-  async function testGrok(settings){
+  async function testGrok(settings) {
     const { apiKey } = settings || {};
     if (!apiKey) throw new Error('Grok API key required');
     const res = await fetch('https://api.x.ai/v1/models', { headers: { 'Authorization': `Bearer ${apiKey}` } });
@@ -47,10 +47,10 @@
    * @param {string} [title]
    * @returns {string}
    */
-  function wrapHtml(inner, title='Distilled') {
+  function wrapHtml(inner, title = 'Distilled') {
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
   }
-  function escapeHtml(s='') { return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function escapeHtml(s = '') { return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
   window.DV = window.DV || {};
   window.DV.aiProviders = window.DV.aiProviders || {};
