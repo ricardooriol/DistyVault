@@ -74,8 +74,8 @@
     const provider = map()[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
     const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
-    // Limit text size to control token usage and stay within provider payload limits
-    const text = extracted.text?.slice(0, 12000) || '';
+    const fullText = extracted.text || '';
+
     // High-specificity system directive that enforces the output format for downstream parsing
     const directive = dedent`
       SYSTEM DIRECTIVE: MUST FOLLOW ALL RULES EXACTLY, DEVIATION IS STRICTLY NOT PERMITTED
@@ -166,18 +166,87 @@
 
       The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.
     `;
-    // Separate system directive from user content to support providers that accept role-based messages
-    const userContent = `Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
 
-    const prepared = {
-      title,
-      prompt: `${directive}\n\n${userContent}`,
-      messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
-    };
+    const CHUNK_SIZE = 10000;
+    const CHUNK_OVERLAP = 500;
 
-    // Pass through prepared prompt/messages for providers that need a single prompt or a role-separated chat
-    const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
-    const rawHtml = await provider.distill(extracted, settingsWithPrepared);
+    /**
+     * Split text at paragraph boundaries into chunks of roughly CHUNK_SIZE chars,
+     * with CHUNK_OVERLAP overlap between adjacent chunks.
+     */
+    function chunkText(text) {
+      if (text.length <= CHUNK_SIZE) return [text];
+      const chunks = [];
+      let start = 0;
+      while (start < text.length) {
+        let end = start + CHUNK_SIZE;
+        if (end >= text.length) {
+          chunks.push(text.slice(start));
+          break;
+        }
+        // Find paragraph break near the boundary
+        const searchRegion = text.slice(end - 300, end + 300);
+        const breakIdx = searchRegion.lastIndexOf('\n\n');
+        if (breakIdx !== -1) {
+          end = end - 300 + breakIdx;
+        }
+        chunks.push(text.slice(start, end));
+        start = Math.max(start + 1, end - CHUNK_OVERLAP);
+      }
+      return chunks;
+    }
+
+    async function distillSingle(text, partNote) {
+      const userContent = `${partNote}Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
+      const prepared = {
+        title,
+        prompt: `${directive}\n\n${userContent}`,
+        messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
+      };
+      const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
+      return await provider.distill(extracted, settingsWithPrepared);
+    }
+
+    let rawHtml;
+    if (fullText.length <= CHUNK_SIZE) {
+      // Short content: single-pass distillation (existing behavior)
+      rawHtml = await distillSingle(fullText, '');
+    } else {
+      // Chunked distillation for long content
+      const chunks = chunkText(fullText);
+      const chunkResults = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill this part thoroughly.]\n\n`;
+        const result = await distillSingle(chunks[i], partNote);
+        chunkResults.push(result);
+      }
+
+      if (chunkResults.length === 1) {
+        rawHtml = chunkResults[0];
+      } else {
+        // Synthesis pass: merge all chunk distillations
+        const mergeDirective = dedent`
+          SYSTEM DIRECTIVE: You are a world-class knowledge synthesizer.
+          You have been given multiple partial distillations of a longer document.
+          Your task is to merge them into ONE cohesive, unified, complete distillation.
+          Remove all redundancies and overlapping points.
+          Maintain the same numbered-list output format as the original distillation.
+          Re-number all points sequentially starting from 1.
+          Preserve all unique insights and do not lose any information.
+          Output ONLY the merged numbered list — no introductions, no commentary.
+        `;
+        const mergeContent = chunkResults.map((r, i) => `--- Part ${i + 1} ---\n${r}`).join('\n\n');
+        const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified document:\n\n${mergeContent}`;
+        const mergePrepared = {
+          title: title + ' (merged)',
+          prompt: `${mergeDirective}\n\n${mergeUserContent}`,
+          messages: [{ role: 'system', content: mergeDirective }, { role: 'user', content: mergeUserContent }]
+        };
+        const mergeSettings = { ...aiSettings, __prepared: mergePrepared };
+        rawHtml = await provider.distill(extracted, mergeSettings);
+      }
+    }
+
     const now = new Date();
     const meta = {
       title,
