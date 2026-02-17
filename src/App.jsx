@@ -238,7 +238,7 @@ function CapturePanel({ onSubmit }) {
       <div className="flex flex-col gap-3">
         <div className="flex gap-2 flex-wrap">
           <div className="flex-1 min-w-0 relative">
-            <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a URL or YouTube link" className="w-full h-12 pl-10 pr-3 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400" />
+            <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && url.trim()) submit(); }} placeholder="Paste a URL or YouTube link" className="w-full h-12 pl-10 pr-3 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400" />
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-900 dark:text-white"><Icon name="link" /></div>
           </div>
           <label className="h-12 w-12 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer text-slate-900 dark:text-white" title="Choose files" aria-label="Choose files">
@@ -310,30 +310,30 @@ function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
  * Search input appears inline and auto-focuses when toggled.
  * Filter menu closes on outside click via a document-level listener.
  */
-function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort }) {
+function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
   const [expanded, setExpanded] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef(null);
-  useEffect(() => { if (!search) setExpanded(false); }, [search]);
+  const searchRef = useRef(null);
   useEffect(() => {
     function onDoc(e) { if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); }
     document.addEventListener('click', onDoc);
     return () => document.removeEventListener('click', onDoc);
   }, [filterOpen]);
+  useEffect(() => { if (expanded && searchRef.current) searchRef.current.focus(); }, [expanded]);
 
   return (
     <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
-      <div className="flex items-center gap-3 relative">
-        <div className="relative z-30">
-          <button onClick={() => setExpanded(v => !v)} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800" title="Search"><Icon name="search" /></button>
-        </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => { const next = !expanded; setExpanded(next); if (!next) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800', expanded && 'ring-2 ring-brand-500')} title="Search"><Icon name="search" /></button>
         {expanded && (
           <input
-            autoFocus
+            ref={searchRef}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setExpanded(false); } }}
             placeholder="Search…"
-            className="absolute left-0 top-0 h-9 w-full max-w-[600px] pl-12 pr-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none shadow z-40 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+            className="h-9 flex-1 min-w-0 max-w-[400px] px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
           />
         )}
         <div className="relative z-20" ref={filterRef}>
@@ -361,6 +361,16 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
           )}
         </div>
 
+        {/* Tag filter */}
+        {allTags && allTags.length > 0 && (
+          <div className="flex items-center gap-1 overflow-x-auto max-w-[40%]">
+            <button onClick={() => setTagFilter('')} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0', !tagFilter ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title="All tags">All</button>
+            {allTags.map(tag => (
+              <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0 truncate max-w-[120px]', tagFilter === tag ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title={tag}>{tag}</button>
+            ))}
+          </div>
+        )}
+
         <div className="ml-auto flex items-center gap-2">
           <input
             type="file"
@@ -370,7 +380,6 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
             onChange={e => {
               const file = e.target.files && e.target.files[0];
               if (file) onImport(file);
-              // Reset value so selecting the same file again will trigger onChange
               e.target.value = '';
             }}
           />
@@ -485,7 +494,11 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                   {i.kind === 'file' ? (
                     <div className="overflow-hidden">
                       <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
+                      {i.tags && i.tags.length > 0 ? (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
+                      ) : (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
+                      )}
                     </div>
                   ) : i.kind === 'playlist' ? (
                     <PlaylistRowName i={i} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
@@ -496,7 +509,9 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                           (i.status === STATUS.PENDING ? `Loading from ${i.title}...` :
                             (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
                       </div>
-                      {i.url ? (
+                      {i.tags && i.tags.length > 0 ? (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
+                      ) : i.url ? (
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
                       ) : (
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
@@ -566,18 +581,19 @@ function formatDuration(ms) {
  *
  * Appears only when at least one item is selected. "View" is offered only when exactly one item is selected.
  */
-function SelectionDock({ count, anyActive, allSelected, disableViewDownload, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll }) {
+function SelectionDock({ count, anyActive, allSelected, disableViewDownload, disableView, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
   if (!count) return null;
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow max-w-[95vw]">
       <div className="overflow-x-auto">
         <div className="inline-flex items-center gap-2 whitespace-nowrap">
           {count === 1 && (
-            <button onClick={onView} disabled={disableViewDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="eye" /><span>View</span></button>
+            <button onClick={onView} disabled={disableView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="eye" /><span>View</span></button>
           )}
           <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
           {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
           <button onClick={onDownload} disabled={disableViewDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="arrow-down-to-line" /><span>Download</span></button>
+          <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="tag" /><span>Tag</span></button>
           <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
           <span className="mx-2 h-5 w-px bg-slate-300/60 dark:bg-white/20" />
           <div className="text-sm">{count} selected</div>
@@ -594,6 +610,80 @@ function SelectionDock({ count, anyActive, allSelected, disableViewDownload, onV
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * TagEditorModal — lightweight modal for adding/removing tags on selected items.
+ */
+function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
+  const [input, setInput] = useState('');
+  const selectedItems = items.filter(i => selectedIds.includes(i.id));
+  const currentTags = useMemo(() => {
+    const s = new Set();
+    selectedItems.forEach(i => (i.tags || []).forEach(t => s.add(t)));
+    return Array.from(s).sort();
+  }, [selectedItems]);
+
+  async function addTag() {
+    const tag = input.trim().toLowerCase();
+    if (!tag) return;
+    for (const id of selectedIds) {
+      const item = items.find(i => i.id === id);
+      const existing = item?.tags || [];
+      if (!existing.includes(tag)) {
+        await DV.queue.updateTags(id, [...existing, tag]);
+      }
+    }
+    setInput('');
+  }
+  async function removeTag(tag) {
+    for (const id of selectedIds) {
+      const item = items.find(i => i.id === id);
+      const existing = item?.tags || [];
+      await DV.queue.updateTags(id, existing.filter(t => t !== tag));
+    }
+  }
+
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose} title="Manage Tags">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addTag(); }}
+            placeholder="Add a tag…"
+            className="flex-1 h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-sm text-slate-900 dark:text-slate-100"
+          />
+          <button onClick={addTag} className="h-9 px-3 rounded-lg bg-brand-700 text-white text-sm">Add</button>
+        </div>
+        {allTags && allTags.length > 0 && (
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Existing tags (click to add)</div>
+            <div className="flex flex-wrap gap-1">
+              {allTags.filter(t => !currentTags.includes(t)).map(t => (
+                <button key={t} onClick={() => { setInput(''); for (const id of selectedIds) { const item = items.find(i => i.id === id); const ex = item?.tags || []; if (!ex.includes(t)) DV.queue.updateTags(id, [...ex, t]); } }} className="px-2 py-0.5 text-xs rounded-full border border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10">{t}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {currentTags.length > 0 && (
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Current tags</div>
+            <div className="flex flex-wrap gap-1">
+              {currentTags.map(t => (
+                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">
+                  {t}
+                  <button onClick={() => removeTag(t)} className="hover:text-rose-600"><Icon name="x" size={12} /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -778,12 +868,39 @@ function App() {
   const [errorItem, setErrorItem] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 });
+  const [tagFilter, setTagFilter] = useState('');
+  const [tagEditorOpen, setTagEditorOpen] = useState(false);
+  const [contentIndex, setContentIndex] = useState(new Map());
 
+  // Derive unique tags across all items
+  const allTags = useMemo(() => {
+    const s = new Set();
+    items.forEach(i => (i.tags || []).forEach(t => s.add(t)));
+    return Array.from(s).sort();
+  }, [items]);
+
+  // Build content index for full-text search
+  async function rebuildContentIndex() {
+    try {
+      const contents = await DV.db.getAll('contents');
+      const idx = new Map();
+      for (const c of contents) {
+        if (c.html && !c.id.endsWith(':file')) {
+          try {
+            const doc = new DOMParser().parseFromString(c.html, 'text/html');
+            const text = (doc.body?.innerText || '').toLowerCase().slice(0, 5000);
+            idx.set(c.id, text);
+          } catch { }
+        }
+      }
+      setContentIndex(idx);
+    } catch { }
+  }
 
   useEffect(() => {
-    const off1 = DV.bus.on('items:loaded', setItems);
+    const off1 = DV.bus.on('items:loaded', (loadedItems) => { setItems(loadedItems); rebuildContentIndex(); });
     const off2 = DV.bus.on('items:added', async () => setItems(await DV.db.getAll('items')));
-    const off3 = DV.bus.on('items:updated', async () => setItems(await DV.db.getAll('items')));
+    const off3 = DV.bus.on('items:updated', async () => { setItems(await DV.db.getAll('items')); rebuildContentIndex(); });
     const off4 = DV.bus.on('ui:openError', setErrorItem);
     DV.queue.loadSettings().then(() => setSettings(DV.queue.getSettings()));
     DV.queue.loadQueue();
@@ -1153,9 +1270,19 @@ a:hover{text-decoration:underline}
       if (filter === 'all') return true;
       if (filter === 'youtube') return i.kind === 'youtube' || isYouTubePlaylist(i);
       return i.kind === filter;
-    }).filter(i =>
-      !q || (i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q))
-    );
+    }).filter(i => {
+      // Tag filter
+      if (tagFilter && !(i.tags || []).includes(tagFilter)) return false;
+      return true;
+    }).filter(i => {
+      if (!q) return true;
+      // Search title, URL, fileName
+      if (i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q)) return true;
+      // Full-text search in distilled content
+      const body = contentIndex.get(i.id);
+      if (body && body.includes(q)) return true;
+      return false;
+    });
     if (sort === 'title') arr.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     else if (sort === 'status') arr.sort((a, b) => (a.status || '').localeCompare(b.status || ''));
     else if (sort === 'duration') arr.sort((a, b) => (a.durationMs || 0) - (b.durationMs || 0));
@@ -1275,6 +1402,10 @@ a:hover{text-decoration:underline}
     const it = items.find(x => x.id === id);
     return it && it.status === STATUS.COMPLETED;
   });
+  const disableView = !selected.every(id => {
+    const it = items.find(x => x.id === id);
+    return it && (it.status === STATUS.COMPLETED || it.status === STATUS.ERROR || it.status === STATUS.STOPPED);
+  });
   const allSelected = visibleItems.length > 0 && visibleItems.every(i => selected.includes(i.id));
 
   return (
@@ -1283,13 +1414,14 @@ a:hover{text-decoration:underline}
       <div className="max-w-6xl mx-auto px-4">
         <CapturePanel onSubmit={handleSubmit} />
         <StatsRow items={items} onDownloadAll={downloadAllCompleted} onStopAll={stopAll} onRetryFailed={retryFailed} />
-        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onExport={exportAll} onImport={importZip} sort={sort} setSort={setSort} />
+        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onExport={exportAll} onImport={importZip} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} />
         <Table items={visibleItems} allItems={allItemsSorted} selected={selected} setSelected={setSelected} onSort={handleSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
         <SelectionDock
           count={selected.length}
           anyActive={anyActive}
           allSelected={allSelected}
           disableViewDownload={disableViewDownload}
+          disableView={disableView}
           onView={viewSelected}
           onRetry={retrySelected}
           onStop={() => {
@@ -1305,11 +1437,13 @@ a:hover{text-decoration:underline}
           onDelete={deleteSelected}
           onSelectAll={() => setSelected(visibleItems.map(i => i.id))}
           onUnselectAll={() => setSelected([])}
+          onTag={() => setTagEditorOpen(true)}
         />
       </div>
 
       <ContentModal item={viewItem} onClose={() => setViewItem(null)} />
       <ErrorModal item={errorItem} onClose={() => setErrorItem(null)} />
+      <TagEditorModal open={tagEditorOpen} onClose={() => setTagEditorOpen(false)} selectedIds={selected} items={items} allTags={allTags} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={applySettings} />
 
       <footer className="mt-10 py-2 text-center text-xs text-slate-600 dark:text-slate-300">DistyVault · {new Date().getFullYear()}</footer>
@@ -1328,15 +1462,18 @@ a:hover{text-decoration:underline}
 function ContentModal({ item, onClose }) {
   const [html, setHtml] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState('');
   const iframeRef = useRef(null);
 
   useEffect(() => {
     if (!item) {
       setHtml('');
+      setErrorText('');
       return;
     }
 
     setLoading(true);
+    setErrorText('');
 
     DV.db.get('contents', item.id).then(content => {
       if (content?.html) {
@@ -1346,11 +1483,15 @@ function ContentModal({ item, onClose }) {
         } catch {
           setHtml(content.html || '');
         }
+      } else if (item.error) {
+        setHtml('');
+        setErrorText(item.error);
       } else {
         setHtml('');
       }
       setLoading(false);
     }).catch(() => {
+      if (item.error) setErrorText(item.error);
       setHtml('');
       setLoading(false);
     });
@@ -1383,6 +1524,12 @@ function ContentModal({ item, onClose }) {
             className="w-full h-[65vh] rounded-lg border border-slate-300 dark:border-white/20"
             srcDoc={html}
           />
+        ) : errorText ? (
+          <div className="flex flex-col items-center justify-center h-[65vh] gap-4 px-6">
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center"><Icon name="alert-triangle" size={24} className="text-rose-600 dark:text-rose-400" /></div>
+            <div className="text-sm font-medium text-rose-700 dark:text-rose-300">Distillation failed</div>
+            <div className="text-sm text-rose-600 dark:text-rose-400 whitespace-pre-wrap text-center max-w-md">{errorText}</div>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-[65vh] text-slate-600 dark:text-slate-300">
             <div className="text-sm">No content available</div>

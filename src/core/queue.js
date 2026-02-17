@@ -118,6 +118,7 @@
       fileType: item.fileType || null,
       size: item.size || 0,
       hasFile: !!item.file,
+      tags: item.tags || [],
       createdAt: now,
       updatedAt: now,
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
@@ -136,6 +137,16 @@
     syncLocalSummary();
     tick();
     return record;
+  }
+
+  /**
+   * Update tags for an existing item.
+   * @param {string} id
+   * @param {string[]} tags
+   * @returns {Promise<any|undefined>}
+   */
+  async function updateTags(id, tags) {
+    return updateItem(id, { tags: (tags || []).map(t => t.trim().toLowerCase()).filter(Boolean) });
   }
 
   /**
@@ -268,5 +279,5 @@
   }
 
   window.DV = window.DV || {};
-  window.DV.queue = { STATUS, addItem, updateItem, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, syncLocalSummary };
+  window.DV.queue = { STATUS, addItem, updateItem, updateTags, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, syncLocalSummary };
 })();
