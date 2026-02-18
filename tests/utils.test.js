@@ -14,7 +14,7 @@ global.fetch = async () => { throw new Error('fetch not available in tests'); };
 
 // Load utils module (IIFE attaches to window.DV.utils)
 require('../src/core/utils.js');
-const { escapeHtml, wrapHtml, normalizeText } = DV.utils;
+const { escapeHtml, wrapHtml, normalizeText, detectSourceTag, relativeTime } = DV.utils;
 
 describe('escapeHtml', () => {
     it('escapes ampersands', () => {
@@ -82,5 +82,74 @@ describe('wrapHtml', () => {
     it('uses default title when not provided', () => {
         const result = wrapHtml('content');
         assert.ok(result.includes('<title>Distilled</title>'));
+    });
+});
+
+describe('detectSourceTag', () => {
+    it('detects YouTube from url', () => {
+        assert.equal(detectSourceTag('https://www.youtube.com/watch?v=abc', 'url'), 'youtube');
+    });
+
+    it('detects YouTube from kind', () => {
+        assert.equal(detectSourceTag('https://youtu.be/abc', 'youtube'), 'youtube');
+    });
+
+    it('detects Substack', () => {
+        assert.equal(detectSourceTag('https://example.substack.com/p/hello', 'url'), 'substack');
+    });
+
+    it('detects Medium', () => {
+        assert.equal(detectSourceTag('https://medium.com/@user/article', 'url'), 'medium');
+    });
+
+    it('detects GitHub', () => {
+        assert.equal(detectSourceTag('https://github.com/user/repo', 'url'), 'github');
+    });
+
+    it('detects PDF file', () => {
+        assert.equal(detectSourceTag(null, 'file', 'application/pdf', 'paper.pdf'), 'pdf');
+    });
+
+    it('detects image file', () => {
+        assert.equal(detectSourceTag(null, 'file', 'image/png', 'photo.png'), 'image');
+    });
+
+    it('detects document file', () => {
+        assert.equal(detectSourceTag(null, 'file', 'application/msword', 'report.docx'), 'document');
+    });
+
+    it('falls back to web for unknown URL', () => {
+        assert.equal(detectSourceTag('https://example.com/page', 'url'), 'web');
+    });
+
+    it('falls back to file for unknown file type', () => {
+        assert.equal(detectSourceTag(null, 'file', 'application/zip', 'archive.zip'), 'file');
+    });
+
+    it('detects arxiv', () => {
+        assert.equal(detectSourceTag('https://arxiv.org/abs/1234.5678', 'url'), 'arxiv');
+    });
+
+    it('detects X/Twitter', () => {
+        assert.equal(detectSourceTag('https://x.com/user/status/123', 'url'), 'x');
+    });
+});
+
+describe('relativeTime', () => {
+    it('returns just now for recent timestamps', () => {
+        assert.equal(relativeTime(Date.now() - 5000), 'just now');
+    });
+
+    it('returns minutes ago', () => {
+        assert.equal(relativeTime(Date.now() - 180000), '3m ago');
+    });
+
+    it('returns hours ago', () => {
+        assert.equal(relativeTime(Date.now() - 7200000), '2h ago');
+    });
+
+    it('returns formatted date for old timestamps', () => {
+        const result = relativeTime(Date.now() - 30 * 86400000);
+        assert.ok(/^\d{2}\/\d{2}\/\d{4}$/.test(result));
     });
 });

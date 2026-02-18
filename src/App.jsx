@@ -467,7 +467,12 @@ a:hover{text-decoration:underline}
     });
     if (sort === 'title') arr.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     else if (sort === 'status') arr.sort((a, b) => (a.status || '').localeCompare(b.status || ''));
-    else if (sort === 'duration') arr.sort((a, b) => (a.durationMs || 0) - (b.durationMs || 0));
+    else if (sort === 'source') arr.sort((a, b) => {
+      const sa = ((a.tags || []).find(t => t.startsWith('source:')) || 'source:web').slice(7);
+      const sb = ((b.tags || []).find(t => t.startsWith('source:')) || 'source:web').slice(7);
+      return sa.localeCompare(sb);
+    });
+    else if (sort === 'date') arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     else if (sort === 'created') arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     else if (sort === 'queue') arr.sort((a, b) => (a.queueIndex || 0) - (b.queueIndex || 0));
     return arr;

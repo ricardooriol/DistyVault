@@ -47,15 +47,16 @@
     } catch { return u + (u.includes('?') ? '&' : '?') + encodeURIComponent(key) + '=' + encodeURIComponent(String(value ?? '')); }
   }
 
-  /** Try to peek a video title via oEmbed; falls back through the proxy when needed. */
+  /** Try to peek a video title via oEmbed; uses proxy-first to avoid CORS. */
   async function peekYouTubeTitle(inputUrl) {
     try {
       if (!isYouTube(inputUrl)) return null;
       const endpoint = 'https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(inputUrl);
       let res = null;
-      try { res = await fetchWithTimeout(endpoint, { headers: { 'Accept': 'application/json' } }, 7000); } catch { }
+      // Proxy-first: YouTube oEmbed blocks direct CORS
+      try { res = await fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(endpoint), {}, 8000); } catch { }
       if (!res || !res.ok) {
-        try { res = await fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(endpoint), {}, 8000); } catch { }
+        try { res = await fetchWithTimeout(endpoint, { headers: { 'Accept': 'application/json' } }, 7000); } catch { }
       }
       if (!res || !res.ok) return null;
       const ctype = (res.headers.get('content-type') || '').toLowerCase();
