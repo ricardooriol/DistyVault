@@ -324,9 +324,10 @@
         .replace(/\n/g, ',')
         .replace(/\d+\.\s*/g, '') // strip numbering
         .trim();
+      const blacklist = new Set(['html', 'head', 'body', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'img', 'a', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'form', 'input', 'button', 'script', 'style', 'meta', 'link', 'title', 'strong', 'em', 'b', 'i']);
       const tags = cleaned.split(',')
         .map(t => t.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'))
-        .filter(t => t.length >= 2 && t.length <= 30)
+        .filter(t => t.length >= 2 && t.length <= 30 && !blacklist.has(t))
         .slice(0, 5);
       return tags.length >= 2 ? tags : [];
     } catch {
