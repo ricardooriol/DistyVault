@@ -78,39 +78,48 @@
 
     // High-specificity system directive that enforces the output format for downstream parsing
     const directive = dedent`
-      SYSTEM DIRECTIVE: DO NOT SUMMARIZE. CAPTURE ALL DETAILS.
+      SYSTEM DIRECTIVE: DO NOT SUMMARIZE. YOUR OUTPUT MUST BE LONG AND COMPLETE.
 
       1. ROLE
-      You are a detailed note-taker. Your job is to create a complete and accurate record of the provided text.
-      You are not an editor or a summarizer. Your goal is to keep all the information.
+      You are a detailed note-taker. Your job is to create a FULL, THOROUGH record of every idea in the provided text.
+      You must NOT condense, shorten, or skip content. Every point the source makes must appear in your output.
 
-      2. CORE OBJECTIVE
-      The user wants a "Long-Form Record". This means:
-      - **Length**: The output must be long. Do not shorten paragraphs.
-      - **Detail**: Keep every specific example, number, date, name, and explanation.
-      - **Completeness**: If the source has 20 points, your list must have 20 points.
-      - **Style**: Explain the concepts directly. Do not say "The text says" or "The author argues". Just explain the ideas as facts.
+      2. WHAT "LONG AND COMPLETE" MEANS
+      - If the source text has 10 ideas, you produce at least 10 numbered points.
+      - Each numbered point must have a bold headline AND at least 2-3 paragraphs of explanation.
+      - A short article should produce 8-15 points. A long article or video transcript should produce 20-50+ points.
+      - One-sentence bullet points are NOT acceptable. Each point needs full paragraphs.
+      - When in doubt, include more detail, not less. The user explicitly wants long output.
 
-      3. PROCESS
-      For every part of the text:
-      A. Find the main idea.
-      B. Find all the supporting reasons, evidence, and details.
-      C. Write a numbered item that explains all of this clearly and fully.
+      3. TONE AND STYLE
+      - Write in normal, plain English. Not overly academic, not overly casual.
+      - Explain concepts directly as facts. Do NOT write "The text says..." or "The author argues...".
+        Instead, just state the idea: "Habit formation works by..." not "The text explains that habit formation works by..."
+      - Keep every specific example, number, date, name, quote, and anecdote from the source.
 
-      4. OUTPUT FORMAT (STRICT)
-      **1. Bold Headline Sentence**
-      [Paragraph 1: Explain the concept directly.]
-      [Paragraph 2: Give the specific examples.]
-      [Paragraph 3: Explain the consequences or details.]
+      4. PROCESS
+      Go through the text section by section. For each distinct idea or topic:
+      A. Write a bold headline sentence capturing the main point.
+      B. Write 2-3 paragraphs explaining the idea fully, including all supporting details, examples, and reasoning.
+      C. Move to the next idea. Do not combine multiple ideas into one point.
 
-      **2. Next Bold Headline Sentence**
-      [Detailed explanation...]
+      5. OUTPUT FORMAT
+      Start directly with **1.** — no introductions, no preambles.
 
-      5. INSTRUCTIONS
-      - **Do not skip anything.** If it's in the text, it must be in your output.
-      - **Write naturally.** Use normal, plain English. Avoid complex words or strictly academic language unless necessary for the topic.
-      - **Direct explanation.** Instead of "The article emphasizes the importance of..." say "It is important to..."
-      - **Structure**: Use as many numbered points as needed. Do not limit yourself.
+      **1. Bold headline sentence here**
+      First paragraph explaining the concept fully with all relevant details.
+      Second paragraph with specific examples, data, or evidence mentioned in the source.
+
+      **2. Next bold headline sentence**
+      Paragraphs of explanation...
+
+      Continue for ALL ideas in the source. Do not stop early. Do not cut corners.
+
+      6. IMPORTANT REMINDERS
+      - Your output should be MUCH LONGER than a typical summary. Aim for thousands of words.
+      - Never say "in summary", "briefly", "to conclude", or "overall". Just keep going through all the material.
+      - If you catch yourself writing short bullet points, stop and expand them into full paragraphs.
+      - Cover the ENTIRE source from beginning to end. Do not stop halfway.
     `;
 
     // Reduced chunk size to force more granular processing.
@@ -145,7 +154,7 @@
     }
 
     async function distillSingle(text, partNote) {
-      const userContent = `${partNote}Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
+      const userContent = `${partNote}Here is the text to distill. Remember: be THOROUGH and LONG. Cover every single point.\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
       const prepared = {
         title,
         prompt: `${directive}\n\n${userContent}`,
@@ -164,7 +173,7 @@
       const chunks = chunkText(fullText);
       const chunkResults = [];
       for (let i = 0; i < chunks.length; i++) {
-        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill this part thoroughly.]\n\n`;
+        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill THIS PART fully and in detail — do not shorten or summarize. Produce as many numbered points as this section warrants.]\n\n`;
         const result = await distillSingle(chunks[i], partNote);
         chunkResults.push(result);
       }
