@@ -50,21 +50,7 @@
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
-    return wrapHtml(text, extracted.title || 'Distilled');
-  }
-
-  /**
-   * Wrap generated text into a simple HTML page for rendering.
-   * @param {string} inner
-   * @param {string} [title]
-   * @returns {string}
-   */
-  function wrapHtml(inner, title = 'Distilled') {
-    return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
-  }
-
-  function escapeHtml(s = '') {
-    return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return DV.utils.wrapHtml(text, extracted.title || 'Distilled');
   }
 
   window.DV = window.DV || {};

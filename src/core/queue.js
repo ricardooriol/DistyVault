@@ -112,7 +112,7 @@
       id,
       kind: item.kind,
       parentId: item.parentId || null,
-      title: item.title || item.name || item.url || 'Untitled',
+      title: sanitizeTitle(item.title || item.name || item.url || 'Untitled'),
       url: item.url || null,
       fileName: item.fileName || null,
       fileType: item.fileType || null,
@@ -159,6 +159,7 @@
     const existing = await DV.db.get('items', id);
     if (!existing) return;
     const updated = { ...existing, ...patch, updatedAt: Date.now() };
+    if (patch.title) updated.title = sanitizeTitle(updated.title);
     await DV.db.put('items', updated);
     DV.bus.emit('items:updated', updated);
     syncLocalSummary();
@@ -204,6 +205,7 @@
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
+      DV.bus.emit('queue:itemProgress', { id, stage: 'extracting', detail: 'Extracting content…' });
 
       const extracted = await DV.extractors.extract(item);
       try {
@@ -216,6 +218,7 @@
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
+      DV.bus.emit('queue:itemProgress', { id, stage: 'distilling', detail: 'Distilling with AI…' });
       const html = await DV.ai.distill(extracted, state.settings.ai);
 
       const durationMs = Date.now() - (item.startedAt || start);
@@ -276,6 +279,15 @@
       localStorage.setItem('dv.items.counts', JSON.stringify({ total: 0, completed: 0, inProgress: 0, pending: 0, extracting: 0, distilling: 0, errors: 0, stopped: 0, playlists: 0 }));
       localStorage.setItem('dv.items.updatedAt', String(Date.now()));
     } catch { }
+  }
+
+  /**
+   * Strip HTML tags from a title to prevent XSS. Preserves plain text content.
+   * @param {string} title
+   * @returns {string}
+   */
+  function sanitizeTitle(title) {
+    return String(title || '').replace(/<[^>]*>/g, '').trim() || 'Untitled';
   }
 
   window.DV = window.DV || {};
