@@ -1,4 +1,4 @@
-(function() {
+(function () {
   /**
    * IndexedDB utility module providing a simple CRUD API and import/export helpers
    * for DistyVault data. Encapsulates database versioning, object stores, and
@@ -133,7 +133,7 @@
     const [items, contents, settings] = await Promise.all([
       getAll('items'), getAll('contents'), getAll('settings')
     ]);
-  zip.file('items.json', JSON.stringify(items, null, 2));
+    zip.file('items.json', JSON.stringify(items, null, 2));
     const manifest = [];
     for (const c of contents) {
       const entry = { ...c };
@@ -168,7 +168,9 @@
     for (const c of contentsManifest) {
       if (c.blobPath && zip.file(c.blobPath)) {
         const blob = await zip.file(c.blobPath).async('blob');
-        contents.push({ ...c, blob });
+        const restored = { ...c, blob };
+        delete restored.blobPath;
+        contents.push(restored);
       } else {
         contents.push(c);
       }

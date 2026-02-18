@@ -204,7 +204,7 @@
         messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
       };
       const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
-      return await provider.distill(extracted, settingsWithPrepared);
+      return await retryWithBackoff(() => provider.distill(extracted, settingsWithPrepared));
     }
 
     let rawHtml;
@@ -243,7 +243,7 @@
           messages: [{ role: 'system', content: mergeDirective }, { role: 'user', content: mergeUserContent }]
         };
         const mergeSettings = { ...aiSettings, __prepared: mergePrepared };
-        rawHtml = await provider.distill(extracted, mergeSettings);
+        rawHtml = await retryWithBackoff(() => provider.distill(extracted, mergeSettings));
       }
     }
 
@@ -370,16 +370,31 @@ footer.dv-footer{position:fixed;left:20px;bottom:10px;color:#64748b}
 <hr />
 ${inner}
 <hr />
-<footer class="dv-footer">DistyVault · 2025</footer>
+<footer class="dv-footer">DistyVault · ${new Date().getFullYear()}</footer>
 </body></html>`;
   }
 
+  /** Use shared escapeHtml from DV.utils. */
+  const escapeHtml = DV.utils.escapeHtml;
+
   /**
-   * Escape a string for safe inclusion in HTML text nodes or attributes.
-   * @param {string} [s]
-   * @returns {string}
+   * Retry a function up to maxRetries times with exponential backoff
+   * for transient errors (429, 5xx). Non-retryable errors throw immediately.
+   * @param {() => Promise<any>} fn
+   * @param {number} [maxRetries=3]
+   * @returns {Promise<any>}
    */
-  function escapeHtml(s = '') {
-    return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  async function retryWithBackoff(fn, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        const msg = String(err?.message || err);
+        const isRetryable = /\b(429|500|502|503|504)\b/.test(msg) || /rate.?limit|too many requests|overloaded/i.test(msg);
+        if (!isRetryable || attempt >= maxRetries) throw err;
+        const delay = Math.pow(3, attempt) * 1000; // 1s, 3s, 9s
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
   }
 })();

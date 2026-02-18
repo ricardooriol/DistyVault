@@ -1,6 +1,6 @@
-(function(){
+(function () {
   /** Ensure URL has a scheme, defaulting to https. */
-  function normalizeUrl(input=''){
+  function normalizeUrl(input = '') {
     const s = String(input).trim();
     if (!s) return '';
     if (!/^https?:\/\//i.test(s) && !/^[a-z]+:\/\//i.test(s)) return 'https://' + s;
@@ -8,10 +8,10 @@
   }
 
   /** Remove non-content elements and obvious chrome/junk by classname/id heuristics. */
-  function cleanDoc(doc){
-    doc.querySelectorAll('script,style,noscript,template,iframe,canvas,svg,form,header,footer,nav,aside,menu,dialog').forEach(n=>n.remove());
-    doc.querySelectorAll('[hidden], [aria-hidden="true"], [style*="display:none" i], [style*="visibility:hidden" i]').forEach(n=>n.remove());
-    const junk = ['ad','ads','advert','promo','subscribe','newsletter','cookie','banner','footer','header','nav','sidebar','social','share','breadcrumb','pagination'];
+  function cleanDoc(doc) {
+    doc.querySelectorAll('script,style,noscript,template,iframe,canvas,svg,form,header,footer,nav,aside,menu,dialog').forEach(n => n.remove());
+    doc.querySelectorAll('[hidden], [aria-hidden="true"], [style*="display:none" i], [style*="visibility:hidden" i]').forEach(n => n.remove());
+    const junk = ['ad', 'ads', 'advert', 'promo', 'subscribe', 'newsletter', 'cookie', 'banner', 'footer', 'header', 'nav', 'sidebar', 'social', 'share', 'breadcrumb', 'pagination'];
     doc.querySelectorAll('*').forEach(el => {
       const cls = (el.className || '').toString().toLowerCase();
       const id = (el.id || '').toLowerCase();
@@ -26,7 +26,7 @@
    * Heuristic selection of the main content node. Prefers semantic containers,
    * otherwise falls back to the largest text block.
    */
-  function pickMainNode(doc){
+  function pickMainNode(doc) {
     const candidates = Array.from(doc.querySelectorAll('article, main, [role="main"], #content, .content, .post, .entry, .article, .main-content'));
     let best = null, max = 0;
     const score = (el) => {
@@ -50,37 +50,20 @@
   }
 
   /** Determine a clean page title from meta and markup. */
-  function metaTitle(doc, url){
+  function metaTitle(doc, url) {
     const mt = doc.querySelector('meta[property="og:title"], meta[name="twitter:title"]')?.content?.trim();
     const h1 = doc.querySelector('h1')?.textContent?.trim();
     let t = doc.querySelector('title')?.textContent?.trim();
-    const clean = (s='') => s.replace(/\s*[|\-–—·•:]\s*.+$/, '').trim();
+    const clean = (s = '') => s.replace(/\s*[|\-–—·•:]\s*.+$/, '').trim();
     const best = mt || h1 || t || url;
     return clean(best);
   }
 
   /** Normalize whitespace and invisible chars in extracted text. */
-  function normalizeText(s=''){
-    return s
-      .replace(/\u00a0/g, ' ')
-      .replace(/[\t\r]+/g, ' ')
-      .replace(/\s+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .replace(/[ \u200b\u200c\u200d\ufeff]+/g, ' ')
-      .trim();
-  }
+  const normalizeText = DV.utils.normalizeText;
 
   /** Fetch with an abort timeout; does not swallow non-timeout errors. */
-  async function fetchWithTimeout(url, opts={}, ms=15000){
-    const controller = new AbortController();
-    const t = setTimeout(()=> controller.abort(), ms);
-    try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      return res;
-    } finally {
-      clearTimeout(t);
-    }
-  }
+  const fetchWithTimeout = DV.utils.fetchWithTimeout;
 
   /**
    * Extract main readable text from a URL. Attempts direct CORS fetch first, then
@@ -137,7 +120,7 @@
    * Lightweight title peek without full extraction. Uses direct fetch, then proxy, and
    * attempts to parse title from HTML when content-type permits.
    */
-  async function peekTitle(inputUrl){
+  async function peekTitle(inputUrl) {
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
     let res;

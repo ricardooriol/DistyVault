@@ -45,30 +45,63 @@ You can select any available model from the settings panel.
 The app is a single-page client-side application with no build step. It loads React (UMD) and Babel standalone via CDN, transpiling JSX at runtime.
 
 ```
-index.html              Entry point, script loading, theme init
+index.html                  Entry point, script loading, theme init
+manifest.json               PWA manifest
+sw.js                       Service worker for offline support
 src/
-  App.jsx               UI components and application state
+  App.jsx                   App shell and business logic
+  components/
+    Components.jsx          All UI components (TopBar, Table, Modal, etc.)
   core/
-    db.js               IndexedDB operations, ZIP import/export
-    queue.js            Item lifecycle, scheduling, concurrency
-    eventBus.js         Pub/sub for inter-module communication
-    toast.js            Transient notifications
+    utils.js                Shared utilities (escapeHtml, normalizeText, etc.)
+    db.js                   IndexedDB operations, ZIP import/export
+    queue.js                Item lifecycle, scheduling, concurrency
+    eventBus.js             Pub/sub for inter-module communication
+    toast.js                Transient notifications (ARIA live region)
   extractors/
-    index.js            Dispatcher by item type
-    url.js              Web page content extraction
-    youtube.js          YouTube video/playlist handling
-    files.js            PDF, DOCX, image, and text extraction
+    index.js                Dispatcher by item type
+    url.js                  Web page content extraction
+    youtube.js              YouTube video/playlist handling
+    files.js                PDF, DOCX, image, and text extraction
   ai/
-    service.js          Prompt preparation, provider orchestration
+    service.js              Prompt preparation, provider orchestration, retry logic
     providers/
-      openai.js         OpenAI chat completions
-      gemini.js         Google Gemini generateContent
-      anthropic.js      Anthropic Claude messages
-      deepseek.js       DeepSeek chat completions
-      grok.js           xAI Grok chat completions
+      openai.js             OpenAI chat completions
+      gemini.js             Google Gemini generateContent
+      anthropic.js          Anthropic Claude messages
+      deepseek.js           DeepSeek chat completions
+      grok.js               xAI Grok chat completions
 api/
-  fetch.js              CORS proxy with protocol/size/timeout guards
+  fetch.js                  CORS proxy with protocol/size/timeout guards
+tests/
+  utils.test.js             Unit tests for shared utilities
 ```
+
+## Running locally
+
+```bash
+# Serve with any static server
+npx -y serve . -p 3000
+
+# Run tests (Node.js 18+)
+node --test tests/
+```
+
+## Content Security Policy (CSP)
+
+Because DistyVault runs JSX through Babel Standalone in the browser, the CSP policy must include `'unsafe-eval'` for `script-src`. If you deploy behind a strict CSP:
+
+```
+script-src 'self' 'unsafe-eval'
+  https://cdn.tailwindcss.com
+  https://unpkg.com
+  https://cdn.jsdelivr.net
+  https://cdnjs.cloudflare.com;
+style-src 'self' 'unsafe-inline';
+connect-src 'self' https://*.googleapis.com https://*.openai.com https://*.anthropic.com https://*.deepseek.com https://api.x.ai;
+```
+
+> **Note:** The `'unsafe-eval'` requirement is inherent to the no-build-step, in-browser Babel transpilation approach. To remove it, migrate to a build-time JSX compilation step.
 
 ## Contributing
 

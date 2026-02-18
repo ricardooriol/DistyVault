@@ -1,0 +1,21 @@
+{
+    "name": "distyvault",
+    "version": "0.3.0",
+    "description": "Gather, distill and control your knowledge — privacy-first content distillation powered by AI",
+    "license": "MIT",
+    "private": true,
+    "scripts": {
+        "serve": "npx -y serve . -p 3000",
+        "test": "node --test tests/"
+    },
+    "keywords": [
+        "knowledge-management",
+        "ai",
+        "distillation",
+        "browser-app",
+        "indexeddb"
+    ],
+    "engines": {
+        "node": ">=18"
+    }
+}

@@ -1,25 +1,22 @@
 /**
- * DistyVault — React application shell and UI logic
+ * DistyVault — App shell and business logic
  *
- * This file is intentionally plain React (UMD) executed via Babel-in-browser.
- * It wires the UI to DV core modules available on window.DV (db, queue, bus, ai, extractors, toast).
+ * UI components are loaded from src/components/Components.jsx (via DV.components).
+ * This file contains only the App root, helper functions, and the mount point.
  *
- * Design notes:
- * - No build step: loaded in index.html using <script type="text/babel">; avoid syntax or APIs that won't transpile.
- * - Dark mode is controlled by a class on <html>; we mirror theme state into iframes via postMessage for parity.
- * - For long-running UI tasks (PDF generation, ZIP creation) we yield to the browser to keep the UI responsive.
+ * No build step: loaded in index.html using <script type="text/babel">.
  */
 const { useState, useEffect, useMemo, useRef } = React;
 
 const STATUS = DV.queue.STATUS;
-
-function classNames(...arr) { return arr.filter(Boolean).join(' '); }
+const {
+  TopBar, CapturePanel, StatsRow, CommandBar, Table, SelectionDock,
+  TagEditorModal, SettingsDrawer, ContentModal, ErrorModal, Modal,
+  ErrorBoundary, Icon, classNames, isYouTubePlaylist, formatDuration
+} = DV.components;
 
 /**
  * Yield control to the browser so rendering/painting can catch up.
- *
- * Uses requestIdleCallback if present, otherwise falls back to rAF or setTimeout.
- * Handy when iterating over large lists (e.g., bulk ZIP/PDF) to avoid jank.
  */
 function yieldToBrowser() {
   return new Promise(resolve => {
@@ -31,17 +28,6 @@ function yieldToBrowser() {
 
 /**
  * Save a Blob to disk with best-effort UX across environments.
- *
- * Strategy (first that succeeds wins):
- * - File System Access API (showSaveFilePicker) on modern desktop browsers (not iOS)
- * - Web Share API with files on mobile (if supported)
- * - iOS: open Blob URL in a new tab (download attribute is ignored by Safari iOS)
- * - Fallback: programmatic <a download> click
- *
- * All branches are wrapped defensively to ignore user cancelation errors.
- *
- * @param {Blob} blob - The data to persist
- * @param {string} filename - Suggested filename
  */
 async function saveBlob(blob, filename) {
   const ua = typeof navigator !== 'undefined' ? navigator : null;
@@ -109,753 +95,7 @@ async function saveBlob(blob, filename) {
 }
 
 /**
- * Icon — wrapper for lucide/feather UMD icon sets.
- *
- * We inject the desired icon name into a <span> and ask lucide/feather to replace it with an SVG.
- * Size is enforced post-render by directly sizing the resulting SVG node.
- */
-function Icon({ name, size = 20, className, strokeWidth = 2 }) {
-  const wrapRef = React.useRef(null);
-  React.useEffect(() => {
-    try {
-      const wrap = wrapRef.current;
-      if (!wrap) return;
-      wrap.innerHTML = '';
-      const i = document.createElement('i');
-      i.setAttribute('data-lucide', name);
-      i.style.width = '100%';
-      i.style.height = '100%';
-      i.style.display = 'block';
-      i.setAttribute('aria-hidden', 'true');
-      wrap.appendChild(i);
-      if (window.lucide && window.lucide.createIcons) {
-        window.lucide.createIcons({ attrs: { 'stroke-width': String(strokeWidth) } });
-      } else if (window.feather && window.feather.replace) {
-        i.setAttribute('data-feather', name);
-        i.removeAttribute('data-lucide');
-        window.feather.replace({ 'stroke-width': strokeWidth });
-      }
-      const svg = wrap.querySelector('svg');
-      if (svg) {
-        svg.setAttribute('width', String(size));
-        svg.setAttribute('height', String(size));
-        svg.style.width = size + 'px';
-        svg.style.height = size + 'px';
-        svg.style.display = 'block';
-        svg.style.margin = 'auto';
-        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      }
-    } catch { }
-  }, [name, size, strokeWidth]);
-  return React.createElement('span', {
-    ref: wrapRef,
-    className: ['dv-icon pointer-events-none inline-flex items-center justify-center', className || ''].join(' '),
-    style: { width: size + 'px', height: size + 'px', display: 'inline-flex' },
-    'aria-hidden': true
-  });
-}
-
-/**
- * TopBar — app header with logo and quick actions.
- * @param {{theme: 'light'|'dark'|'system', setTheme: (t:string)=>void, openSettings: ()=>void}} props
- */
-function TopBar({ theme, setTheme, openSettings }) {
-  const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
-  const themeIcon = isDark ? 'moon' : 'sun';
-  const logoSrc = isDark ? 'logos/logo_no_bg_w.png' : 'logos/logo_no_bg_b.png';
-
-  return (
-    <div className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/70 border-b border-slate-300 dark:border-white/10">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src={logoSrc} alt="DistyVault" className="w-8 h-8 rounded-full shadow" />
-          <div>
-            <div className="font-semibold text-slate-900 dark:text-slate-100">DistyVault</div>
-            <div className="text-xs text-slate-600 dark:text-slate-300">Gather, distill and control your knowledge</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label="Toggle theme"
-            className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-          >
-            <Icon name={themeIcon} />
-          </button>
-          <button onClick={openSettings} title="Settings" aria-label="Settings" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-            <Icon name="settings" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * CapturePanel — entry for URLs and file uploads (drag/drop + picker).
- *
- * The component keeps a local list of selected files until submission.
- * Keyboard focus behavior: input is standard; drag-and-drop focuses the drop zone visually.
- */
-function CapturePanel({ onSubmit }) {
-  const [url, setUrl] = useState('');
-  const [files, setFiles] = useState([]);
-  const dropRef = useRef(null);
-
-  function choose(evt) {
-    const f = Array.from(evt.target.files || []);
-    if (f.length) {
-      setFiles(prev => [...prev, ...f]);
-    }
-  }
-
-  function onDrop(e) {
-    e.preventDefault();
-    const f = Array.from(e.dataTransfer.files || []);
-    if (f.length) {
-      setFiles(prev => [...prev, ...f]);
-    }
-    dropRef.current?.classList.remove('ring-2', 'ring-brand-500');
-  }
-
-  function onDragOver(e) { e.preventDefault(); dropRef.current?.classList.add('ring-2', 'ring-brand-500'); }
-  function onDragLeave() { dropRef.current?.classList.remove('ring-2', 'ring-brand-500'); }
-
-  function removeFile(i) { setFiles(prev => prev.filter((_, idx) => idx !== i)); }
-  function clearFiles() { setFiles([]); }
-
-  async function submit() {
-    const trimmed = url.trim();
-    await onSubmit(trimmed, files);
-    setUrl('');
-    setFiles([]);
-  }
-
-  return (
-    <div ref={dropRef} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave} className="max-w-6xl mx-auto mt-6 p-4 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-2 flex-wrap">
-          <div className="flex-1 min-w-0 relative">
-            <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && url.trim()) submit(); }} placeholder="Paste a URL or YouTube link" className="w-full h-12 pl-10 pr-3 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400" />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-900 dark:text-white"><Icon name="link" /></div>
-          </div>
-          <label className="h-12 w-12 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer text-slate-900 dark:text-white" title="Choose files" aria-label="Choose files">
-            <input type="file" multiple className="hidden" onChange={choose} />
-            <Icon name="paperclip" />
-          </label>
-          <button onClick={submit} title="Distill" aria-label="Distill" className="h-12 w-12 rounded-xl bg-brand-700 text-white hover:bg-brand-800 flex items-center justify-center"><Icon name="wand-2" /></button>
-        </div>
-
-        {files.length > 0 && (
-          <div className="text-sm flex items-center gap-2 flex-wrap">
-            {files.slice(0, 6).map((f, i) => (
-              <div key={i} className="px-2 py-1 border rounded-full text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 flex items-center gap-2">
-                <span className="truncate max-w-[160px]">{f.name}</span>
-                <button onClick={() => removeFile(i)} className="text-slate-400 hover:text-slate-700"><Icon name="x" /></button>
-              </div>
-            ))}
-            {files.length > 6 && <span className="text-slate-500">+{files.length - 6} more</span>}
-            <button onClick={clearFiles} className="ml-auto inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white">
-              <Icon name="trash-2" />
-              <span>Remove all</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * StatsRow — summary cards for queue state (completed/in-progress/errors).
- * Actions are contextual (disabled when the count is zero).
- */
-function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
-  const completed = items.filter(i => i.status === STATUS.COMPLETED).length;
-  const inprog = items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
-  const errors = items.filter(i => i.status === STATUS.ERROR).length;
-
-  const Card = ({ label, count, action, actionText, bg }) => (
-    <div className={classNames('flex-1 p-3 rounded-xl border border-slate-300 dark:border-white/20', bg)}>
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="flex items-center justify-between mt-1">
-        <div className="text-xl font-semibold text-slate-900 dark:text-white">{count}</div>
-        {action && (
-          <button
-            onClick={action}
-            className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"
-            aria-label={typeof label === 'string' ? label + ' action' : 'action'}
-          >
-            {actionText}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="max-w-6xl mx-auto mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <Card label="Completed" count={completed} action={completed ? onDownloadAll : null} actionText={<Icon name="arrow-down-to-line" />} />
-      <Card label="In Progress" count={inprog} action={inprog ? onStopAll : null} actionText={<Icon name="square" />} />
-      <Card label="Errors" count={errors} action={errors ? onRetryFailed : null} actionText={<Icon name="refresh-ccw" />} />
-    </div>
-  );
-}
-
-/**
- * CommandBar — filter/search/sort and import/export controls.
- *
- * Search input appears inline and auto-focuses when toggled.
- * Filter menu closes on outside click via a document-level listener.
- */
-function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
-  const [expanded, setExpanded] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-  const searchRef = useRef(null);
-  useEffect(() => {
-    function onDoc(e) { if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); }
-    document.addEventListener('click', onDoc);
-    return () => document.removeEventListener('click', onDoc);
-  }, [filterOpen]);
-  useEffect(() => { if (expanded && searchRef.current) searchRef.current.focus(); }, [expanded]);
-
-  return (
-    <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
-      <div className="flex items-center gap-3">
-        <button onClick={() => { const next = !expanded; setExpanded(next); if (!next) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800', expanded && 'ring-2 ring-brand-500')} title="Search"><Icon name="search" /></button>
-        {expanded && (
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setExpanded(false); } }}
-            placeholder="Search…"
-            className="h-9 flex-1 min-w-0 max-w-[400px] px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
-          />
-        )}
-        <div className="relative z-20" ref={filterRef}>
-          <button onClick={() => setFilterOpen(v => !v)} title="Filter" aria-label="Filter"
-            className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-            <Icon name={filter === 'all' ? 'asterisk' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : filter === 'file' ? 'file' : 'asterisk'} />
-          </button>
-          {filterOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50 flex flex-col gap-2">
-              {[
-                { k: 'all', icon: 'asterisk', label: 'All' },
-                { k: 'url', icon: 'link', label: 'URL' },
-                { k: 'youtube', icon: 'video', label: 'YouTube' },
-                { k: 'file', icon: 'file', label: 'File' },
-              ].map(({ k, icon, label }) => (
-                <button key={k} onClick={() => { setFilter(k); setFilterOpen(false); }}
-                  className={classNames('w-9 h-9 flex items-center justify-center rounded-lg',
-                    filter === k ? 'bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-slate-100')}
-                  title={label} aria-label={label}
-                >
-                  <Icon name={icon} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Tag filter */}
-        {allTags && allTags.length > 0 && (
-          <div className="flex items-center gap-1 overflow-x-auto max-w-[40%]">
-            <button onClick={() => setTagFilter('')} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0', !tagFilter ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title="All tags">All</button>
-            {allTags.map(tag => (
-              <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0 truncate max-w-[120px]', tagFilter === tag ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title={tag}>{tag}</button>
-            ))}
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <input
-            type="file"
-            accept="application/zip"
-            style={{ display: 'none' }}
-            ref={ref => { CommandBar.importInput = ref; }}
-            onChange={e => {
-              const file = e.target.files && e.target.files[0];
-              if (file) onImport(file);
-              e.target.value = '';
-            }}
-          />
-          <button
-            onClick={() => {
-              if (CommandBar.importInput) CommandBar.importInput.click();
-            }}
-            title="Import"
-            aria-label="Import"
-            className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-          >
-            <Icon name="download" />
-          </button>
-          <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><span style={{ display: 'inline-block', transform: 'rotate(180deg)' }}><Icon name="download" /></span></button>
-
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * StatusChip — colored badge representing queue state.
- */
-function StatusChip({ status, onClick }) {
-  const map = {
-    [STATUS.PENDING]: 'bg-slate-200 text-slate-700',
-    [STATUS.EXTRACTING]: 'bg-amber-200 text-amber-900',
-    [STATUS.DISTILLING]: 'bg-indigo-200 text-indigo-900',
-    [STATUS.COMPLETED]: 'bg-emerald-200 text-emerald-900',
-    [STATUS.ERROR]: 'bg-rose-200 text-rose-900',
-    [STATUS.STOPPED]: 'bg-slate-300 text-slate-800'
-  };
-  return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
-}
-
-/**
- * Table — main items list with selection, status and duration.
- *
- * Selection model rules:
- * - Clicking a playlist toggles selection of the playlist and all its children as a group.
- * - Clicking a child toggles itself; if all siblings are selected, the parent playlist becomes selected.
- * - Selection state is lifted via setSelected so the Dock can act on it.
- */
-function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }) {
-  // Helper to determine if item is a child of a playlist
-  function isPlaylistChild(item) {
-    const parent = allItems.find(x => x.id === item.parentId);
-    return parent && parent.kind === 'playlist';
-  }
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [items]);
-  function toggle(id) {
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }
-  function displayDuration(it) {
-    const active = [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
-    const base = active && it.startedAt ? (now - it.startedAt) : (it.durationMs || 0);
-    return base > 0 ? formatDuration(base) : '-';
-  }
-
-  function onRowClick(e, item) {
-    if (item.kind === 'playlist') {
-      const isSelected = selected.includes(item.id);
-      const childIds = allItems.filter(x => x.parentId === item.id).map(x => x.id);
-      if (isSelected) {
-        setSelected(prev => prev.filter(id => id !== item.id && !childIds.includes(id)));
-      } else {
-        setSelected(prev => Array.from(new Set([...prev, item.id, ...childIds])));
-      }
-    } else if (item.parentId) {
-      const isSelected = selected.includes(item.id);
-      const siblings = allItems.filter(x => x.parentId === item.parentId);
-      let next = selected.slice();
-      if (isSelected) next = next.filter(id => id !== item.id);
-      else next = Array.from(new Set([...next, item.id]));
-      const allSelected = siblings.every(s => next.includes(s.id));
-      if (allSelected) next = Array.from(new Set([...next, item.parentId]));
-      else next = next.filter(id => id !== item.parentId);
-      setSelected(next);
-    } else {
-      toggle(item.id);
-    }
-  }
-
-  return (
-    <div className="max-w-6xl mx-auto mt-4 rounded-2xl border border-slate-300 dark:border-white/20 overflow-hidden">
-      <div className="overflow-x-auto w-full">
-        <table className="w-full min-w-[720px] table-fixed rounded-2xl overflow-hidden">
-          <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
-            <tr>
-              <th className="w-[60%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
-              <th className="w-[20%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('status')}>Status</th>
-              <th className="w-[20%] p-2 text-center relative">
-                <span className="cursor-pointer" onClick={() => onSort && onSort('duration')}>Duration</span>
-                <button title="Reset sort" aria-label="Reset sort" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" onClick={() => onSort && onSort('queue')}><Icon name="rotate-ccw" /></button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 && (
-              <tr><td colSpan={3} className="p-6 text-center text-slate-600 dark:text-slate-300">Paste a URL or upload a document to get started</td></tr>
-            )}
-            {items.map(i => (
-              <tr key={i.id} onClick={(e) => onRowClick(e, i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '', isPlaylistChild(i) ? 'pl-8' : '')}>
-                <td className={classNames('p-2 pl-4 text-left', isPlaylistChild(i) ? 'pl-8' : '')}>
-                  {i.kind === 'file' ? (
-                    <div className="overflow-hidden">
-                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
-                      {i.tags && i.tags.length > 0 ? (
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
-                      ) : (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
-                      )}
-                    </div>
-                  ) : i.kind === 'playlist' ? (
-                    <PlaylistRowName i={i} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
-                  ) : (
-                    <div className="overflow-hidden">
-                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                        {(i.title && i.title !== i.url) ? i.title :
-                          (i.status === STATUS.PENDING ? `Loading from ${i.title}...` :
-                            (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
-                      </div>
-                      {i.tags && i.tags.length > 0 ? (
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
-                      ) : i.url ? (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
-                      ) : (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="p-2 text-center">
-                  {i.kind === 'playlist' ? null : (
-                    <StatusChip status={i.status} onClick={(e) => { e.stopPropagation(); if (i.status === STATUS.ERROR) DV.bus.emit('ui:openError', i); }} />
-                  )}
-                </td>
-                <td className="p-2 text-sm text-slate-700 dark:text-slate-200 text-center">{i.kind === 'playlist' ? '' : displayDuration(i)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/**
- * PlaylistRowName — name cell for playlist rows with expand/collapse affordance.
- */
-function PlaylistRowName({ i, expandedIds, setExpandedIds }) {
-  const expanded = expandedIds && expandedIds.has(i.id);
-  return (
-    <div className="overflow-hidden flex items-center gap-2">
-      <button
-        className="w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center"
-        title={expanded ? 'Collapse' : 'Expand'}
-        onClick={(e) => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}
-      >
-        <span className={expanded ? 'rotate-90 transition-transform flex items-center justify-center w-full h-full' : 'rotate-0 transition-transform flex items-center justify-center w-full h-full'}>
-          <Icon name="chevron-right" />
-        </span>
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-slate-900 dark:text-slate-100 truncate ml-1">{i.title}</div>
-        {i.url ? (
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate ml-1">{i.url}</div>
-        ) : (
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none ml-1">placeholder</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function isYouTubePlaylist(item) {
-  return item.kind === 'playlist';
-}
-
-/**
- * formatDuration — render milliseconds as Xm Ys.
- */
-function formatDuration(ms) {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60), r = s % 60;
-  return `${m}m ${r}s`;
-}
-
-/**
- * SelectionDock — floating actions for the current selection.
- *
- * Appears only when at least one item is selected. "View" is offered only when exactly one item is selected.
- */
-function SelectionDock({ count, anyActive, allSelected, disableViewDownload, disableView, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
-  if (!count) return null;
-  return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow max-w-[95vw]">
-      <div className="overflow-x-auto">
-        <div className="inline-flex items-center gap-2 whitespace-nowrap">
-          {count === 1 && (
-            <button onClick={onView} disabled={disableView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="eye" /><span>View</span></button>
-          )}
-          <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
-          {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
-          <button onClick={onDownload} disabled={disableViewDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800 disabled:opacity-50"><Icon name="arrow-down-to-line" /><span>Download</span></button>
-          <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="tag" /><span>Tag</span></button>
-          <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 inline-flex items-center gap-1 text-slate-900 dark:text-white bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
-          <span className="mx-2 h-5 w-px bg-slate-300/60 dark:bg-white/20" />
-          <div className="text-sm">{count} selected</div>
-          {!allSelected && (
-            <button onClick={onSelectAll} className="text-sm text-slate-900 dark:text-white inline-flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-400 dark:border-white/30">
-              <Icon name="check-square" />
-              <span>Select all</span>
-            </button>
-          )}
-          <button onClick={onUnselectAll} className="text-sm text-slate-900 dark:text-white inline-flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-400 dark:border-white/30">
-            <Icon name="x" />
-            <span>Unselect all</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * TagEditorModal — lightweight modal for adding/removing tags on selected items.
- */
-function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
-  const [input, setInput] = useState('');
-  const selectedItems = items.filter(i => selectedIds.includes(i.id));
-  const currentTags = useMemo(() => {
-    const s = new Set();
-    selectedItems.forEach(i => (i.tags || []).forEach(t => s.add(t)));
-    return Array.from(s).sort();
-  }, [selectedItems]);
-
-  async function addTag() {
-    const tag = input.trim().toLowerCase();
-    if (!tag) return;
-    for (const id of selectedIds) {
-      const item = items.find(i => i.id === id);
-      const existing = item?.tags || [];
-      if (!existing.includes(tag)) {
-        await DV.queue.updateTags(id, [...existing, tag]);
-      }
-    }
-    setInput('');
-  }
-  async function removeTag(tag) {
-    for (const id of selectedIds) {
-      const item = items.find(i => i.id === id);
-      const existing = item?.tags || [];
-      await DV.queue.updateTags(id, existing.filter(t => t !== tag));
-    }
-  }
-
-  if (!open) return null;
-  return (
-    <Modal open={open} onClose={onClose} title="Manage Tags">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addTag(); }}
-            placeholder="Add a tag…"
-            className="flex-1 h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-sm text-slate-900 dark:text-slate-100"
-          />
-          <button onClick={addTag} className="h-9 px-3 rounded-lg bg-brand-700 text-white text-sm">Add</button>
-        </div>
-        {allTags && allTags.length > 0 && (
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Existing tags (click to add)</div>
-            <div className="flex flex-wrap gap-1">
-              {allTags.filter(t => !currentTags.includes(t)).map(t => (
-                <button key={t} onClick={() => { setInput(''); for (const id of selectedIds) { const item = items.find(i => i.id === id); const ex = item?.tags || []; if (!ex.includes(t)) DV.queue.updateTags(id, [...ex, t]); } }} className="px-2 py-0.5 text-xs rounded-full border border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10">{t}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {currentTags.length > 0 && (
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Current tags</div>
-            <div className="flex flex-wrap gap-1">
-              {currentTags.map(t => (
-                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">
-                  {t}
-                  <button onClick={() => removeTag(t)} className="hover:text-rose-600"><Icon name="x" size={12} /></button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * Modal — accessible dialog with optional headerless style.
- *
- * Close affordance: overlay click, explicit close button; Escape is handled globally in App for selection only.
- */
-function Modal({ open, onClose, title, children, hideHeader }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose}></div>
-      <div className="relative max-w-3xl w-full mx-4 p-4 rounded-2xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 shadow-xl">
-        {!hideHeader && (
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</div>
-            <button onClick={onClose} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-800 dark:text-slate-100"><Icon name="x" /></button>
-          </div>
-        )}
-        {hideHeader && (
-          <button onClick={onClose} title="Close" aria-label="Close" className="absolute top-2 right-2 w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-800 dark:text-slate-100 bg-white/70 dark:bg-slate-800/70 backdrop-blur">
-            <Icon name="x" />
-          </button>
-        )}
-        <div className="max-h-[70vh] overflow-auto">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * SettingsDrawer — provider/model/key configuration + concurrency.
- *
- * All edits are staged locally and committed via setSettings() on Save.
- * The Test button calls DV.ai.test() for the selected provider using the given API key.
- */
-function SettingsDrawer({ open, onClose, settings, setSettings }) {
-  const DEFAULTS = { ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 };
-  const [local, setLocal] = useState(settings || DEFAULTS);
-  const [testing, setTesting] = useState(false);
-  useEffect(() => {
-    const cloned = settings ? { ...settings, ai: { ...(settings.ai || {}) } } : { ...DEFAULTS };
-    setLocal(cloned);
-  }, [settings]);
-
-  function save() { setSettings(local); DV.toast('Settings saved', { type: 'success' }); onClose(); }
-  function reset() {
-    setLocal({ ...DEFAULTS });
-    setTesting(false);
-  }
-  async function testKey() {
-    try {
-      setTesting(true);
-      await DV.ai.test(local.ai);
-      DV.toast('API key works', { type: 'success' });
-    } catch (e) {
-      DV.toast(e?.message || 'API key test failed', { type: 'error' });
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  return (
-    <div className={classNames('fixed inset-0 z-50', open ? '' : 'pointer-events-none')}>
-      <div className={classNames('absolute inset-0 bg-black/30 transition-opacity', open ? 'opacity-100' : 'opacity-0')} onClick={onClose}></div>
-      <div className={classNames('absolute right-0 top-0 h-full w-full max-w-md p-4 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-white/10 transition-transform', open ? 'translate-x-0' : 'translate-x-full')}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-lg font-semibold">Settings</div>
-          <button onClick={onClose} title="Close" aria-label="Close" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-            <Icon name="x" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <div className="text-sm font-medium mb-1">AI Provider</div>
-            <select
-              value={local.ai.mode || ''}
-              onChange={e => setLocal({ ...local, ai: { ...local.ai, mode: e.target.value, model: '' } })}
-              className="w-full h-10 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-slate-100 px-2">
-              <option value="">Select a provider</option>
-              <option value="anthropic">Anthropic Claude</option>
-              <option value="deepseek">Deepseek</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="grok">Grok</option>
-              <option value="openai">OpenAI</option>
-            </select>
-          </div>
-          {local.ai.mode && (
-            <>
-              <div>
-                <div className="text-sm font-medium mb-1">Model</div>
-                <select
-                  value={local.ai.model || ''}
-                  onChange={e => setLocal({ ...local, ai: { ...local.ai, model: e.target.value } })}
-                  className="w-full h-10 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-slate-100 px-2">
-                  <option value="">Select a model</option>
-                  {local.ai.mode === 'anthropic' && [
-                    { v: 'claude-opus-4.6-latest', l: 'Claude Opus 4.6' },
-                    { v: 'claude-sonnet-4.5-latest', l: 'Claude Sonnet 4.5' },
-                    { v: 'claude-haiku-4.5-latest', l: 'Claude Haiku 4.5' },
-                  ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                  {local.ai.mode === 'deepseek' && [
-                    { v: 'deepseek-chat', l: 'DeepSeek Chat' },
-                    { v: 'deepseek-reasoner', l: 'DeepSeek Reasoner' },
-                  ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                  {local.ai.mode === 'gemini' && [
-                    { v: 'gemini-3-flash-preview', l: 'Gemini 3 Flash' },
-                    { v: 'gemini-2.5-flash', l: 'Gemini 2.5 Flash' },
-                  ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                  {local.ai.mode === 'grok' && [
-                    { v: 'grok-4', l: 'Grok 4' },
-                    { v: 'grok-4.1-fast', l: 'Grok 4.1 Fast' },
-                  ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                  {local.ai.mode === 'openai' && [
-                    { v: 'gpt-5-mini', l: 'GPT-5 Mini' },
-                    { v: 'gpt-5', l: 'GPT-5' },
-                    { v: 'o4-mini', l: 'O4 Mini' },
-                  ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                </select>
-              </div>
-              <div>
-                <div className="text-sm font-medium mb-1">API Key</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={local.ai.apiKey || ''}
-                    onChange={e => { setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } }); }}
-                    placeholder="Paste a valid API Key"
-                    className={classNames('flex-1 h-10 rounded-lg bg-white dark:bg-slate-900/60 px-2 text-sm text-slate-900 dark:text-slate-100 border border-slate-400 dark:border-white/30')} />
-                  <button
-                    onClick={testKey}
-                    disabled={!local.ai.mode || !local.ai.apiKey || testing}
-                    className="px-3 h-10 rounded-lg border border-slate-400 dark:border-white/30 disabled:opacity-50 text-slate-900 dark:text-white bg-white dark:bg-slate-800 inline-flex items-center gap-2">
-                    <Icon name="beaker" />
-                    <span>{testing ? 'Testing…' : 'Test'}</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          <div>
-            <div className="text-sm font-semibold mb-1 text-slate-900 dark:text-slate-100">Simultaneous processing</div>
-            <input type="range" min="1" max="10" value={local.concurrency} onChange={e => setLocal({ ...local, concurrency: Number(e.target.value) })} />
-            <div className="mt-1 inline-flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
-              <Icon name="sliders" />
-              <span>{local.concurrency}</span>
-            </div>
-          </div>
-        </div>
-        <div className="mt-6 flex gap-2">
-          <button onClick={save} className="px-3 h-10 rounded-lg bg-brand-700 text-white inline-flex items-center gap-2">
-            <Icon name="save" />
-            <span>Save</span>
-          </button>
-          <button onClick={reset} className="px-3 h-10 rounded-lg border border-slate-400 dark:border-white/30 text-slate-900 dark:text-white bg-white dark:bg-slate-800 inline-flex items-center gap-2">
-            <Icon name="rotate-ccw" />
-            <span>Reset</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
  * App — main application component.
- *
- * Responsibilities:
- * - Subscribe to DV.bus events to keep the UI synchronized with queue/db mutations
- * - Drive theme toggling and propagate theme to child iframes
- * - Orchestrate item creation (URLs, files, YouTube, playlists) and previews
- * - Provide bulk actions (export/import, retry/stop, download/delete)
  */
 function App() {
   const [items, setItems] = useState([]);
@@ -872,14 +112,12 @@ function App() {
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [contentIndex, setContentIndex] = useState(new Map());
 
-  // Derive unique tags across all items
   const allTags = useMemo(() => {
     const s = new Set();
     items.forEach(i => (i.tags || []).forEach(t => s.add(t)));
     return Array.from(s).sort();
   }, [items]);
 
-  // Build content index for full-text search
   async function rebuildContentIndex() {
     try {
       const contents = await DV.db.getAll('contents');
@@ -909,11 +147,6 @@ function App() {
 
   useEffect(() => { localStorage.setItem('dv.sort', sort); }, [sort]);
 
-
-  /**
-   * Apply theme preference and propagate to iframes.
-   * Uses class on <html> and postMessage to embedded viewers for live sync.
-   */
   function setTheme(t) {
     setThemeState(t);
     localStorage.setItem('dv.theme', t);
@@ -928,22 +161,12 @@ function App() {
     } catch { }
   }
 
-  /**
-   * Persist settings to DV.queue and update local state.
-   */
   function applySettings(s) {
     setSettings(s);
     DV.queue.setConcurrency(s.concurrency);
     DV.queue.setSettings(s);
   }
 
-  /**
-   * Handle submissions from CapturePanel.
-   *
-   * - URLs: Detect playlist vs single video vs page; add parent then children for playlists
-   * - Files: Add records with File blobs so extractor can read them later
-   * - Optimistically peek title for URLs/YouTube to improve UX while extraction runs
-   */
   async function handleSubmit(url, files) {
     const additions = [];
     if (url) {
@@ -982,16 +205,11 @@ function App() {
     if (!DV.extractors.isYouTubePlaylist || !DV.extractors.isYouTubePlaylist(url)) DV.toast('Added to queue', { type: 'success' });
   }
 
-  /** Convert HTML fragment into plain text using DOMParser. */
   async function htmlToPlainText(html = '') {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return (doc.body?.innerText || '').trim();
   }
 
-  /**
-   * Parse distilled HTML points back into a structured representation.
-   * Returns null if the content is not using the dv-point markup.
-   */
   function parseFormattedPoints(html = '') {
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -1005,7 +223,6 @@ function App() {
     } catch { return null; }
   }
 
-  /** Extract header metadata (title, source, date) from distilled HTML. */
   function parseHeaderMeta(html = '') {
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -1017,13 +234,6 @@ function App() {
     } catch { return { h1: '', srcText: '', dateText: '' }; }
   }
 
-  /**
-   * Render distilled HTML into a PDF Blob using jsPDF (if present),
-   * otherwise fall back to returning the original HTML as a text/html Blob.
-   *
-   * The layout aims for legible A4 pages with margins and simple headers.
-   * Theme is not applied in PDF; colors are neutral for readability.
-   */
   async function makePdfBlobFromHtml(html, title = 'Document') {
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) {
@@ -1106,7 +316,7 @@ function App() {
       doc.setPage(i);
       const footerY = pageHeight - margin + 10;
       doc.setFont('helvetica', 'normal');
-      doc.text('DistyVault · 2025', margin, footerY);
+      doc.text(`DistyVault · ${new Date().getFullYear()}`, margin, footerY);
       const pageText = `${i}/${pageCount}`;
       const textWidth = doc.getTextWidth(pageText);
       doc.text(pageText, pageWidth - margin - textWidth, footerY);
@@ -1114,13 +324,6 @@ function App() {
     return doc.output('blob');
   }
 
-  /**
-   * buildViewerHtml — wrap distilled HTML points into a minimal, theme-aware HTML document.
-   *
-   * - Extracts just the distilled <section.dv-point> blocks if present; otherwise embeds full body.
-   * - Synchronizes dark mode with the parent document via MutationObserver and postMessage.
-   * - Avoids external CSS/JS for portability; styles are embedded for consistency.
-   */
   function buildViewerHtml(savedHtml = '') {
     try {
       let inner = '';
@@ -1163,7 +366,6 @@ a:hover{text-decoration:underline}
   try {
     var d=document.documentElement;
     var pd=parent&&parent.document&&parent.documentElement;
-    
     function syncTheme(){
       if(pd&&pd.classList.contains('dark')){
         d.classList.add('dark');
@@ -1171,31 +373,26 @@ a:hover{text-decoration:underline}
         d.classList.remove('dark');
       }
     }
-    
     syncTheme();
-    
     try {
       if(pd&&pd.classList){
         var mo=new MutationObserver(syncTheme);
         mo.observe(pd,{attributes:true,attributeFilter:['class']});
       }
     } catch (e) {}
-    
     window.addEventListener('storage',function(e){
       if(e && (e.key==='dv.theme'||e.key==='theme'||e.key==='darkMode')){
         setTimeout(syncTheme,0);
       }
     });
-    
     window.addEventListener('message', function(e){
       try {
         var data = e && e.data;
         if (data && data.type === 'dv-theme'){
           if (data.isDark) d.classList.add('dark'); else d.classList.remove('dark');
         }
-      } catch {}
+      } catch{}
     });
-    
   }catch(e){}
 })();
 </script>
@@ -1205,11 +402,6 @@ a:hover{text-decoration:underline}
   }
   try { if (window && window.DV) window.DV.buildViewerHtml = buildViewerHtml; } catch { }
 
-  /**
-   * Download all completed items:
-   * - Single item: generate and download one PDF
-   * - Many items: generate PDFs and ZIP them into one archive
-   */
   async function downloadAllCompleted() {
     const completed = items.filter(i => i.status === STATUS.COMPLETED);
     if (!completed.length) return;
@@ -1235,9 +427,7 @@ a:hover{text-decoration:underline}
     await saveBlob(blob, 'distyvault-bulk.zip');
   }
 
-  /** Sanitize filename to a safe subset. */
   function sanitize(s = '') { return s.replace(/[^a-z0-9 _-]+/ig, '_').slice(0, 80) || 'file'; }
-  /** Strip common document/image extensions from a name-like string. */
   function stripExtLike(s = '') {
     let out = String(s || '').trim();
     out = out.replace(/\.(pdf|docx|doc|txt|md|rtf|html?|png|jpe?g|webp|gif|tiff?)$/i, '');
@@ -1246,14 +436,12 @@ a:hover{text-decoration:underline}
   }
   function pdfFileName(title) { return `${sanitize(stripExtLike(title || 'Document'))}.pdf`; }
 
-  /** Request all in-progress items to stop and reload queue. */
   async function stopAll() {
     items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).forEach(i => DV.queue.requestStop(i.id));
     DV.queue.loadQueue();
     DV.toast('Stop requested for all in progress');
   }
 
-  /** Find failed/stopped items, reset their state, and requeue. */
   async function retryFailed() {
     const failed = items.filter(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED);
     for (const it of failed) await DV.queue.updateItem(it.id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
@@ -1261,9 +449,6 @@ a:hover{text-decoration:underline}
     DV.toast('Retry queued');
   }
 
-  /**
-   * Apply current filter/search/sort to items and return a derived array.
-   */
   function filteredSorted() {
     const q = search.toLowerCase();
     let arr = items.filter(i => {
@@ -1271,14 +456,11 @@ a:hover{text-decoration:underline}
       if (filter === 'youtube') return i.kind === 'youtube' || isYouTubePlaylist(i);
       return i.kind === filter;
     }).filter(i => {
-      // Tag filter
       if (tagFilter && !(i.tags || []).includes(tagFilter)) return false;
       return true;
     }).filter(i => {
       if (!q) return true;
-      // Search title, URL, fileName
       if (i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q)) return true;
-      // Full-text search in distilled content
       const body = contentIndex.get(i.id);
       if (body && body.includes(q)) return true;
       return false;
@@ -1291,21 +473,18 @@ a:hover{text-decoration:underline}
     return arr;
   }
 
-  /** Export entire database (items, contents, settings) as a portable ZIP. */
   async function exportAll() {
     await yieldToBrowser();
     const blob = await DV.db.exportAllToZip();
     await saveBlob(blob, 'distyvault-export.zip');
   }
 
-  /** Import a previously exported ZIP, then reload the queue. */
   async function importZip(file) {
     await DV.db.importFromZip(file);
     DV.queue.loadQueue();
     DV.toast('Imported');
   }
 
-  /** Open the content viewer for the single selected item. */
   async function viewSelected() {
     if (selected.length !== 1) return;
     const id = selected[0];
@@ -1313,14 +492,12 @@ a:hover{text-decoration:underline}
     setViewItem(item || null);
   }
 
-  /** Reset selected items to PENDING to retry processing and unselect them. */
   async function retrySelected() {
     for (const id of selected) await DV.queue.updateItem(id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
     DV.queue.loadQueue();
     setSelected([]);
   }
 
-  /** Download selected items as one or many PDFs (ZIP for many). */
   async function downloadSelected() {
     if (selected.length === 1) {
       const id = selected[0];
@@ -1346,7 +523,6 @@ a:hover{text-decoration:underline}
     await saveBlob(blob, `distyvault-bulk-download.zip`);
   }
 
-  /** Delete selected items from both items and contents stores. */
   async function deleteSelected() {
     for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); await DV.db.del('contents', id + ':file'); }
     setSelected([]);
@@ -1360,7 +536,6 @@ a:hover{text-decoration:underline}
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  /** Update sort mode; when switching to queue-order, reload to re-compute indices. */
   const handleSort = (k) => {
     setSort(k);
     if (k === 'queue') DV.queue.loadQueue();
@@ -1451,105 +626,6 @@ a:hover{text-decoration:underline}
   );
 }
 
-// Mount the React root into #root once scripts have loaded.
-
-/**
- * ContentModal — sandboxed viewer for distilled HTML.
- *
- * The content is embedded via srcDoc to avoid cross-origin issues and to keep the viewer static.
- * On load, theme is synchronized with the parent through postMessage.
- */
-function ContentModal({ item, onClose }) {
-  const [html, setHtml] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState('');
-  const iframeRef = useRef(null);
-
-  useEffect(() => {
-    if (!item) {
-      setHtml('');
-      setErrorText('');
-      return;
-    }
-
-    setLoading(true);
-    setErrorText('');
-
-    DV.db.get('contents', item.id).then(content => {
-      if (content?.html) {
-        try {
-          const viewer = (window.DV && typeof DV.buildViewerHtml === 'function') ? DV.buildViewerHtml(content.html) : content.html;
-          setHtml(viewer);
-        } catch {
-          setHtml(content.html || '');
-        }
-      } else if (item.error) {
-        setHtml('');
-        setErrorText(item.error);
-      } else {
-        setHtml('');
-      }
-      setLoading(false);
-    }).catch(() => {
-      if (item.error) setErrorText(item.error);
-      setHtml('');
-      setLoading(false);
-    });
-  }, [item?.id]);
-
-  useEffect(() => {
-    const fr = iframeRef.current;
-    if (!fr) return;
-    function sendTheme() {
-      try {
-        const isDark = document.documentElement.classList.contains('dark');
-        fr.contentWindow && fr.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*');
-      } catch { }
-    }
-    fr.addEventListener('load', sendTheme, { once: true });
-    const t = setTimeout(sendTheme, 50);
-    return () => { clearTimeout(t); };
-  }, [html]);
-
-  return (
-    <Modal open={!!item} onClose={onClose} title={item?.title || 'Content'} hideHeader>
-      <div className="space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center py-4 text-slate-600 dark:text-slate-300">
-            <div className="text-sm">Loading...</div>
-          </div>
-        ) : html ? (
-          <iframe
-            ref={iframeRef}
-            className="w-full h-[65vh] rounded-lg border border-slate-300 dark:border-white/20"
-            srcDoc={html}
-          />
-        ) : errorText ? (
-          <div className="flex flex-col items-center justify-center h-[65vh] gap-4 px-6">
-            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center"><Icon name="alert-triangle" size={24} className="text-rose-600 dark:text-rose-400" /></div>
-            <div className="text-sm font-medium text-rose-700 dark:text-rose-300">Distillation failed</div>
-            <div className="text-sm text-rose-600 dark:text-rose-400 whitespace-pre-wrap text-center max-w-md">{errorText}</div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-[65vh] text-slate-600 dark:text-slate-300">
-            <div className="text-sm">No content available</div>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-/** Simple error modal presenting the captured error text for an item. */
-function ErrorModal({ item, onClose }) {
-  return (
-    <Modal open={!!item} onClose={onClose} title={item ? 'Error — ' + (item.title || '') : 'Error'}>
-      <div className="text-sm text-rose-700 dark:text-rose-300 whitespace-pre-wrap">{item?.error || 'Unknown error'}</div>
-    </Modal>
-  );
-}
-
-// All components and helpers above
-// Mount the React root into #root once scripts have loaded.
+// Mount the React root with ErrorBoundary wrapper
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+root.render(<ErrorBoundary><App /></ErrorBoundary>);

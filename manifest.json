@@ -1,0 +1,23 @@
+{
+  "name": "DistyVault",
+  "short_name": "DistyVault",
+  "description": "Gather, distill and control your knowledge — privacy-first content distillation powered by AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4338ca",
+  "icons": [
+    {
+      "src": "logos/logo_no_bg_b.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logos/logo_no_bg_w.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

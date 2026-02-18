@@ -4,13 +4,13 @@
 
   This file bootstraps a no-build, CDN-based stack:
   - Tailwind via CDN with a small custom theme (brand colors) and dark mode class strategy
-  - React 18 UMD + ReactDOM UMD + Babel Standalone to transpile JSX at runtime
+  - React 18 UMD (production) + ReactDOM UMD (production) + Babel Standalone to transpile JSX at runtime
   - Utility libs: dayjs, JSZip, FileSaver, jsPDF (UMD)
-  - Icon sets: lucide (preferred) and feather (fallback)
+  - Icon sets: lucide (pinned) and feather (pinned, fallback)
 
   Architectural notes:
-  - window.DV is the global namespace for core modules (db, queue, bus, ai, extractors, toast).
-  - Each module is loaded via <script type="text/babel"> and attaches to DV; ordering matters (core → ai → extractors → app).
+  - window.DV is the global namespace for core modules (db, queue, bus, ai, extractors, toast, utils, components).
+  - Each module is loaded via <script type="text/babel"> and attaches to DV; ordering matters (utils → core → ai → extractors → components → app).
   - Theme is toggled by adding/removing the 'dark' class on <html>. We also propagate theme to iframes via postMessage.
   - requestIdleCallback polyfill is provided early for consistent yielding behavior across browsers.
   - This document is intentionally self-contained to keep deployment simple (static hosting friendly).
@@ -20,7 +20,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DistyVault</title>
-    <meta name="description" content="Gather, distill and control your knowledge" />
+    <meta name="description" content="Gather, distill and control your knowledge — privacy-first content distillation powered by AI" />
+    <link rel="manifest" href="manifest.json" />
   <!-- TailwindCSS via CDN (dark mode via 'class') -->
   <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -47,20 +48,20 @@
   <link rel="apple-touch-icon" href="logos/logo_no_bg_b.png" media="(prefers-color-scheme: light)" />
   <link rel="apple-touch-icon" href="logos/logo_no_bg_w.png" media="(prefers-color-scheme: dark)" />
 
-    <!-- React UMD + ReactDOM UMD + Babel Standalone (no bundler) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- React UMD (production) + ReactDOM UMD (production) + Babel Standalone (no bundler) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <!-- Utilities shared across modules -->
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   
-  <!-- Icons: lucide preferred, feather as fallback -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <script src="https://unpkg.com/feather-icons"></script>
+  <!-- Icons: lucide (pinned) preferred, feather (pinned) as fallback -->
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
+  <script src="https://unpkg.com/feather-icons@4.29.2/dist/feather.min.js"></script>
 
     <style>
       /* Minimal global CSS; Tailwind handles most styling */
@@ -122,11 +123,14 @@
         } catch {}
       })();
       // Bump DV version when coordinating breaking changes across modules
-      window.DV = { version: '0.2.0' };
+      window.DV = { version: '0.3.0' };
     </script>
   </head>
   <body class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
     <div id="root"></div>
+
+    <!-- Shared utilities (must load first, before any module that uses DV.utils) -->
+    <script type="text/babel" src="src/core/utils.js"></script>
 
     <!-- Core modules: bus → toast → db → queue (order matters) -->
     <script type="text/babel" src="src/core/eventBus.js"></script>
@@ -147,6 +151,9 @@
     <script type="text/babel" src="src/extractors/url.js"></script>
     <script type="text/babel" src="src/extractors/youtube.js"></script>
   <script type="text/babel" src="src/extractors/index.js"></script>
+
+    <!-- UI Components (must load before App) -->
+    <script type="text/babel" src="src/components/Components.jsx"></script>
   
     <!-- App should load last so all DV modules are available -->
     <script type="text/babel" src="src/App.jsx"></script>
@@ -157,6 +164,10 @@
           window.lucide.createIcons();
         }
       });
+      // Register service worker for PWA support
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function() {});
+      }
     </script>
   </body>
   </html>
