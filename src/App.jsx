@@ -459,7 +459,17 @@ a:hover{text-decoration:underline}
 
   async function retryFailed() {
     const failed = items.filter(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED);
-    for (const it of failed) await DV.queue.updateItem(it.id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
+    for (const it of failed) {
+      const keptTags = (it?.tags || []).filter(t => t.startsWith('source:'));
+      await DV.queue.updateItem(it.id, {
+        status: STATUS.PENDING,
+        error: null,
+        durationMs: 0,
+        startedAt: null,
+        createdAt: Date.now(),
+        tags: keptTags
+      });
+    }
     DV.queue.loadQueue();
     DV.toast('Retry queued');
   }
@@ -517,7 +527,18 @@ a:hover{text-decoration:underline}
   }
 
   async function retrySelected() {
-    for (const id of selected) await DV.queue.updateItem(id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
+    for (const id of selected) {
+      const item = items.find(i => i.id === id);
+      const keptTags = (item?.tags || []).filter(t => t.startsWith('source:'));
+      await DV.queue.updateItem(id, {
+        status: STATUS.PENDING,
+        error: null,
+        durationMs: 0,
+        startedAt: null,
+        createdAt: Date.now(), // Refresh date to jump to top
+        tags: keptTags // Clear auto-generated tags
+      });
+    }
     DV.queue.loadQueue();
     setSelected([]);
   }

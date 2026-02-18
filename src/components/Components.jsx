@@ -599,9 +599,13 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                                     ) : (
                                         <div className="overflow-hidden">
                                             <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                                                {(i.title && i.title !== i.url) ? i.title :
-                                                    (i.status === STATUS.PENDING ? `Loading from ${i.title}...` :
-                                                        (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
+                                                {i.url ? (
+                                                    <a href={i.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="hover:underline text-inherit" title={i.url}>
+                                                        {(i.title && i.title !== i.url) ? i.title : (i.status === STATUS.PENDING ? `Loading...` : (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
+                                                    </a>
+                                                ) : (
+                                                    (i.title && i.title !== i.url) ? i.title : (i.status === STATUS.PENDING ? `Loading...` : (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))
+                                                )}
                                             </div>
                                             {(i.tags && i.tags.length > 0) ? (
                                                 <TagBadges tags={i.tags} />

@@ -78,38 +78,39 @@
 
     // High-specificity system directive that enforces the output format for downstream parsing
     const directive = dedent`
-      SYSTEM DIRECTIVE: STRICTLY FORBIDDEN TO SUMMARIZE. GOAL IS TOTAL INFORMATION RETENTION.
+      SYSTEM DIRECTIVE: DO NOT SUMMARIZE. CAPTURE ALL DETAILS.
 
       1. ROLE
-      You are a specialized "Deep-Resolution Recorder". Your job is to create a COMPREHENSIVE, DETAILED, AND EXHAUSTIVE record of the provided text.
-      You are NOT an editor. You are NOT a summarizer. You are a fidelity engine.
+      You are a detailed note-taker. Your job is to create a complete and accurate record of the provided text.
+      You are not an editor or a summarizer. Your goal is to keep all the information.
 
-      2. CORE OBJECTIVE (READ CAREFULLY)
-      The user wants a "Long-Form Distillation". This means:
-      - **Length**: The output must be LONG. Do not compress 5 paragraphs into 1. Keep them as 5 points if needed.
-      - **Detail**: Retain every single specific example, statistic, date, name, and nuance.
-      - **Completeness**: If the source text makes 20 distinct points, your list must have 20 distinct numbered items.
-      - **Anti-Brevity**: Never use phrases like "briefly", "in short", or "summary". deeply explain everything.
+      2. CORE OBJECTIVE
+      The user wants a "Long-Form Record". This means:
+      - **Length**: The output must be long. Do not shorten paragraphs.
+      - **Detail**: Keep every specific example, number, date, name, and explanation.
+      - **Completeness**: If the source has 20 points, your list must have 20 points.
+      - **Style**: Explain the concepts directly. Do not say "The text says" or "The author argues". Just explain the ideas as facts.
 
-      3. MANDATORY PROCESS
-      For every logical segment in the source text:
-      A. Extract the core idea.
-      B. Extract ALL supporting arguments, evidence, and sub-points.
-      C. Write a numbered item that fully encapsulates ALL of this.
+      3. PROCESS
+      For every part of the text:
+      A. Find the main idea.
+      B. Find all the supporting reasons, evidence, and details.
+      C. Write a numbered item that explains all of this clearly and fully.
 
       4. OUTPUT FORMAT (STRICT)
       **1. Bold Headline Sentence**
-      [Detailed paragraph 1: Explain the concept fully.]
-      [Detailed paragraph 2: Provide the specific examples from the text.]
-      [Detailed paragraph 3: Explain the implications/nuances mentioned.]
+      [Paragraph 1: Explain the concept directly.]
+      [Paragraph 2: Give the specific examples.]
+      [Paragraph 3: Explain the consequences or details.]
 
       **2. Next Bold Headline Sentence**
-      [Detailed elaboration...]
+      [Detailed explanation...]
 
-      5. CRITICAL INSTRUCTIONS
+      5. INSTRUCTIONS
       - **Do not skip anything.** If it's in the text, it must be in your output.
-      - **Err on the side of too much detail.** The user prefers a 5000-word document over a 500-word summary.
-      - **Structure**: Use as many numbered points as necessary. Do not artificially limit yourself to 3 or 5 points. If the text justifies 50 points, generate 50 points.
+      - **Write naturally.** Use normal, plain English. Avoid complex words or strictly academic language unless necessary for the topic.
+      - **Direct explanation.** Instead of "The article emphasizes the importance of..." say "It is important to..."
+      - **Structure**: Use as many numbered points as needed. Do not limit yourself.
     `;
 
     // Reduced chunk size to force more granular processing.
@@ -226,7 +227,8 @@
     if (plain.includes('<')) {
       try {
         const doc = new DOMParser().parseFromString(plain, 'text/html');
-        plain = (doc.body?.innerText || '').trim();
+        doc.querySelectorAll('script, style, link, meta').forEach(n => n.remove());
+        plain = (doc.body?.innerText || doc.body?.textContent || '').trim();
       } catch { }
     }
 
