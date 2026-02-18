@@ -32,9 +32,14 @@
     const model = settings?.model || 'gemini-3-flash-preview';
     if (!apiKey) throw new Error('Gemini API key required');
 
-    const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
+    // Use local proxy to hide API key from URL parameters
+    const proxyUrl = '/api/gemini?model=' + encodeURIComponent(model);
+    const res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
         tools: [{ google_search: {} }],
@@ -65,7 +70,21 @@
     const apiKey = settings?.apiKey;
     const model = settings?.model || 'gemini-3-flash-preview';
     if (!apiKey) throw new Error('Gemini API key required');
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`);
+    if (!apiKey) throw new Error('Gemini API key required');
+    // Test via proxy (GET not supported by our simple proxy for generateContent, so we do a minimal generation)
+    // Actually, our proxy expects POST. We should use a minimal prompt test.
+    const proxyUrl = '/api/gemini?model=' + encodeURIComponent(model);
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: 'Test' }] }],
+        generationConfig: { maxOutputTokens: 1 }
+      })
+    });
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }

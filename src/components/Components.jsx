@@ -20,7 +20,8 @@ function Icon({ name, size = 20, className, strokeWidth = 2 }) {
         try {
             const wrap = wrapRef.current;
             if (!wrap) return;
-            wrap.innerHTML = '';
+            while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+
             const i = document.createElement('i');
             i.setAttribute('data-lucide', name);
             i.style.width = '100%';
@@ -827,11 +828,14 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
                             <div>
                                 <div className="text-sm font-medium mb-1">API Key</div>
                                 <div className="flex items-center gap-2">
-                                    <input
-                                        value={local.ai.apiKey || ''}
-                                        onChange={e => { setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } }); }}
-                                        placeholder="Paste a valid API Key"
-                                        className={classNames('flex-1 h-10 rounded-lg bg-white dark:bg-slate-900/60 px-2 text-sm text-slate-900 dark:text-slate-100 border border-slate-400 dark:border-white/30')} />
+                                    <div className="flex-1 relative">
+                                        <input
+                                            type="password"
+                                            value={local.ai.apiKey || ''}
+                                            onChange={e => { setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } }); }}
+                                            placeholder="Paste a valid API Key"
+                                            className={classNames('w-full h-10 rounded-lg bg-white dark:bg-slate-900/60 px-2 text-sm text-slate-900 dark:text-slate-100 border border-slate-400 dark:border-white/30')} />
+                                    </div>
                                     <button
                                         onClick={testKey}
                                         disabled={!local.ai.mode || !local.ai.apiKey || testing}
@@ -912,7 +916,7 @@ function ContentModal({ item, onClose }) {
         function sendTheme() {
             try {
                 const isDark = document.documentElement.classList.contains('dark');
-                fr.contentWindow && fr.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*');
+                fr.contentWindow && fr.contentWindow.postMessage({ type: 'dv-theme', isDark }, window.location.origin);
             } catch { }
         }
         fr.addEventListener('load', sendTheme, { once: true });

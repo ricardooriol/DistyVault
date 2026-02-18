@@ -57,6 +57,51 @@
     return open().then(db => db.transaction(storeNames, mode));
   }
 
+  /* ── Security: Encryption Helpers ── */
+  const ENC_ALGO = { name: 'AES-GCM', length: 256 };
+  const KEY_STORAGE = 'dv_master_key';
+
+  async function getMasterKey() {
+    let raw = localStorage.getItem(KEY_STORAGE);
+    if (!raw) {
+      const k = await crypto.subtle.generateKey(ENC_ALGO, true, ['encrypt', 'decrypt']);
+      const exported = await crypto.subtle.exportKey('jwk', k);
+      localStorage.setItem(KEY_STORAGE, JSON.stringify(exported));
+      return k;
+    }
+    return await crypto.subtle.importKey('jwk', JSON.parse(raw), ENC_ALGO, true, ['encrypt', 'decrypt']);
+  }
+
+  async function encrypt(text) {
+    if (!text) return '';
+    try {
+      const key = await getMasterKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encoded = new TextEncoder().encode(text);
+      const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+      // Store as iv:ciphertext (base64)
+      const bIv = btoa(String.fromCharCode(...iv));
+      const bCipher = btoa(String.fromCharCode(...new Uint8Array(cipher)));
+      return `enc:${bIv}:${bCipher}`;
+    } catch (e) { console.error('Encr failed', e); return text; }
+  }
+
+  async function decrypt(str) {
+    if (!str || !str.startsWith('enc:')) return str;
+    try {
+      const parts = str.split(':');
+      if (parts.length !== 3) return str;
+      const iv = Uint8Array.from(atob(parts[1]), c => c.charCodeAt(0));
+      const cipher = Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0));
+      const key = await getMasterKey();
+      const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+      return new TextDecoder().decode(dec);
+    } catch (e) {
+      console.error('Decr failed', e);
+      return ''; // Fail secure
+    }
+  }
+
   /**
    * Upsert a value into a store by keyPath.
    * Resolves when the transaction completes to ensure durability.
@@ -66,7 +111,18 @@
    * @returns {Promise<T>}
    */
   async function put(store, value) {
-    const t = await tx([store], 'readwrite');
+    const db = await open();
+    // Intercept settings save to encrypt API key
+    if (store === 'settings' && value.key === 'app' && value.value?.ai?.apiKey) {
+      const clone = JSON.parse(JSON.stringify(value));
+      const rawKey = clone.value.ai.apiKey;
+      if (!rawKey.startsWith('enc:')) {
+        clone.value.ai.apiKey = await encrypt(rawKey);
+        value = clone;
+      }
+    }
+
+    const t = db.transaction([store], 'readwrite');
     await new Promise((res, rej) => {
       const r = t.objectStore(store).put(value);
       r.onsuccess = () => res();
@@ -86,7 +142,13 @@
     const t = await tx([store]);
     return await new Promise((res, rej) => {
       const r = t.objectStore(store).get(key);
-      r.onsuccess = () => res(r.result || null);
+      r.onsuccess = async () => {
+        let val = r.result || null;
+        if (store === 'settings' && val && val.key === 'app' && val.value?.ai?.apiKey) {
+          val.value.ai.apiKey = await decrypt(val.value.ai.apiKey);
+        }
+        res(val);
+      };
       r.onerror = () => rej(r.error);
     });
   }
@@ -146,7 +208,14 @@
       }
     }
     zip.file('contents.json', JSON.stringify(manifest, null, 2));
-    zip.file('settings.json', JSON.stringify(settings, null, 2));
+    // Security: strip API keys from exported settings to prevent leakage
+    const safeSettings = settings.map(s => {
+      if (s.key === 'app' && s.value?.ai?.apiKey) {
+        return { ...s, value: { ...s.value, ai: { ...s.value.ai, apiKey: '' } } };
+      }
+      return s;
+    });
+    zip.file('settings.json', JSON.stringify(safeSettings, null, 2));
     return await zip.generateAsync({ type: 'blob' });
   }
 
@@ -159,18 +228,36 @@
    */
   async function importFromZip(file) {
     const zip = await JSZip.loadAsync(file);
-    const parse = async (name) => zip.file(name) ? JSON.parse(await zip.file(name).async('string')) : [];
+    const parse = async (name) => {
+      if (!zip.file(name)) return [];
+      try {
+        const text = await zip.file(name).async('string');
+        const json = JSON.parse(text);
+        return Array.isArray(json) ? json : [];
+      } catch { return []; }
+    };
+
+    // Validate structure
+    if (!zip.file('items.json') && !zip.file('contents.json')) {
+      throw new Error('Invalid backup archive: missing manifest files');
+    }
+
     const [items, contentsManifest, settings] = await Promise.all([
       parse('items.json'), parse('contents.json'), parse('settings.json')
     ]);
 
     const contents = [];
     for (const c of contentsManifest) {
-      if (c.blobPath && zip.file(c.blobPath)) {
-        const blob = await zip.file(c.blobPath).async('blob');
-        const restored = { ...c, blob };
-        delete restored.blobPath;
-        contents.push(restored);
+      if (!c || !c.id) continue;
+      if (c.blobPath) {
+        // Prevent directory traversal or prototype pollution keys/paths
+        const safePath = c.blobPath.replace(/^[\.\/]+/, '');
+        if (zip.file(safePath)) {
+          const blob = await zip.file(safePath).async('blob');
+          const restored = { ...c, blob };
+          delete restored.blobPath;
+          contents.push(restored);
+        }
       } else {
         contents.push(c);
       }
@@ -178,11 +265,16 @@
 
     const t = await tx(['items', 'contents', 'settings'], 'readwrite');
     const promises = [];
-    const putAll = (store, arr) => arr.forEach(v => promises.push(new Promise((res, rej) => {
-      const r = t.objectStore(store).put(v);
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
-    })));
+    const putAll = (store, arr) => arr.forEach(v => {
+      if (v && v.key !== '__proto__' && v.constructor !== Object && v.prototype !== Object) {
+        promises.push(new Promise((res, rej) => {
+          const r = t.objectStore(store).put(v);
+          r.onsuccess = () => res();
+          r.onerror = () => rej(r.error);
+        }));
+      }
+    });
+
     putAll('items', items);
     putAll('contents', contents);
     putAll('settings', settings);

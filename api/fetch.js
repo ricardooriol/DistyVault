@@ -29,14 +29,73 @@
  * @param {import('http').ServerResponse} res
  * @returns {Promise<void>}
  */
+/**
+ * Simple in-memory rate limiter (per-IP, per serverless cold start).
+ * Allows `MAX_RPM` requests per minute per IP.
+ */
+const RATE_MAP = new Map();
+const MAX_RPM = 60;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  let entry = RATE_MAP.get(ip);
+  if (!entry || now - entry.start > RATE_WINDOW_MS) {
+    entry = { start: now, count: 0 };
+    RATE_MAP.set(ip, entry);
+  }
+  entry.count++;
+  // Evict stale entries periodically
+  if (RATE_MAP.size > 10000) {
+    for (const [k, v] of RATE_MAP) {
+      if (now - v.start > RATE_WINDOW_MS) RATE_MAP.delete(k);
+    }
+  }
+  return entry.count <= MAX_RPM;
+}
+
+/**
+ * Check whether a hostname points to a private/internal/link-local IP range.
+ * Blocks SSRF attacks targeting cloud metadata, localhost, or LAN addresses.
+ * @param {string} hostname
+ * @returns {boolean} true if the hostname appears to be internal
+ */
+function isPrivateHost(hostname) {
+  const h = hostname.toLowerCase();
+  // Block localhost and common internal hostnames
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]' || h === '0.0.0.0') return true;
+  // Block cloud metadata endpoints
+  if (h === '169.254.169.254' || h === 'metadata.google.internal') return true;
+  // Block common private IP ranges (basic check; does not resolve DNS)
+  if (/^10\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^169\.254\./.test(h)) return true;
+  if (/^0\./.test(h)) return true;
+  // Block .local, .internal, .localhost TLDs
+  if (/\.(local|internal|localhost|corp|home|lan)$/i.test(h)) return true;
+  return false;
+}
+
 module.exports = async (req, res) => {
+  const origin = req.headers?.origin || '*';
+  const allowedOriginPattern = /^https?:\/\/(localhost(:\d+)?|.*\.vercel\.app)$/;
+  const corsOrigin = allowedOriginPattern.test(origin) ? origin : (req.headers?.referer ? new URL(req.headers.referer).origin : '*');
+
   // CORS preflight: respond early with allowed methods/headers and no body
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.statusCode = 204;
     res.end();
+    return;
+  }
+
+  // Rate limiting
+  const clientIp = (req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+  if (!checkRateLimit(clientIp)) {
+    respond(429, 'Rate limit exceeded. Try again later.');
     return;
   }
 
@@ -69,6 +128,12 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // SSRF protection: block private/internal/cloud-metadata hostnames
+  if (isPrivateHost(u.hostname)) {
+    respond(403, 'Access to internal addresses is not allowed');
+    return;
+  }
+
   try {
     // Enforce an upper bound on request duration to prevent hanging connections
     const controller = new AbortController();
@@ -84,6 +149,15 @@ module.exports = async (req, res) => {
     });
     clearTimeout(timeout);
 
+    // After redirect, re-check final URL for SSRF bypass via DNS rebinding
+    try {
+      const finalUrl = new URL(response.url || u.toString());
+      if (isPrivateHost(finalUrl.hostname)) {
+        respond(403, 'Redirect to internal address blocked');
+        return;
+      }
+    } catch { /* keep going if URL parse fails */ }
+
     // Default to a sensible content-type if none provided upstream
     const ctype = response.headers.get('content-type') || 'text/plain; charset=utf-8';
     // Read full body into memory; apply a conservative 4 MiB cap to protect server resources
@@ -91,8 +165,8 @@ module.exports = async (req, res) => {
     const maxBytes = 4 * 1024 * 1024;
     const limited = buffer.length > maxBytes ? buffer.subarray(0, maxBytes) : buffer;
 
-    // Return proxied response with permissive CORS and expose the final resolved URL
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Return proxied response with scoped CORS and expose the final resolved URL
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('Access-Control-Expose-Headers', 'x-final-url, content-type');
     res.setHeader('x-final-url', response.url || u.toString());
     res.setHeader('content-type', ctype);
@@ -112,9 +186,9 @@ module.exports = async (req, res) => {
    * @param {number} code HTTP status code
    * @param {string} message Human-readable message returned in the body
    */
-  function respond(code, message){
+  function respond(code, message) {
     res.statusCode = code;
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('content-type', 'text/plain; charset=utf-8');
     res.end(message);
   }

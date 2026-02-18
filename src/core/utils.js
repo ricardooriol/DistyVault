@@ -15,13 +15,41 @@
   }
 
   /**
+   * Strip dangerous tags and attributes from HTML string using DOMParser.
+   * Removes <script>, <iframe>, <object>, <embed>, <form> and on* events / javascript: links.
+   * @param {string} html
+   * @returns {string}
+   */
+  function sanitizeHtml(html) {
+    if (!html) return '';
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const badTags = ['script', 'iframe', 'object', 'embed', 'form', 'base', 'meta'];
+      badTags.forEach(tag => doc.querySelectorAll(tag).forEach(n => n.remove()));
+
+      const all = doc.querySelectorAll('*');
+      for (let i = 0; i < all.length; i++) {
+        const el = all[i];
+        for (let j = el.attributes.length - 1; j >= 0; j--) {
+          const attr = el.attributes[j];
+          if (attr.name.startsWith('on') || (attr.value && attr.value.trim().toLowerCase().startsWith('javascript:'))) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+      return doc.body.innerHTML;
+    } catch (e) { return escapeHtml(html); }
+  }
+
+  /**
    * Wrap raw AI model output in a minimal HTML document for rendering.
    * @param {string} inner
    * @param {string} [title]
    * @returns {string}
    */
   function wrapHtml(inner, title = 'Distilled') {
-    return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
+    const clean = sanitizeHtml(inner);
+    return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${clean}</body></html>`;
   }
 
   /**
@@ -132,5 +160,5 @@
   }
 
   window.DV = window.DV || {};
-  window.DV.utils = { escapeHtml, wrapHtml, normalizeText, fetchWithTimeout, detectSourceTag, relativeTime };
+  window.DV.utils = { escapeHtml, wrapHtml, sanitizeHtml, normalizeText, fetchWithTimeout, detectSourceTag, relativeTime };
 })();
