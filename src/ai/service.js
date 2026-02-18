@@ -221,26 +221,11 @@
       if (chunkResults.length === 1) {
         rawHtml = chunkResults[0];
       } else {
-        // Synthesis pass: merge all chunk distillations
-        const mergeDirective = dedent`
-          SYSTEM DIRECTIVE: You are a world-class knowledge synthesizer.
-          You have been given multiple partial distillations of a longer document.
-          Your task is to merge them into ONE cohesive, unified, complete distillation.
-          Remove all redundancies and overlapping points.
-          Maintain the same numbered-list output format as the original distillation.
-          Re-number all points sequentially starting from 1.
-          Preserve all unique insights and do not lose any information.
-          Output ONLY the merged numbered list — no introductions, no commentary.
-        `;
-        const mergeContent = chunkResults.map((r, i) => `--- Part ${i + 1} ---\n${r}`).join('\n\n');
-        const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified document:\n\n${mergeContent}`;
-        const mergePrepared = {
-          title: title + ' (merged)',
-          prompt: `${mergeDirective}\n\n${mergeUserContent}`,
-          messages: [{ role: 'system', content: mergeDirective }, { role: 'user', content: mergeUserContent }]
-        };
-        const mergeSettings = { ...aiSettings, __prepared: mergePrepared };
-        rawHtml = await retryWithBackoff(() => provider.distill(extracted, mergeSettings));
+        // Lossless Sequential Concatenation:
+        // Instead of asking AI to "merge" (which causes summarization/data loss),
+        // we simply join the full-detail chunks and rely on reformatDistilled
+        // to re-number them sequentially.
+        rawHtml = chunkResults.join('\n\n');
       }
     }
 
@@ -357,10 +342,11 @@
         points = fallbackParagraphParse(rawText);
       }
       if (!points.length) return sanitized;
-      const body = points.map(pt => {
+      const body = points.map((pt, idx) => {
         // Strip markdown bold markers from the heading text (handling start/end)
         let cleanHead = pt.head.trim().replace(/^\*\*/, '').replace(/\*\*$/, '');
-        const head = escapeHtml(`${pt.n}. ${cleanHead}`);
+        // Force sequential numbering (1..N) regardless of what the AI output said
+        const head = escapeHtml(`${idx + 1}. ${cleanHead}`);
         const bodyText = stripBoldFromText(pt.body);
         const paras = bodyText.split(/\n{2,}/).map(p => `<p style="font-weight:400;">${escapeHtml(p.trim())}</p>`).join('');
         // Removed the 10px spacer div to create a "small space" (just the p margin)
