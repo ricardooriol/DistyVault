@@ -156,6 +156,14 @@
       - Double line break between numbered points
 
 
+      ANTI-BOLD FORMATTING (ABSOLUTE RULE):
+      - NEVER wrap the entire response or entire paragraphs in bold, strong, or ** markers
+      - The ONLY text that should be bold is the numbered heading sentence (e.g. "1. Core idea sentence")
+      - ALL elaboration paragraphs MUST be normal weight — no bold, no strong, no ** wrapping
+      - If in doubt, use NO formatting at all — plain text is always acceptable
+      - Wrapping everything in bold is the WORST possible mistake
+
+
       EXAMPLE OF PERFECT FORMAT:
       1. The core concept drives the entire system architecture
 
@@ -276,8 +284,69 @@
     return true;
   }
 
+  /**
+   * Generate ~5 short topic tags from distilled content using a lightweight AI call.
+   * @param {string} title - Item title
+   * @param {string} text - Distilled text (plain or HTML)
+   * @param {{mode:string, apiKey?:string, model?:string}} aiSettings
+   * @returns {Promise<string[]>} Array of lowercase tag strings
+   */
+  async function generateTags(title, text, aiSettings) {
+    const key = aiSettings?.mode;
+    if (!key) return [];
+    const provider = map()[key];
+    if (!provider) return [];
+
+    // Extract plain text from HTML if needed
+    let plain = text || '';
+    if (plain.includes('<')) {
+      try {
+        const doc = new DOMParser().parseFromString(plain, 'text/html');
+        plain = (doc.body?.innerText || '').trim();
+      } catch { }
+    }
+
+    // Use only first 2000 chars to keep it fast and cheap
+    const snippet = plain.slice(0, 2000);
+
+    const tagDirective = dedent`
+      You are a content tagger. Given a title and content snippet, return EXACTLY 5 short lowercase topic tags.
+      Rules:
+      - Tags must be 1-2 words each, lowercase, no special characters
+      - Tags should be broad topics (e.g. "machine-learning", "economics", "psychology", "web-dev", "history")
+      - Do NOT include the source platform as a tag (no "youtube", "substack", "medium", etc.)
+      - Return ONLY a comma-separated list, nothing else
+      - Example output: ai, neuroscience, attention, productivity, deep-work
+    `;
+
+    const userContent = `Title: ${title}\n\nContent:\n${snippet}`;
+    const prepared = {
+      title: 'Tag generation',
+      prompt: `${tagDirective}\n\n${userContent}`,
+      messages: [{ role: 'system', content: tagDirective }, { role: 'user', content: userContent }]
+    };
+    const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
+
+    try {
+      const raw = await retryWithBackoff(() => provider.distill({ title, text: snippet }, settingsWithPrepared), 1);
+      // Parse comma-separated response
+      const cleaned = (raw || '')
+        .replace(/<[^>]*>/g, '')  // strip HTML
+        .replace(/\n/g, ',')
+        .replace(/\d+\.\s*/g, '') // strip numbering
+        .trim();
+      const tags = cleaned.split(',')
+        .map(t => t.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'))
+        .filter(t => t.length >= 2 && t.length <= 30)
+        .slice(0, 5);
+      return tags.length >= 2 ? tags : [];
+    } catch {
+      return [];
+    }
+  }
+
   window.DV = window.DV || {};
-  window.DV.ai = { distill, test };
+  window.DV.ai = { distill, test, generateTags };
   /**
    * Try to parse a strict numbered-list response and transform it into a structured
    * HTML document with consistent styling and metadata. Falls back to the original
@@ -288,13 +357,20 @@
    */
   function reformatDistilled(html = '', meta) {
     try {
-      const doc = new DOMParser().parseFromString(html || '', 'text/html');
+      // Pre-sanitize the raw HTML before parsing
+      const sanitized = sanitizeDistilledHtml(html);
+      const doc = new DOMParser().parseFromString(sanitized || '', 'text/html');
       const rawText = (doc.body?.innerText || '').trim();
-      const points = parseNumberedList(rawText);
-      if (!points.length) return html;
+      let points = parseNumberedList(rawText);
+      // Fallback: if no numbered list found, try splitting on double-newlines
+      if (!points.length) {
+        points = fallbackParagraphParse(rawText);
+      }
+      if (!points.length) return sanitized;
       const body = points.map(pt => {
         const head = escapeHtml(`${pt.n}. ${pt.head}`);
-        const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
+        const bodyText = stripBoldFromText(pt.body);
+        const paras = bodyText.split(/\n{2,}/).map(p => `<p style="font-weight:400;">${escapeHtml(p.trim())}</p>`).join('');
         return `
 <section class="dv-point" style="margin: 8px 0 20px 0;">
   <div class="dv-head" style="font-weight:700;">${head}</div>
@@ -396,5 +472,60 @@ ${inner}
         await new Promise(r => setTimeout(r, delay));
       }
     }
+  }
+
+  /**
+   * Sanitize raw AI HTML output to fix common formatting issues.
+   * Strips wrapping bold/strong tags, removes excessive markdown bold markers,
+   * and normalizes font weights.
+   * @param {string} html
+   * @returns {string}
+   */
+  function sanitizeDistilledHtml(html = '') {
+    let s = html;
+    // Remove wrapping <strong>/<b> that envelop the entire content
+    s = s.replace(/^\s*<(strong|b)>\s*/i, '').replace(/\s*<\/(strong|b)>\s*$/i, '');
+    // Remove markdown ** bold that wraps entire paragraphs
+    s = s.replace(/\*\*([^*]{100,})\*\*/g, '$1');
+    // Strip <strong>/<b> tags from body paragraphs (preserve content)
+    s = s.replace(/<(strong|b)>((?:(?!<\/\1>).)*)<\/\1>/gi, (match, tag, content) => {
+      // Keep short bold text (likely intentional emphasis), strip long bold blocks
+      return content.length > 80 ? content : match;
+    });
+    return s;
+  }
+
+  /**
+   * Strip bold/strong markers from plain text.
+   * @param {string} text
+   * @returns {string}
+   */
+  function stripBoldFromText(text = '') {
+    // Check bold ratio: if > 50% of text is wrapped in bold, strip all
+    const boldMatches = text.match(/\*\*[^*]+\*\*/g) || [];
+    const boldLen = boldMatches.reduce((sum, m) => sum + m.length, 0);
+    if (boldLen > text.length * 0.5) {
+      return text.replace(/\*\*/g, '');
+    }
+    return text;
+  }
+
+  /**
+   * Fallback parser: split text into paragraphs and create pseudo-numbered points.
+   * Used when the AI ignores the numbered-list format entirely.
+   * @param {string} text
+   * @returns {Array<{n:number, head:string, body:string}>}
+   */
+  function fallbackParagraphParse(text = '') {
+    if (!text || text.length < 50) return [];
+    const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 20);
+    if (paragraphs.length < 2) return [];
+    return paragraphs.map((p, i) => {
+      // Use first sentence as heading, rest as body
+      const sentenceEnd = p.search(/[.!?]\s/) + 1;
+      const head = sentenceEnd > 10 ? p.slice(0, sentenceEnd).trim() : p.slice(0, 80).trim();
+      const body = sentenceEnd > 10 ? p.slice(sentenceEnd).trim() : '';
+      return { n: i + 1, head, body };
+    });
   }
 })();

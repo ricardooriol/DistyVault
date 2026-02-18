@@ -76,23 +76,25 @@
     if (!url) throw new Error('No URL');
 
     let res;
+    // Proxy-first: most sites block direct CORS, so use the reliable proxy path first
+    const proxied = '/api/fetch?url=' + encodeURIComponent(url);
     try {
-      res = await fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8' } });
-    } catch (err) {
-      const msg = String(err?.message || err);
-      if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL');
+      res = await fetchWithTimeout(proxied, { redirect: 'follow' });
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL (proxy)');
       res = null;
     }
+    // Fallback to direct CORS only if proxy is unavailable (e.g. running locally without proxy)
     if (!res || !res.ok) {
-      const proxied = '/api/fetch?url=' + encodeURIComponent(url);
       try {
-        res = await fetchWithTimeout(proxied, { redirect: 'follow' });
+        res = await fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8' } });
       } catch (e) {
         const msg = String(e?.message || e);
-        if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL (proxy)');
-        throw new Error('Fetch failed and proxy fallback failed: ' + msg);
+        if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL');
+        throw new Error('Failed to fetch URL: ' + msg);
       }
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (res.statusText || '') + ' (via proxy)');
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (res.statusText || ''));
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
@@ -124,10 +126,11 @@
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
     let res;
-    try {
-      res = await fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000);
-    } catch {
-      try { res = await fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+    // Proxy-first for title peeking too
+    try { res = await fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+    // Fallback to direct for local/CORS-friendly targets
+    if (!res || !res.ok) {
+      try { res = await fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000); } catch { res = null; }
     }
     if (!res || !res.ok) return null;
     const finalUrl = res.headers.get('x-final-url') || res.url || url;

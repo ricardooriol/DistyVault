@@ -108,6 +108,10 @@
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
+    // Auto-detect source tag from URL/kind/fileType
+    const sourceTag = 'source:' + DV.utils.detectSourceTag(item.url, item.kind, item.fileType, item.fileName);
+    const userTags = item.tags || [];
+    const tags = [sourceTag, ...userTags.filter(t => t !== sourceTag)];
     const record = {
       id,
       kind: item.kind,
@@ -118,7 +122,7 @@
       fileType: item.fileType || null,
       size: item.size || 0,
       hasFile: !!item.file,
-      tags: item.tags || [],
+      tags,
       createdAt: now,
       updatedAt: now,
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
@@ -211,9 +215,18 @@
       try {
         const newTitle = extracted?.title || item.title;
         const newUrl = extracted?.url || item.url;
-        if (newTitle !== item.title || newUrl !== item.url) {
-          item = await updateItem(id, { title: newTitle, url: newUrl });
+        const patch = {};
+        if (newTitle !== item.title) patch.title = newTitle;
+        if (newUrl !== item.url) {
+          patch.url = newUrl;
+          // Re-detect source tag from final resolved URL
+          const newSource = 'source:' + DV.utils.detectSourceTag(newUrl, item.kind, item.fileType, item.fileName);
+          const oldSource = (item.tags || []).find(t => t.startsWith('source:'));
+          if (newSource !== oldSource) {
+            patch.tags = [newSource, ...(item.tags || []).filter(t => !t.startsWith('source:'))];
+          }
         }
+        if (Object.keys(patch).length) item = await updateItem(id, patch);
       } catch (_) { /* non-blocking */ }
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
@@ -225,6 +238,23 @@
 
       await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
       await updateItem(id, { status: STATUS.COMPLETED, durationMs });
+
+      // Auto-generate content tags (non-blocking — don't fail the pipeline)
+      try {
+        const autoTags = await DV.ai.generateTags(item.title, html, state.settings.ai);
+        if (autoTags.length) {
+          const current = (await DV.db.get('items', id))?.tags || [];
+          const sourceTag = current.find(t => t.startsWith('source:'));
+          const existingUser = current.filter(t => !t.startsWith('source:'));
+          // Merge: source tag first, then auto-tags (deduped), then any existing user tags
+          const merged = [
+            ...(sourceTag ? [sourceTag] : []),
+            ...autoTags.filter(t => !existingUser.includes(t)),
+            ...existingUser
+          ];
+          await updateItem(id, { tags: merged });
+        }
+      } catch (_) { /* tag generation failure is non-critical */ }
     } catch (err) {
       const durationMs = Date.now() - (item.startedAt || start);
       await updateItem(id, { status: state.stopRequested.has(id) ? STATUS.STOPPED : STATUS.ERROR, error: String(err?.message || err), durationMs });

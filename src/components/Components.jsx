@@ -283,19 +283,29 @@ function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
 function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
     const [expanded, setExpanded] = useState(false);
     const [filterOpen, setFilterOpen] = useState(false);
+    const [tagOpen, setTagOpen] = useState(false);
     const filterRef = useRef(null);
+    const tagRef = useRef(null);
     const searchRef = useRef(null);
     useEffect(() => {
-        function onDoc(e) { if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); }
+        function onDoc(e) {
+            if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
+            if (tagOpen && tagRef.current && !tagRef.current.contains(e.target)) setTagOpen(false);
+        }
         document.addEventListener('click', onDoc);
         return () => document.removeEventListener('click', onDoc);
-    }, [filterOpen]);
+    }, [filterOpen, tagOpen]);
     useEffect(() => { if (expanded && searchRef.current) searchRef.current.focus(); }, [expanded]);
+
+    const activeTagCount = tagFilter ? 1 : 0;
 
     return (
         <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
-            <div className="flex items-center gap-3">
-                <button onClick={() => { const next = !expanded; setExpanded(next); if (!next) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800', expanded && 'ring-2 ring-brand-500')} title="Search"><Icon name="search" /></button>
+            <div className="flex items-center gap-3 relative">
+                {/* Search icon — always visible */}
+                <button onClick={() => { const next = !expanded; setExpanded(next); if (!next) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 z-30 relative', expanded && 'ring-2 ring-brand-500')} title="Search"><Icon name="search" /></button>
+
+                {/* Search input — overlays filter+tag buttons when expanded */}
                 {expanded && (
                     <input
                         ref={searchRef}
@@ -303,10 +313,13 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
                         onChange={e => setSearch(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setExpanded(false); } }}
                         placeholder="Search…"
-                        className="h-9 flex-1 min-w-0 max-w-[400px] px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                        className="absolute left-12 z-30 h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                        style={{ width: 'calc(100% - 160px)' }}
                     />
                 )}
-                <div className="relative z-20" ref={filterRef}>
+
+                {/* Filter button */}
+                <div className={classNames('relative z-20', expanded && 'invisible')} ref={filterRef}>
                     <button onClick={() => setFilterOpen(v => !v)} title="Filter" aria-label="Filter"
                         className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800">
                         <Icon name={filter === 'all' ? 'asterisk' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : filter === 'file' ? 'file' : 'asterisk'} />
@@ -331,13 +344,44 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
                     )}
                 </div>
 
-                {/* Tag filter */}
+                {/* Tag filter dropdown */}
                 {allTags && allTags.length > 0 && (
-                    <div className="flex items-center gap-1 overflow-x-auto max-w-[40%]">
-                        <button onClick={() => setTagFilter('')} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0', !tagFilter ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title="All tags">All</button>
-                        {allTags.map(tag => (
-                            <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0 truncate max-w-[120px]', tagFilter === tag ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')} title={tag}>{tag}</button>
-                        ))}
+                    <div className={classNames('relative z-20', expanded && 'invisible')} ref={tagRef}>
+                        <button onClick={() => setTagOpen(v => !v)} title="Filter by tag" aria-label="Filter by tag"
+                            className={classNames('w-9 h-9 rounded-lg border flex items-center justify-center bg-white dark:bg-slate-800 relative',
+                                tagFilter ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-slate-400 dark:border-white/30 text-slate-900 dark:text-white')}>
+                            <Icon name="tag" />
+                            {activeTagCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-brand-600 text-white text-[9px] font-bold flex items-center justify-center">1</span>
+                            )}
+                        </button>
+                        {tagOpen && (
+                            <div className="absolute left-0 mt-2 w-56 max-h-64 overflow-y-auto p-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50">
+                                <button
+                                    onClick={() => { setTagFilter(''); setTagOpen(false); }}
+                                    className={classNames('w-full text-left px-3 py-1.5 text-sm rounded-lg mb-1',
+                                        !tagFilter ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')}
+                                >All tags</button>
+                                <div className="border-t border-slate-200 dark:border-white/10 my-1" />
+                                {allTags.map(tag => {
+                                    const isSource = tag.startsWith('source:');
+                                    const display = isSource ? tag.slice(7) : tag;
+                                    return (
+                                        <button
+                                            key={tag}
+                                            onClick={() => { setTagFilter(tagFilter === tag ? '' : tag); setTagOpen(false); }}
+                                            className={classNames('w-full text-left px-3 py-1.5 text-sm rounded-lg flex items-center gap-2',
+                                                tagFilter === tag ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')}
+                                        >
+                                            <span className={classNames('w-2 h-2 rounded-full shrink-0',
+                                                isSource ? 'bg-teal-500' : 'bg-brand-500')} />
+                                            <span className="truncate">{display}</span>
+                                            {tagFilter === tag && <Icon name="check" size={14} className="ml-auto shrink-0 text-brand-600 dark:text-brand-400" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -421,6 +465,64 @@ function formatDuration(ms) {
     return `${m}m ${r}s`;
 }
 
+// ── Source icon/label mapping ────────────────────────────────
+const SOURCE_META = {
+    youtube: { icon: 'youtube', label: 'YouTube' },
+    substack: { icon: 'mail', label: 'Substack' },
+    medium: { icon: 'book-open', label: 'Medium' },
+    github: { icon: 'github', label: 'GitHub' },
+    arxiv: { icon: 'file-text', label: 'arXiv' },
+    wikipedia: { icon: 'globe', label: 'Wikipedia' },
+    reddit: { icon: 'message-circle', label: 'Reddit' },
+    x: { icon: 'at-sign', label: 'X' },
+    nytimes: { icon: 'newspaper', label: 'NYTimes' },
+    bbc: { icon: 'radio', label: 'BBC' },
+    guardian: { icon: 'newspaper', label: 'Guardian' },
+    stackoverflow: { icon: 'code', label: 'Stack Overflow' },
+    hackernews: { icon: 'terminal', label: 'Hacker News' },
+    linkedin: { icon: 'linkedin', label: 'LinkedIn' },
+    notion: { icon: 'layout', label: 'Notion' },
+    pdf: { icon: 'file-text', label: 'PDF' },
+    document: { icon: 'file', label: 'Document' },
+    image: { icon: 'image', label: 'Image' },
+    text: { icon: 'file-text', label: 'Text' },
+    file: { icon: 'paperclip', label: 'File' },
+    web: { icon: 'link', label: 'Web' },
+};
+
+function SourceBadge({ item }) {
+    const sourceTag = (item.tags || []).find(t => t.startsWith('source:'));
+    const key = sourceTag ? sourceTag.slice(7) : (item.kind === 'youtube' ? 'youtube' : item.kind === 'file' ? 'file' : 'web');
+    const meta = SOURCE_META[key] || SOURCE_META.web;
+    return (
+        <div className="flex items-center gap-1.5 justify-center text-xs text-slate-600 dark:text-slate-300">
+            <Icon name={meta.icon} size={14} className="opacity-60" />
+            <span className="truncate">{meta.label}</span>
+        </div>
+    );
+}
+
+function TagBadges({ tags }) {
+    if (!tags || !tags.length) return null;
+    return (
+        <div className="flex items-center gap-1 mt-1 flex-wrap">
+            {tags.map(t => {
+                const isSource = t.startsWith('source:');
+                return (
+                    <span key={t} className={classNames(
+                        'px-1.5 py-0 text-[10px] leading-4 rounded-full border',
+                        isSource
+                            ? 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-700/40'
+                            : 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-700/40'
+                    )}>
+                        {isSource ? t.slice(7) : t}
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
+
 // ── Table ────────────────────────────────────────────────────
 function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }) {
     function isPlaylistChild(item) {
@@ -436,11 +538,6 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
     }, [items]);
     function toggle(id) {
         setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    }
-    function displayDuration(it) {
-        const active = [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
-        const base = active && it.startedAt ? (now - it.startedAt) : (it.durationMs || 0);
-        return base > 0 ? formatDuration(base) : '-';
     }
 
     function onRowClick(e, item) {
@@ -470,32 +567,30 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
     return (
         <div className="max-w-6xl mx-auto mt-4 rounded-2xl border border-slate-300 dark:border-white/20 overflow-hidden">
             <div className="overflow-x-auto w-full">
-                <table className="w-full min-w-[720px] table-fixed rounded-2xl overflow-hidden">
+                <table className="w-full table-fixed rounded-2xl overflow-hidden">
                     <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
                         <tr>
-                            <th className="w-[60%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
-                            <th className="w-[20%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('status')}>Status</th>
-                            <th className="w-[20%] p-2 text-center relative">
-                                <span className="cursor-pointer" onClick={() => onSort && onSort('duration')}>Duration</span>
+                            <th className="w-[50%] sm:w-[50%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
+                            <th className="hidden sm:table-cell w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('source')}>Source</th>
+                            <th className="w-[30%] sm:w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('status')}>Status</th>
+                            <th className="hidden sm:table-cell w-[20%] p-2 text-center relative">
+                                <span className="cursor-pointer" onClick={() => onSort && onSort('date')}>Date</span>
                                 <button title="Reset sort" aria-label="Reset sort" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" onClick={() => onSort && onSort('queue')}><Icon name="rotate-ccw" /></button>
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.length === 0 && (
-                            <tr><td colSpan={3} className="p-6 text-center text-slate-600 dark:text-slate-300">Paste a URL or upload a document to get started</td></tr>
+                            <tr><td colSpan={4} className="p-6 text-center text-slate-600 dark:text-slate-300">Paste a URL or upload a document to get started</td></tr>
                         )}
                         {items.map(i => (
-                            <tr key={i.id} onClick={(e) => onRowClick(e, i)} tabIndex="0" role="row" onKeyDown={(e) => { if (e.key === 'Enter') onRowClick(e, i); }} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '', isPlaylistChild(i) ? 'pl-8' : '')}>
+                            <tr key={i.id} onClick={(e) => onRowClick(e, i)} tabIndex="0" role="row" onKeyDown={(e) => { if (e.key === 'Enter') onRowClick(e, i); }} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors', selected.includes(i.id) ? 'bg-brand-50/70 dark:bg-brand-600/10' : '', isPlaylistChild(i) ? 'pl-8' : '')}>
+                                {/* Name column */}
                                 <td className={classNames('p-2 pl-4 text-left', isPlaylistChild(i) ? 'pl-8' : '')}>
                                     {i.kind === 'file' ? (
                                         <div className="overflow-hidden">
                                             <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{i.title}</div>
-                                            {i.tags && i.tags.length > 0 ? (
-                                                <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
-                                            ) : (
-                                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 invisible select-none">placeholder</div>
-                                            )}
+                                            <TagBadges tags={i.tags} />
                                         </div>
                                     ) : i.kind === 'playlist' ? (
                                         <PlaylistRowName i={i} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
@@ -506,8 +601,8 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                                                     (i.status === STATUS.PENDING ? `Loading from ${i.title}...` :
                                                         (i.status === STATUS.EXTRACTING ? 'Extracting title...' : i.title))}
                                             </div>
-                                            {i.tags && i.tags.length > 0 ? (
-                                                <div className="flex items-center gap-1 mt-1 flex-wrap">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] leading-4 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
+                                            {(i.tags && i.tags.length > 0) ? (
+                                                <TagBadges tags={i.tags} />
                                             ) : i.url ? (
                                                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{i.url}</div>
                                             ) : (
@@ -516,12 +611,20 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                                         </div>
                                     )}
                                 </td>
+                                {/* Source column — hidden on mobile */}
+                                <td className="hidden sm:table-cell p-2 text-center">
+                                    {i.kind === 'playlist' ? null : <SourceBadge item={i} />}
+                                </td>
+                                {/* Status column */}
                                 <td className="p-2 text-center">
                                     {i.kind === 'playlist' ? null : (
                                         <StatusChip status={i.status} onClick={(e) => { e.stopPropagation(); if (i.status === STATUS.ERROR) DV.bus.emit('ui:openError', i); }} />
                                     )}
                                 </td>
-                                <td className="p-2 text-sm text-slate-700 dark:text-slate-200 text-center">{i.kind === 'playlist' ? '' : displayDuration(i)}</td>
+                                {/* Date column — hidden on mobile */}
+                                <td className="hidden sm:table-cell p-2 text-sm text-slate-500 dark:text-slate-400 text-center">
+                                    {i.kind === 'playlist' ? '' : DV.utils.relativeTime(i.createdAt)}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
