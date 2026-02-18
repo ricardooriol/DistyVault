@@ -288,6 +288,7 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
     const filterRef = useRef(null);
     const tagRef = useRef(null);
     const searchRef = useRef(null);
+    const importInputRef = useRef(null);
     useEffect(() => {
         function onDoc(e) {
             if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
@@ -389,25 +390,27 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
                 <div className="ml-auto flex items-center gap-2">
                     <input
                         type="file"
-                        accept="application/zip"
-                        style={{ display: 'none' }}
-                        ref={ref => { CommandBar.importInput = ref; }}
+                        accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream"
+                        id="dv-import-input"
+                        style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}
+                        ref={importInputRef}
                         onChange={e => {
                             const file = e.target.files && e.target.files[0];
                             if (file) onImport(file);
                             e.target.value = '';
                         }}
                     />
-                    <button
-                        onClick={() => {
-                            if (CommandBar.importInput) CommandBar.importInput.click();
-                        }}
+                    <label
+                        htmlFor="dv-import-input"
+                        role="button"
+                        tabIndex={0}
                         title="Import"
                         aria-label="Import"
-                        className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); importInputRef.current?.click(); } }}
+                        className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 cursor-pointer"
                     >
                         <Icon name="download" />
-                    </button>
+                    </label>
                     <button onClick={onExport} title="Export" aria-label="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800"><span style={{ display: 'inline-block', transform: 'rotate(180deg)' }}><Icon name="download" /></span></button>
 
                 </div>

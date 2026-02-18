@@ -37,61 +37,65 @@ async function saveBlob(blob, filename) {
     ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)
   ));
   const isIOS = !!(ua && (/iPad|iPhone|iPod/i.test(ua.userAgent || '') || ((ua.platform === 'MacIntel' || ua.platform === 'MacPPC') && ua.maxTouchPoints > 1)));
-  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  try {
-    if (!isIOS && window.showSaveFilePicker) {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{ description: 'File', accept: { [blob.type || 'application/octet-stream']: ['.' + (filename.split('.').pop() || 'bin')] } }]
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return;
+  // 1. Desktop: try File System Access API (not iOS, not mobile)
+  if (!isMobile) {
+    try {
+      if (window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'File', accept: { [blob.type || 'application/octet-stream']: ['.' + (filename.split('.').pop() || 'bin')] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+    } catch (e) {
+      const msg = String(e && (e.name || e.message || e));
+      if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
+      // Fall through to other methods
     }
-  } catch (e) {
-    const msg = String(e && (e.name || e.message || e));
-    if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
   }
 
-  try {
-    const supportsShareFiles = !!(ua && typeof ua.share === 'function' && ua.canShare && ua.canShare({ files: [file] }));
-    if (isMobile && supportsShareFiles) {
-      await ua.share({ files: [file], title: filename });
-      return;
+  // 2. Mobile: try Web Share API with file
+  if (isMobile) {
+    try {
+      const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+      if (ua && typeof ua.share === 'function' && ua.canShare && ua.canShare({ files: [file] })) {
+        await ua.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (e) {
+      const msg = String(e && (e.name || e.message || e));
+      if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
+      // Fall through
     }
-  } catch (e) {
-    const msg = String(e && (e.name || e.message || e));
-    if (/AbortError|NotAllowedError|cancell?ed/i.test(msg)) return;
   }
 
+  // 3. Universal fallback: anchor download (works on most browsers including Android)
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 10000);
+    return;
+  } catch { }
+
+  // 4. Last resort for iOS Safari: open blob in new tab
   if (isIOS) {
     const urlIOS = URL.createObjectURL(blob);
     try {
       window.open(urlIOS, '_blank');
     } finally {
-      setTimeout(() => { URL.revokeObjectURL(urlIOS); }, 10000);
+      setTimeout(() => { URL.revokeObjectURL(urlIOS); }, 30000);
     }
-    return;
   }
-
-  try {
-    if (!isMobile && typeof window.saveAs === 'function') {
-      window.saveAs(blob, filename);
-      return;
-    }
-  } catch { }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 4000);
 }
 
 /**
