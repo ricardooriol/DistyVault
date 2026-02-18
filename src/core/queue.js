@@ -245,12 +245,10 @@
         if (autoTags.length) {
           const current = (await DV.db.get('items', id))?.tags || [];
           const sourceTag = current.find(t => t.startsWith('source:'));
-          const existingUser = current.filter(t => !t.startsWith('source:'));
-          // Merge: source tag first, then auto-tags (deduped), then any existing user tags
+          // Reset: source tag first, then new auto-tags (replacing old tags)
           const merged = [
             ...(sourceTag ? [sourceTag] : []),
-            ...autoTags.filter(t => !existingUser.includes(t)),
-            ...existingUser
+            ...autoTags
           ];
           await updateItem(id, { tags: merged });
         }

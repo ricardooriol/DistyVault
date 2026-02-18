@@ -712,16 +712,7 @@ function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
                     />
                     <button onClick={addTag} className="h-9 px-3 rounded-lg bg-brand-700 text-white text-sm">Add</button>
                 </div>
-                {allTags && allTags.length > 0 && (
-                    <div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Existing tags (click to add)</div>
-                        <div className="flex flex-wrap gap-1">
-                            {allTags.filter(t => !currentTags.includes(t)).map(t => (
-                                <button key={t} onClick={() => { setInput(''); for (const id of selectedIds) { const item = items.find(i => i.id === id); const ex = item?.tags || []; if (!ex.includes(t)) DV.queue.updateTags(id, [...ex, t]); } }} className="px-2 py-0.5 text-xs rounded-full border border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10">{t}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+
                 {currentTags.length > 0 && (
                     <div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Current tags</div>
@@ -729,7 +720,7 @@ function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
                             {currentTags.map(t => (
                                 <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">
                                     {t}
-                                    <button onClick={() => removeTag(t)} className="hover:text-rose-600"><Icon name="x" size={12} /></button>
+                                    <button onClick={() => removeTag(t)} className="flex items-center justify-center hover:text-rose-600"><Icon name="x" size={12} /></button>
                                 </span>
                             ))}
                         </div>
