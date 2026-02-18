@@ -249,7 +249,7 @@ function CapturePanel({ onSubmit }) {
 
 // ── StatsRow ─────────────────────────────────────────────────
 function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
-    const completed = items.filter(i => i.status === STATUS.COMPLETED).length;
+    const completed = items.filter(i => i.status === STATUS.COMPLETED || i.status === STATUS.READ).length;
     const inprog = items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
     const errors = items.filter(i => i.status === STATUS.ERROR).length;
 
@@ -423,6 +423,7 @@ function StatusChip({ status, onClick }) {
         [STATUS.EXTRACTING]: 'bg-amber-200 text-amber-900',
         [STATUS.DISTILLING]: 'bg-indigo-200 text-indigo-900',
         [STATUS.COMPLETED]: 'bg-emerald-200 text-emerald-900',
+        [STATUS.READ]: 'bg-blue-100 text-blue-800', // Distinct style for read items
         [STATUS.ERROR]: 'bg-rose-200 text-rose-900',
         [STATUS.STOPPED]: 'bg-slate-300 text-slate-800'
     };
