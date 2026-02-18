@@ -167,51 +167,57 @@ function App() {
     DV.queue.setSettings(s);
   }
 
-  async function handleSubmit(url, files) {
+  async function handleSubmit(urlVal, files) {
     const additions = [];
-    if (url) {
-      try {
-        const u = url.trim();
-        // Allow valid http/https URLs or treat as search if invalid
-        let isUrl = false;
-        try { new URL(u); isUrl = u.startsWith('http'); } catch { }
+    if (urlVal) {
+      // Split by comma/newline to support batch paste
+      const urls = urlVal.split(/[\n,]+/).map(u => u.trim()).filter(Boolean);
 
-        // If not a URL, maybe it's just a title/text?
-        // Current logic assumes URL. Let's strict check.
-        if (!isUrl) throw new Error('Invalid URL provided');
+      for (const url of urls) {
+        try {
+          // Allow valid http/https URLs or treat as search if invalid (only if single input?)
+          // For batch, we strictly filter for URLs to avoid confusion
+          let isUrl = false;
+          try { new URL(url); isUrl = url.startsWith('http'); } catch { }
 
-        const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(u);
-        if (isPlaylist) {
-          const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(u);
-          if (!vids || !vids.length) throw new Error('No videos found in playlist');
-          const parent = await DV.queue.addItem({ kind: 'playlist', url, title: plTitle || 'YouTube Playlist' });
-          const LIMIT = 100;
-          const list = vids.slice(0, LIMIT);
-          for (const v of list) {
-            additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url, parentId: parent.id }));
+          if (!isUrl) {
+            if (urls.length === 1) throw new Error('Invalid URL provided');
+            continue; // Skip invalid in batch
           }
-        } else {
-          const isYt = DV.extractors.isYouTube(url);
-          const kind = isYt ? 'youtube' : 'url';
-          const placeholder = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || url;
-          const recPromise = DV.queue.addItem({ kind, url, title: placeholder });
-          additions.push(recPromise);
-          recPromise.then(async rec => {
-            try {
-              const peek = isYt
-                ? (DV.extractors.peekYouTubeTitle ? await DV.extractors.peekYouTubeTitle(url) : null)
-                : (DV.extractors.peekTitle ? await DV.extractors.peekTitle(url) : null);
-              if (peek && peek.title) await DV.queue.updateItem(rec.id, { title: peek.title, url: peek.url || url });
-            } catch { }
-          });
+
+          const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(url);
+          if (isPlaylist) {
+            const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(url);
+            if (!vids || !vids.length) throw new Error('No videos found in playlist');
+            const parent = await DV.queue.addItem({ kind: 'playlist', url, title: plTitle || 'YouTube Playlist' });
+            const LIMIT = 100;
+            const list = vids.slice(0, LIMIT);
+            for (const v of list) {
+              additions.push(DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title || v.url, parentId: parent.id }));
+            }
+          } else {
+            const isYt = DV.extractors.isYouTube(url);
+            const kind = isYt ? 'youtube' : 'url';
+            const placeholder = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || url;
+            const recPromise = DV.queue.addItem({ kind, url, title: placeholder });
+            additions.push(recPromise);
+            recPromise.then(async rec => {
+              try {
+                const peek = isYt
+                  ? (DV.extractors.peekYouTubeTitle ? await DV.extractors.peekYouTubeTitle(url) : null)
+                  : (DV.extractors.peekTitle ? await DV.extractors.peekTitle(url) : null);
+                if (peek && peek.title) await DV.queue.updateItem(rec.id, { title: peek.title, url: peek.url || url });
+              } catch { }
+            });
+          }
+        } catch (e) {
+          DV.toast(String(e && (e.message || e)), { type: 'error' });
         }
-      } catch (e) {
-        DV.toast(String(e && (e.message || e)), { type: 'error' });
       }
     }
     for (const f of files) additions.push(DV.queue.addItem({ kind: 'file', title: f.name, fileName: f.name, size: f.size, file: f, fileType: f.type }));
     await Promise.all(additions);
-    if (!DV.extractors.isYouTubePlaylist || !DV.extractors.isYouTubePlaylist(url)) DV.toast('Added to queue', { type: 'success' });
+    if (additions.length > 0) DV.toast(`Added ${additions.length} items to queue`, { type: 'success' });
   }
 
   async function htmlToPlainText(html = '') {
@@ -412,7 +418,7 @@ a:hover{text-decoration:underline}
   try { if (window && window.DV) window.DV.buildViewerHtml = buildViewerHtml; } catch { }
 
   async function downloadAllCompleted() {
-    const completed = items.filter(i => i.status === STATUS.COMPLETED);
+    const completed = items.filter(i => i.status === STATUS.COMPLETED || i.status === STATUS.READ);
     if (!completed.length) return;
     if (completed.length === 1) {
       const it = completed[0];
@@ -503,6 +509,10 @@ a:hover{text-decoration:underline}
     if (selected.length !== 1) return;
     const id = selected[0];
     const item = items.find(i => i.id === id);
+    if (item && item.status === STATUS.COMPLETED) {
+      // Mark as read when viewed, if it was completed
+      await DV.queue.updateItem(id, { status: STATUS.READ });
+    }
     setViewItem(item || null);
   }
 
@@ -589,11 +599,11 @@ a:hover{text-decoration:underline}
   });
   const disableViewDownload = !selected.every(id => {
     const it = items.find(x => x.id === id);
-    return it && it.status === STATUS.COMPLETED;
+    return it && (it.status === STATUS.COMPLETED || it.status === STATUS.READ);
   });
   const disableView = !selected.every(id => {
     const it = items.find(x => x.id === id);
-    return it && (it.status === STATUS.COMPLETED || it.status === STATUS.ERROR || it.status === STATUS.STOPPED);
+    return it && (it.status === STATUS.COMPLETED || it.status === STATUS.READ || it.status === STATUS.ERROR || it.status === STATUS.STOPPED);
   });
   const allSelected = visibleItems.length > 0 && visibleItems.every(i => selected.includes(i.id));
 

@@ -11,6 +11,14 @@ const assert = require('node:assert/strict');
 global.window = global;
 global.DV = {};
 global.fetch = async () => { throw new Error('fetch not available in tests'); };
+global.DOMParser = class {
+    parseFromString(str) {
+        return {
+            body: { innerHTML: str },
+            querySelectorAll: () => []
+        };
+    }
+};
 
 // Load utils module (IIFE attaches to window.DV.utils)
 require('../src/core/utils.js');

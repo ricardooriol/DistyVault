@@ -7,6 +7,7 @@
     EXTRACTING: 'extracting',
     DISTILLING: 'distilling',
     COMPLETED: 'completed',
+    READ: 'read', // New status for viewed items
     ERROR: 'error',
     STOPPED: 'stopped'
   };
@@ -49,6 +50,7 @@
       if (it.kind === 'playlist') { c.playlists++; continue; }
       switch (it.status) {
         case STATUS.COMPLETED: c.completed++; break;
+        case STATUS.READ: c.completed++; break;
         case STATUS.PENDING: c.pending++; c.inProgress++; break;
         case STATUS.EXTRACTING: c.extracting++; c.inProgress++; break;
         case STATUS.DISTILLING: c.distilling++; c.inProgress++; break;
