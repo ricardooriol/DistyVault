@@ -16,158 +16,206 @@
   - This document is intentionally self-contained to keep deployment simple (static hosting friendly).
 -->
 <html lang="en" class="h-full">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DistyVault</title>
-    <meta name="description" content="Gather, distill and control your knowledge — privacy-first content distillation powered by AI" />
-    <link rel="manifest" href="manifest.json" />
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DistyVault</title>
+  <meta name="description"
+    content="Gather, distill and control your knowledge — privacy-first content distillation powered by AI" />
+  <link rel="manifest" href="manifest.json" />
+  <script>
+    // Suppress expected warnings for no-build architecture
+    (function () {
+      const w = console.warn;
+      console.warn = function (...args) {
+        if (typeof args[0] === 'string' && (
+          args[0].includes('cdn.tailwindcss.com') ||
+          args[0].includes('in-browser Babel transformer')
+        )) return;
+        w.apply(console, args);
+      };
+    })();
+  </script>
   <!-- TailwindCSS via CDN (dark mode via 'class') -->
-  <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: { sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'] },
-            colors: {
-              brand: {
-                50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
-                400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
-                800: '#3730a3', 900: '#312e81'
-              }
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'] },
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#312e81'
             }
           }
-        },
-        darkMode: 'class'
-      }
-    </script>
-  
+        }
+      },
+      darkMode: 'class'
+    }
+  </script>
+
   <!-- Icons for light and dark schemes -->
   <link rel="icon" href="logos/logo_no_bg_b.png" media="(prefers-color-scheme: light)" type="image/png" />
   <link rel="icon" href="logos/logo_no_bg_w.png" media="(prefers-color-scheme: dark)" type="image/png" />
   <link rel="apple-touch-icon" href="logos/logo_no_bg_b.png" media="(prefers-color-scheme: light)" />
   <link rel="apple-touch-icon" href="logos/logo_no_bg_w.png" media="(prefers-color-scheme: dark)" />
 
-    <!-- React UMD (production) + ReactDOM UMD (production) + Babel Standalone (no bundler) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- React UMD (production) + ReactDOM UMD (production) + Babel Standalone (no bundler) -->
+  <script crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"
+    src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"
+    src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-Fo0OdKhdnE7y2WmzjOMW4PYjHkkANeu1501pWTqKrzAPeJMFQb4ZTdAA9dtrVUJV"
+    src="https://unpkg.com/@babel/standalone@7.29.1/babel.min.js"></script>
 
-    <!-- Utilities shared across modules -->
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  
+  <!-- Utilities shared across modules -->
+  <script crossorigin="anonymous" integrity="sha384-DpVxUeeBWjUvUV1czyIHJAjh+jYUZFu2lLakbdua5vbwOrBGi1UgaKCHjTC+x3Ky"
+    src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+    src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-PlRSzpewlarQuj5alIadXwjNUX+2eNMKwr0f07ShWYLy8B6TjEbm7ZlcN/ScSbwy"
+    src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
+    src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
   <!-- Icons: lucide (pinned) preferred, feather (pinned) as fallback -->
-  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
-  <script src="https://unpkg.com/feather-icons@4.29.2/dist/feather.min.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-cztVf4nptt4arwI8Ixfn8naubPgxH22BSvA0CuqFUCulIT+dgnb18vSqiZbbPDL1"
+    src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
+  <script crossorigin="anonymous" integrity="sha384-qEqAs1VsN9WH2myXDbiP2wGGIttL9bMRZBKCl54ZnzpDlVqbYANP9vMaoT/wvQcf"
+    src="https://unpkg.com/feather-icons@4.29.2/dist/feather.min.js"></script>
 
-    <style>
-      /* Minimal global CSS; Tailwind handles most styling */
-      html, body, #root { height: 100%; }
-      .glass {
-        backdrop-filter: saturate(180%) blur(12px);
-        -webkit-backdrop-filter: saturate(180%) blur(12px);
-      }
-  
-  .theme-transition * { transition: none; }
-  
-  input::placeholder { color: #64748b; opacity: 1; }
-  .dark input::placeholder { color: #94a3b8; }
-  
-  input[type="range"] { accent-color: #4f46e5; }
-  
-  .dv-icon svg { color: currentColor; stroke: currentColor; }
-  .dark .dv-icon svg { color: currentColor; stroke: currentColor; }
-    </style>
-    <script>
+  <style>
+    /* Minimal global CSS; Tailwind handles most styling */
+    html,
+    body,
+    #root {
+      height: 100%;
+    }
+
+    .glass {
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+    }
+
+    .theme-transition * {
+      transition: none;
+    }
+
+    input::placeholder {
+      color: #64748b;
+      opacity: 1;
+    }
+
+    .dark input::placeholder {
+      color: #94a3b8;
+    }
+
+    input[type="range"] {
+      accent-color: #4f46e5;
+    }
+
+    .dv-icon svg {
+      color: currentColor;
+      stroke: currentColor;
+    }
+
+    .dark .dv-icon svg {
+      color: currentColor;
+      stroke: currentColor;
+    }
+  </style>
+  <script>
       // Polyfill requestIdleCallback/cancelIdleCallback when missing
-      (function(){
+      (function () {
         if (typeof window !== 'undefined') {
           if (!('requestIdleCallback' in window)) {
-            window.requestIdleCallback = function(cb, opts){
+            window.requestIdleCallback = function (cb, opts) {
               const start = Date.now();
-              return setTimeout(function(){
-                cb({ didTimeout: false, timeRemaining: function(){ return Math.max(0, 50 - (Date.now()-start)); } });
+              return setTimeout(function () {
+                cb({ didTimeout: false, timeRemaining: function () { return Math.max(0, 50 - (Date.now() - start)); } });
               }, (opts && opts.timeout) || 1);
             };
           }
           if (!('cancelIdleCallback' in window)) {
-            window.cancelIdleCallback = function(id){ clearTimeout(id); };
+            window.cancelIdleCallback = function (id) { clearTimeout(id); };
           }
         }
       })();
-    </script>
-    <script>
-      // Initialize theme from persisted preference and keep in sync with system preference
-      (function() {
-        try {
-          const pref = localStorage.getItem('dv.theme') || 'system';
-          const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.classList.toggle('dark', isDark);
-          const mq = window.matchMedia('(prefers-color-scheme: dark)');
-          function onChange(){
-            try {
-              const prefNow = localStorage.getItem('dv.theme') || 'system';
-              if (prefNow !== 'system') return;
-              const darkNow = mq.matches;
-              document.documentElement.classList.toggle('dark', darkNow);
-              const msg = { type: 'dv-theme', isDark: darkNow };
-              document.querySelectorAll('iframe').forEach(fr => { try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch {} });
-              window.postMessage(msg, '*');
-            } catch {}
-          }
-          if (mq && mq.addEventListener) mq.addEventListener('change', onChange);
-          else if (mq && mq.addListener) mq.addListener(onChange);
-        } catch {}
-      })();
-      // Bump DV version when coordinating breaking changes across modules
-      window.DV = { version: '0.3.0' };
-    </script>
-  </head>
-  <body class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-    <div id="root"></div>
+  </script>
+  <script>
+    // Initialize theme from persisted preference and keep in sync with system preference
+    (function () {
+      try {
+        const pref = localStorage.getItem('dv.theme') || 'system';
+        const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', isDark);
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        function onChange() {
+          try {
+            const prefNow = localStorage.getItem('dv.theme') || 'system';
+            if (prefNow !== 'system') return;
+            const darkNow = mq.matches;
+            document.documentElement.classList.toggle('dark', darkNow);
+            const msg = { type: 'dv-theme', isDark: darkNow };
+            document.querySelectorAll('iframe').forEach(fr => { try { fr.contentWindow && fr.contentWindow.postMessage(msg, window.location.origin); } catch { } });
+            window.postMessage(msg, window.location.origin);
+          } catch { }
+        }
+        if (mq && mq.addEventListener) mq.addEventListener('change', onChange);
+        else if (mq && mq.addListener) mq.addListener(onChange);
+      } catch { }
+    })();
+    // Bump DV version when coordinating breaking changes across modules
+    window.DV = { version: '0.3.0' };
+  </script>
+</head>
 
-    <!-- Shared utilities (must load first, before any module that uses DV.utils) -->
-    <script type="text/babel" src="src/core/utils.js"></script>
+<body class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+  <div id="root"></div>
 
-    <!-- Core modules: bus → toast → db → queue (order matters) -->
-    <script type="text/babel" src="src/core/eventBus.js"></script>
-    <script type="text/babel" src="src/core/toast.js"></script>
-    <script type="text/babel" src="src/core/db.js"></script>
-    <script type="text/babel" src="src/core/queue.js"></script>
-  
+  <!-- Shared utilities (must load first, before any module that uses DV.utils) -->
+  <script type="text/babel" src="src/core/utils.js"></script>
+
+  <!-- Core modules: bus → toast → db → queue (order matters) -->
+  <script type="text/babel" src="src/core/eventBus.js"></script>
+  <script type="text/babel" src="src/core/toast.js"></script>
+  <script type="text/babel" src="src/core/db.js"></script>
+  <script type="text/babel" src="src/core/queue.js"></script>
+
   <!-- AI providers then orchestrator -->
   <script type="text/babel" src="src/ai/providers/openai.js"></script>
   <script type="text/babel" src="src/ai/providers/gemini.js"></script>
   <script type="text/babel" src="src/ai/providers/anthropic.js"></script>
   <script type="text/babel" src="src/ai/providers/deepseek.js"></script>
   <script type="text/babel" src="src/ai/providers/grok.js"></script>
-    <script type="text/babel" src="src/ai/service.js"></script>
-  
-    <!-- Extractors: files → url → youtube → dispatcher -->
-    <script type="text/babel" src="src/extractors/files.js"></script>
-    <script type="text/babel" src="src/extractors/url.js"></script>
-    <script type="text/babel" src="src/extractors/youtube.js"></script>
+  <script type="text/babel" src="src/ai/service.js"></script>
+
+  <!-- Extractors: files → url → youtube → dispatcher -->
+  <script type="text/babel" src="src/extractors/files.js"></script>
+  <script type="text/babel" src="src/extractors/url.js"></script>
+  <script type="text/babel" src="src/extractors/youtube.js"></script>
   <script type="text/babel" src="src/extractors/index.js"></script>
 
-    <!-- UI Components (must load before App) -->
-    <script type="text/babel" src="src/components/Components.jsx"></script>
-  
-    <!-- App should load last so all DV modules are available -->
-    <script type="text/babel" src="src/App.jsx"></script>
-    <script>
-      // Initialize icons on DOM ready; components also request replacements on-demand
-      document.addEventListener('DOMContentLoaded', function(){
-        if (window.lucide && window.lucide.createIcons) {
-          window.lucide.createIcons();
-        }
-      });
-      // Register service worker for PWA support
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(function() {});
+  <!-- UI Components (must load before App) -->
+  <script type="text/babel" src="src/components/Components.jsx"></script>
+
+  <!-- App should load last so all DV modules are available -->
+  <script type="text/babel" src="src/App.jsx"></script>
+  <script>
+    // Initialize icons on DOM ready; components also request replacements on-demand
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.lucide && window.lucide.createIcons) {
+        window.lucide.createIcons();
       }
-    </script>
-  </body>
-  </html>
+    });
+    // Register service worker for PWA support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => reg.update()).catch(function () { });
+    }
+  </script>
+</body>
+
+</html>

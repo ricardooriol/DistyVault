@@ -155,9 +155,9 @@ function App() {
     try {
       const msg = { type: 'dv-theme', isDark };
       document.querySelectorAll('iframe').forEach(fr => {
-        try { fr.contentWindow && fr.contentWindow.postMessage(msg, '*'); } catch { }
+        try { fr.contentWindow && fr.contentWindow.postMessage(msg, window.location.origin); } catch { }
       });
-      window.postMessage(msg, '*');
+      window.postMessage(msg, window.location.origin);
     } catch { }
   }
 
@@ -171,9 +171,18 @@ function App() {
     const additions = [];
     if (url) {
       try {
-        const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(url);
+        const u = url.trim();
+        // Allow valid http/https URLs or treat as search if invalid
+        let isUrl = false;
+        try { new URL(u); isUrl = u.startsWith('http'); } catch { }
+
+        // If not a URL, maybe it's just a title/text?
+        // Current logic assumes URL. Let's strict check.
+        if (!isUrl) throw new Error('Invalid URL provided');
+
+        const isPlaylist = DV.extractors.isYouTubePlaylist && DV.extractors.isYouTubePlaylist(u);
         if (isPlaylist) {
-          const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(url);
+          const { items: vids, title: plTitle } = await DV.extractors.extractYouTubePlaylist(u);
           if (!vids || !vids.length) throw new Error('No videos found in playlist');
           const parent = await DV.queue.addItem({ kind: 'playlist', url, title: plTitle || 'YouTube Playlist' });
           const LIMIT = 100;

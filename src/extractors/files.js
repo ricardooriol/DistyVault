@@ -14,10 +14,14 @@
    * Load an external script at most once, with an optional readiness check.
    * Resolves when the script loads, or immediately if `check()` returns true.
    * @param {string} url
+   * @param {string} [integrity] SRI hash
    * @param {() => boolean} [check]
    * @returns {Promise<void>}
    */
-  function loadScriptOnce(url, check) {
+  function loadScriptOnce(url, integrity, check) {
+    // If check provided as 2nd arg
+    if (typeof integrity === 'function') { check = integrity; integrity = null; }
+
     return new Promise((resolve, reject) => {
       try {
         if (check && check()) return resolve();
@@ -25,6 +29,10 @@
         const s = document.createElement('script');
         s.src = url;
         s.async = true;
+        if (integrity) {
+          s.integrity = integrity;
+          s.crossOrigin = 'anonymous';
+        }
         s.onload = () => resolve();
         s.onerror = (e) => reject(new Error('Failed to load ' + url));
         document.head.appendChild(s);
@@ -37,22 +45,37 @@
 
   /** Ensure pdf.js is loaded and worker is configured. */
   async function ensurePdfJs() {
-    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.min.js', () => !!(window.pdfjsLib));
+    await loadScriptOnce(
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.min.js',
+      'sha384-tNI3EzM3RvB4TEiQDOtP0vgZJJhlsOfULMUNWCJ7AXSBqEY56Xa7fi4cbcTsygR8',
+      () => !!(window.pdfjsLib)
+    );
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
       try {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.worker.min.js';
+        // Note: workerSrc is loaded by pdf.js internally, we can't easily attach integrity unless we blob it,
+        // but since it's from same cdnjs version, it's fairly safe. 
+        // Or we can try to pre-load it? pdf.js handles the loading.
       } catch { }
     }
   }
 
   /** Load Tesseract.js on demand for OCR. */
   async function ensureTesseract() {
-    await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js', () => !!window.Tesseract);
+    await loadScriptOnce(
+      'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js',
+      'sha384-+56qagDlzJ3YYkDcyAXRdhrP7/+ai8qJcS6HpjACl2idDoCyCqRf5VVi7E/XkGae',
+      () => !!window.Tesseract
+    );
   }
 
   /** Load Mammoth for DOCX extraction (client-side). */
   async function ensureMammoth() {
-    await loadScriptOnce('https://unpkg.com/mammoth/mammoth.browser.min.js', () => !!window.mammoth);
+    await loadScriptOnce(
+      'https://unpkg.com/mammoth@1.11.0/mammoth.browser.min.js',
+      'sha384-t9eMqh3OtJXZhvLtmol8r2+23t6vg1GDo1UeyP55BEQdCI67GW2u8Nso+Yzo5m9r',
+      () => !!window.mammoth
+    );
   }
 
   /** Read a plain text file via the File API. */

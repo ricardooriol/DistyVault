@@ -6,7 +6,7 @@
  * - Network-first for CDN scripts to avoid stale caches.
  * - Cache-first for local files once cached.
  */
-const CACHE_NAME = 'dv-cache-v1';
+const CACHE_NAME = 'dv-cache-v3';
 
 const SHELL_FILES = [
     '/',
@@ -47,24 +47,22 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-    const url = new URL(event.request.url);
+    // Ignore non-http requests (extensions, data:, etc) and non-GET
+    if (!event.request.url.startsWith('http') || event.request.method !== 'GET') return;
 
-    // Network-first for CDN resources
-    if (url.hostname !== self.location.hostname) {
-        event.respondWith(
-            fetch(event.request).catch(() => caches.match(event.request))
-        );
-        return;
-    }
-
-    // Cache-first for local resources
+    // Network-first for everything to ensure fresh code
+    // Fall back to cache if network fails (offline)
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            return cached || fetch(event.request).then(response => {
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        fetch(event.request)
+            .then(response => {
+                if (response && response.status === 200) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache =>
+                        cache.put(event.request, clone).catch(err => console.debug('SW Cache Error:', err))
+                    );
+                }
                 return response;
-            });
-        })
+            })
+            .catch(() => caches.match(event.request))
     );
 });
