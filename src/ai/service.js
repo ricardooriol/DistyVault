@@ -128,46 +128,39 @@
       NO CONVERSATIONAL INTROS: Absolutely NO conversational introductions, preambles, or any text outside this strict format: deviations are UNACCEPTABLE
       STRUCTURE: Present your response as an incremental numbered list
 
-      EACH POINT'S STRUCTURE: Every point MUST follow this precise structure, organizing the main body of your response as an incremental numbered list:
-      1. Core idea sentence
-      Start with a short, concise, single, memorable sentence that captures one complete, fundamental idea. This sentence is the "hook" or "headline" of the concept.
-      Following that sentence, write detailed, substantive paragraphs to fully exhaust this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context. Use analogies or specific examples from the text. The purpose is to cement the idea, explaining not just what it is, but why it matters and how it works. Do not be brief; be complete.
+      EACH POINT'S STRUCTURE: Every point MUST follow this precise structure:
+      1. Core idea sentence (SHORT & BOLD)
+      Start with a **very short**, concise, single, memorable sentence that captures one complete, fundamental idea.
+      This sentence MUST be in bold asterisk format (e.g. **1. The Idea**).
+      Following that sentence, write detailed, substantive paragraphs to fully exhaust this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context. Do not be brief; be complete.
 
       2. Next single, short, concise, memorable, core idea sentence
-      This follows the same pattern as the first point: a single, impactful sentence summarizing the next fundamental concept.
-      Follow up with in-depth explanation, connecting this idea to previous points to build a cohesive mental model.
+      This follows the same pattern as the first point: a single, impactful bold sentence summarizing the next fundamental concept.
+      Follow up with in-depth explanation (long paragraphs), connecting this idea to previous points.
 
-      COVERAGE: Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail. No point should be left unexplored or superficial.
+      COVERAGE: Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail.
 
 
       CRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):
-      - Format: "1. Main sentence here\\nElaboration here\\n\\n2. Next main sentence here\\nElaboration here"
-      - Start with "1." (period and space, nothing else)
-      - Continue sequentially: 1., 2., 3., 4., etc.
+      - Format: "**1. Main sentence here**\\nElaboration here\\n**2. Next main sentence here**\\nElaboration here"
+      - Start with "**1." (bold markers, period, space)
+      - Continue sequentially: **1.**, **2.**, **3.**, etc.
       - NEVER use: 1), (1), 1:, 1-, or any other format
-      - NEVER repeat numbers (no multiple "1." entries)
       - NEVER skip numbers in sequence
-      - Main sentence comes IMMEDIATELY after "1. " on the same line
+      - Main sentence comes IMMEDIATELY after "**1. " on the same line
       - Elaboration starts on the next line
-      - Double line break between numbered points
+      - SINGLE line break between numbered points (No extra empty lines/paragraphs between items)
 
 
       ANTI-BOLD FORMATTING (ABSOLUTE RULE):
-      - NEVER wrap the entire response or entire paragraphs in bold, strong, or ** markers
-      - The ONLY text that should be bold is the numbered heading sentence (e.g. "1. Core idea sentence")
-      - ALL elaboration paragraphs MUST be normal weight — no bold, no strong, no ** wrapping
-      - If in doubt, use NO formatting at all — plain text is always acceptable
-      - Wrapping everything in bold is the WORST possible mistake
+      - ONLY the numbered heading sentence must be bold (e.g. "**1. Core idea sentence**")
+      - The elaboration paragraphs content MUST NOT be bold
 
 
       EXAMPLE OF PERFECT FORMAT:
-      1. The core concept drives the entire system architecture
-
+      **1. The core concept drives the entire system architecture**
       This fundamental principle shapes how all components interact and determines the scalability limits of the platform. Understanding this relationship is crucial because it affects both performance optimization strategies and future development decisions. It is not merely a technical detail but a philosophical stance on how the system manages state.
-
-
-      2. Implementation details reveal critical trade-offs
-
+      **2. Implementation details reveal critical trade-offs**
       The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design. We must look closer at the latency implications...
     `;
 
@@ -395,7 +388,7 @@
     let current = null;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      const m = line.match(/^(\d+)\.\s+(.+)/);
+      const m = line.match(/^(?:\*\*)?(\d+)\.\s+(.+)/);
       if (m) {
         if (current) pts.push(current);
         current = { n: Number(m[1]), head: m[2].trim(), body: '' };
