@@ -240,8 +240,19 @@ function App() {
 
   async function htmlToPlainText(html = '') {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    doc.querySelectorAll('style, script, link, meta, head, title').forEach(n => n.remove());
-    return (doc.body?.innerText || doc.documentElement.innerText || '').trim();
+    function getText(node) {
+      if (node.nodeType === 3) return node.nodeValue;
+      if (node.nodeType === 1) {
+        const tag = node.tagName.toLowerCase();
+        if (['style', 'script', 'head', 'meta', 'title', 'link'].includes(tag)) return '';
+        let s = '';
+        for (const child of node.childNodes) s += getText(child);
+        if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'br', 'hr', 'section'].includes(tag)) s += '\n';
+        return s;
+      }
+      return '';
+    }
+    return normalizeText(getText(doc.body || doc.documentElement));
   }
 
   function parseFormattedPoints(html = '') {
