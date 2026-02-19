@@ -572,8 +572,20 @@ a:hover{text-decoration:underline}
     await saveBlob(blob, `distyvault-bulk-download.zip`);
   }
 
+  /**
+   * Run a DB vacuum on startup to clear any orphaned content.
+   */
+  useEffect(() => {
+    DV.db.vacuum().then(count => {
+      if (count > 0) console.log(`Vacuumed ${count} orphaned records from DB.`);
+    }).catch(console.error);
+  }, []);
+
   async function deleteSelected() {
-    for (const id of selected) { await DV.db.del('items', id); await DV.db.del('contents', id); await DV.db.del('contents', id + ':file'); }
+    // Use the new atomic deleteItem to ensure clean removal of files/blobs
+    for (const id of selected) {
+      await DV.db.deleteItem(id);
+    }
     setSelected([]);
     try { if (DV.queue && DV.queue.syncLocalSummary) await DV.queue.syncLocalSummary(); } catch { }
     DV.queue.loadQueue();

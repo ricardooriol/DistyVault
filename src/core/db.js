@@ -291,6 +291,80 @@
     return 'id_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
+  /**
+   * Delete an item and all its associated content (blobs, files) transactionally.
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
+  async function deleteItem(id) {
+    // Use a readwrite transaction across all stores to ensure consistency
+    const t = await tx(['items', 'contents'], 'readwrite');
+    await new Promise((res, rej) => {
+      // 1. Delete the item record
+      const r1 = t.objectStore('items').delete(id);
+
+      // 2. Delete the main content record
+      const r2 = t.objectStore('contents').delete(id);
+
+      // 3. Delete any associated file blob record (convention: id + ':file')
+      const r3 = t.objectStore('contents').delete(id + ':file');
+
+      // Wait for all requests to succeed (basic error handling)
+      let count = 0;
+      const check = () => { if (++count === 3) res(); };
+      r1.onsuccess = check; r2.onsuccess = check; r3.onsuccess = check;
+
+      r1.onerror = () => rej(r1.error);
+      r2.onerror = () => rej(r2.error);
+      r3.onerror = () => rej(r3.error);
+    });
+    await new Promise(res => t.oncomplete = res);
+  }
+
+  /**
+   * "Vacuum" the database: remove any content records that do not have a corresponding
+   * item in the 'items' store. This fixes "ghost" data issues.
+   * @returns {Promise<number>} Number of orphaned records deleted.
+   */
+  async function vacuum() {
+    const t = await tx(['items', 'contents'], 'readwrite');
+    return await new Promise((resolve, reject) => {
+      // 1. Get all valid item IDs
+      const itemReq = t.objectStore('items').getAllKeys();
+
+      itemReq.onsuccess = () => {
+        const validIds = new Set(itemReq.result);
+        const contentStore = t.objectStore('contents');
+        const contentReq = contentStore.openCursor();
+        let deletedCount = 0;
+
+        contentReq.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const key = cursor.key; // e.g. "id_123" or "id_123:file"
+            // Check if this content belongs to a valid item
+            // If key is "id_...", primitive check.
+            // If key is "id_...:file", strip suffix.
+            let baseId = key;
+            if (key.endsWith(':file')) baseId = key.slice(0, -5);
+
+            if (!validIds.has(baseId)) {
+              // Orphan! Delete it.
+              cursor.delete();
+              deletedCount++;
+            }
+            cursor.continue();
+          } else {
+            // Done iterating
+            resolve(deletedCount);
+          }
+        };
+        contentReq.onerror = () => reject(contentReq.error);
+      };
+      itemReq.onerror = () => reject(itemReq.error);
+    });
+  }
+
   window.DV = window.DV || {};
-  window.DV.db = { open, put, get, del, getAll, exportAllToZip, importFromZip, uid };
+  window.DV.db = { open, put, get, del, deleteItem, getAll, exportAllToZip, importFromZip, uid, vacuum };
 })();

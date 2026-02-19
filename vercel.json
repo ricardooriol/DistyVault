@@ -1,10 +1,25 @@
+```json
 {
     "rewrites": [
         {
+            "source": "/api/ai",
+            "destination": "/api/ai.js"
+        },
+        {
             "source": "/api/fetch",
-            "destination": "/api/fetch"
+            "destination": "/api/fetch.js"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
         }
     ],
+    "functions": {
+        "api/ai.js": {
+            "maxDuration": 60,
+            "memory": 1024
+        }
+    },
     "headers": [
         {
             "source": "/(.*)",
