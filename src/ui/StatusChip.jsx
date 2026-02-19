@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '../utils';
 // We'll interpret STATUS based on strict strings to avoid depending on a global object for constants if possible, 
 // or import them if we move queue.js first. For now, strings work.
 const STATUS = {

@@ -1,5 +1,5 @@
 import React from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from './Icon';
 
 const SOURCE_META = {
     youtube: { icon: 'youtube', label: 'YouTube' },

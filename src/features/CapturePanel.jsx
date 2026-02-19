@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from '../ui/Icon';
 
 export default function CapturePanel({ onSubmit }) {
     const [url, setUrl] = useState('');

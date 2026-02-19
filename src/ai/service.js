@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 (function () {
   /**
    * Remove common leading indentation from template literals or strings while preserving

@@ -1,5 +1,5 @@
 import React from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from '../ui/Icon';
 
 export default function SelectionDock({ count, anyActive, allSelected, disableViewDownload, disableView, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
     if (!count) return null;

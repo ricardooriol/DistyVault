@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Icon from '@/components/ui/Icon';
-import { cn } from '@/lib/utils';
+import Icon from '../ui/Icon';
+import { cn } from '../utils';
 
 export default function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
     const [expanded, setExpanded] = useState(false);

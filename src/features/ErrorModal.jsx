@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/ui/Modal';
+import Modal from '../ui/Modal';
 
 export default function ErrorModal({ item, onClose }) {
     return (
