@@ -571,8 +571,8 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
 
     return (
         <div className="max-w-6xl mx-auto mt-4 rounded-2xl border border-slate-300 dark:border-white/20 overflow-hidden">
-            <div className="overflow-x-auto w-full">
-                <table className="w-full table-fixed rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto w-full -webkit-overflow-scrolling-touch">
+                <table className="w-full min-w-[640px] table-auto rounded-2xl overflow-hidden">
                     <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
                         <tr>
                             <th className="w-[50%] sm:w-[50%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
