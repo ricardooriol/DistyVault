@@ -29,7 +29,7 @@ const PROVIDERS = {
     }
 };
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
     // CORS setup
     const origin = req.headers?.origin || '*';
     const allowedOriginPattern = /^https?:\/\/(localhost(:\d+)?|.*\.vercel\.app)$/;
@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { provider = 'gemini', model } = req.query || {};
+        const { provider = 'gemini', model = 'gemini-3-flash-preview' } = req.query || {};
         const config = PROVIDERS[provider];
 
         if (!config) {
@@ -66,9 +66,9 @@ module.exports = async (req, res) => {
 
         // Extract API Key from various possible headers
         // Priority: x-goog-api-key (Gemini), Authorization (OpenAI/others), x-api-key (Anthropic)
-        const apiKey = req.headers['x-goog-api-key'] || 
-                       req.headers['authorization']?.replace('Bearer ', '') || 
-                       req.headers['x-api-key'];
+        const apiKey = req.headers['x-goog-api-key'] ||
+            req.headers['authorization']?.replace('Bearer ', '') ||
+            req.headers['x-api-key'];
 
         if (!apiKey) {
             res.statusCode = 401;
@@ -81,7 +81,7 @@ module.exports = async (req, res) => {
         // Construct Upstream URL
         // Pass model and apiKey in case the provider needs them in the URL (like Gemini)
         const upstreamUrl = typeof config.url === 'function' ? config.url(model, apiKey) : config.url;
-        
+
         // Prepare Headers
         const extraHeaders = config.headers ? config.headers(apiKey) : {};
         const upstreamHeaders = {
@@ -138,11 +138,11 @@ module.exports = async (req, res) => {
                     console.error('Stream error:', e);
                 }
                 res.end();
-            } 
+            }
             // Node-fetch style (Node stream)
             else if (typeof upstreamRes.body.pipe === 'function') {
                 upstreamRes.body.pipe(res);
-            } 
+            }
             // Fallback for buffer
             else {
                 const buffer = await upstreamRes.arrayBuffer();
