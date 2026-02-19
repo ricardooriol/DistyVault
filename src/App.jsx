@@ -458,7 +458,7 @@ a:hover{text-decoration:underline}
   async function stopAll() {
     items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).forEach(i => DV.queue.requestStop(i.id));
     DV.queue.loadQueue();
-    DV.toast('Stop requested for all in progress');
+    DV.toast('Stopped all active distillations', { type: 'success' });
   }
 
   async function retryFailed() {

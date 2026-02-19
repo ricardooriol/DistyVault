@@ -154,47 +154,50 @@
     }
 
     async function distillSingle(text, partNote) {
+      if (aiSettings.signal?.aborted) throw new Error('Aborted');
+
       const userContent = `${partNote}Here is the text to distill. Remember: be THOROUGH and LONG. Cover every single point.\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
       const prepared = {
         title,
         prompt: `${directive}\n\n${userContent}`,
         messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
       };
+      // Pass the settings INCLUDING the signal down to the provider
       const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
-      return await retryWithBackoff(() => provider.distill(extracted, settingsWithPrepared));
+      return await retryWithBackoff(() => provider.distill(extracted, settingsWithPrepared), 3, aiSettings.signal);
     }
 
     let rawHtml;
-    if (fullText.length <= CHUNK_SIZE) {
-      // Short content: single-pass distillation (existing behavior)
-      rawHtml = await distillSingle(fullText, '');
-    } else {
-      // Chunked distillation for long content
+    // ... existing logic ...
+
+    // For chunked content loop:
+    if (fullText.length > CHUNK_SIZE) {
       const chunks = chunkText(fullText);
       const chunkResults = [];
       for (let i = 0; i < chunks.length; i++) {
+        if (aiSettings.signal?.aborted) throw new Error('Aborted');
+        // ...
         const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill THIS PART fully and in detail — do not shorten or summarize. Produce as many numbered points as this section warrants.]\n\n`;
         const result = await distillSingle(chunks[i], partNote);
         chunkResults.push(result);
       }
-
+      // ... join ...
       if (chunkResults.length === 1) {
         rawHtml = chunkResults[0];
       } else {
-        // Lossless Sequential Concatenation:
-        // Instead of asking AI to "merge" (which causes summarization/data loss),
-        // we simply join the full-detail chunks and rely on reformatDistilled
-        // to re-number them sequentially.
         rawHtml = chunkResults.join('\n\n');
       }
+    } else {
+      rawHtml = await distillSingle(fullText, '');
     }
 
     const now = new Date();
+    // ... rest of function ...
     const meta = {
+      // ...
       title,
       sourceUrl: extracted.url || '',
       sourceName: extracted.fileName || extracted.url || title,
-      // Prefer dayjs when present for deterministic formatting; fall back to locale string otherwise
       dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
     };
     const formatted = reformatDistilled(rawHtml, meta);
@@ -400,13 +403,16 @@ ${inner}
    * for transient errors (429, 5xx). Non-retryable errors throw immediately.
    * @param {() => Promise<any>} fn
    * @param {number} [maxRetries=3]
+   * @param {AbortSignal} [signal]
    * @returns {Promise<any>}
    */
-  async function retryWithBackoff(fn, maxRetries = 3) {
+  async function retryWithBackoff(fn, maxRetries = 3, signal) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (signal?.aborted) throw new Error('Aborted');
       try {
         return await fn();
       } catch (err) {
+        if (signal?.aborted) throw new Error('Aborted');
         const msg = String(err?.message || err);
         const isRetryable = /\b(429|500|502|503|504)\b/.test(msg) || /rate.?limit|too many requests|overloaded/i.test(msg);
         if (!isRetryable || attempt >= maxRetries) throw err;
