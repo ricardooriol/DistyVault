@@ -578,9 +578,11 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                             <th className="w-[50%] sm:w-[50%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
                             <th className="w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('source')}>Source</th>
                             <th className="w-[30%] sm:w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('status')}>Status</th>
-                            <th className="w-[20%] p-2 text-center relative">
-                                <span className="cursor-pointer" onClick={() => onSort && onSort('date')}>Date</span>
-                                <button title="Reset sort" aria-label="Reset sort" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" onClick={() => onSort && onSort('queue')}><Icon name="rotate-ccw" /></button>
+                            <th className="w-[20%] p-2">
+                                <div className="flex items-center justify-center gap-1">
+                                    <span className="cursor-pointer" onClick={() => onSort && onSort('date')}>Date</span>
+                                    <button title="Reset sort" aria-label="Reset sort" className="text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" onClick={() => onSort && onSort('queue')}><Icon name="rotate-ccw" size={14} /></button>
+                                </div>
                             </th>
                         </tr>
                     </thead>
