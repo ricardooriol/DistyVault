@@ -43,7 +43,140 @@
     settings: defaultSettings
   };
 
-  // ... (rest of file) ...
+  /**
+   * Compute aggregate counts for UI summary and quick metrics.
+   * Playlists are counted separately and excluded from progress states.
+   * @param {Array<any>} items
+   * @returns {{total:number,completed:number,inProgress:number,pending:number,extracting:number,distilling:number,errors:number,stopped:number,playlists:number}}
+   */
+  function computeCounts(items) {
+    const c = { total: 0, completed: 0, inProgress: 0, pending: 0, extracting: 0, distilling: 0, errors: 0, stopped: 0, playlists: 0 };
+    for (const it of items) {
+      c.total++;
+      if (it.kind === 'playlist') { c.playlists++; continue; }
+      switch (it.status) {
+        case STATUS.COMPLETED: c.completed++; break;
+        case STATUS.READ: c.completed++; break;
+        case STATUS.PENDING: c.pending++; c.inProgress++; break;
+        case STATUS.EXTRACTING: c.extracting++; c.inProgress++; break;
+        case STATUS.DISTILLING: c.distilling++; c.inProgress++; break;
+        case STATUS.ERROR: c.errors++; break;
+        case STATUS.STOPPED: c.stopped++; break;
+      }
+    }
+    return c;
+  }
+
+  /**
+   * Persist a lightweight summary to localStorage for quick dashboard reads without
+   * hitting IndexedDB, handling quota failures gracefully.
+   * @param {Array<any>} [itemsArg]
+   */
+  async function syncLocalSummary(itemsArg) {
+    try {
+      const items = itemsArg || await DV.db.getAll('items');
+      const ids = items.map(i => i.id);
+      const counts = computeCounts(items);
+      localStorage.setItem('dv.items.ids', JSON.stringify(ids));
+      localStorage.setItem('dv.items.counts', JSON.stringify(counts));
+      localStorage.setItem('dv.items.updatedAt', String(Date.now()));
+    } catch (e) {
+      try { if (e && /quota|storage/i.test(String(e))) localStorage.removeItem('dv.items.ids'); } catch { }
+    }
+  }
+
+  /** Update settings both in memory and durable storage, and notify listeners. */
+  function setSettings(newSettings) {
+    state.settings = { ...state.settings, ...newSettings };
+    DV.db.put('settings', { key: 'app', value: state.settings });
+    DV.bus.emit('settings:update', state.settings);
+  }
+
+  /** Get the current effective settings. */
+  function getSettings() { return state.settings; }
+
+  /**
+   * Load persisted settings at startup and emit an update. Normalizes concurrency.
+   */
+  async function loadSettings() {
+    const s = await DV.db.get('settings', 'app');
+    if (s && s.value) {
+      state.settings = { ...defaultSettings, ...s.value };
+    }
+    state.concurrency = Number(state.settings.concurrency || 1);
+    DV.bus.emit('settings:update', state.settings);
+  }
+
+  /**
+   * Enqueue a new item and persist it. For file-backed items, stores the Blob under
+   * contents with an id-suffixed key. Emits items:added and kicks the scheduler.
+   * @param {{id?:string,kind:string,parentId?:string,title?:string,name?:string,url?:string,file?:File,fileName?:string,fileType?:string,size?:number}} item
+   * @returns {Promise<any>}
+   */
+  async function addItem(item) {
+    const now = Date.now();
+    const id = item.id || DV.db.uid();
+    // Auto-detect source tag from URL/kind/fileType
+    const sourceTag = 'source:' + DV.utils.detectSourceTag(item.url, item.kind, item.fileType, item.fileName);
+    const userTags = item.tags || [];
+    const tags = [sourceTag, ...userTags.filter(t => t !== sourceTag)];
+    const record = {
+      id,
+      kind: item.kind,
+      parentId: item.parentId || null,
+      title: sanitizeTitle(item.title || item.name || item.url || 'Untitled'),
+      url: item.url || null,
+      fileName: item.fileName || null,
+      fileType: item.fileType || null,
+      size: item.size || 0,
+      hasFile: !!item.file,
+      tags,
+      createdAt: now,
+      updatedAt: now,
+      status: item.kind === 'playlist' ? null : STATUS.PENDING,
+      error: null,
+      durationMs: 0,
+      queueIndex: state.queue.length,
+    };
+    await DV.db.put('items', record);
+    if (item.file) {
+      try {
+        await DV.db.put('contents', { id: id + ':file', blob: item.file, name: item.file.name, type: item.file.type, size: item.file.size });
+      } catch (e) { console.warn('Failed to store file blob', e); }
+    }
+    state.queue.push(id);
+    DV.bus.emit('items:added', record);
+    syncLocalSummary();
+    tick();
+    return record;
+  }
+
+  /**
+   * Update tags for an existing item.
+   * @param {string} id
+   * @param {string[]} tags
+   * @returns {Promise<any|undefined>}
+   */
+  async function updateTags(id, tags) {
+    return updateItem(id, { tags: (tags || []).map(t => t.trim().toLowerCase()).filter(Boolean) });
+  }
+
+  /**
+   * Patch an existing item atomically and emit an update.
+   * @param {string} id
+   * @param {object} patch
+   * @returns {Promise<any|undefined>}
+   */
+  async function updateItem(id, patch) {
+    const existing = await DV.db.get('items', id);
+    if (!existing) return;
+    const updated = { ...existing, ...patch, updatedAt: Date.now() };
+    if (patch.title) updated.title = sanitizeTitle(updated.title);
+    await DV.db.put('items', updated);
+    DV.bus.emit('items:updated', updated);
+    syncLocalSummary();
+    return updated;
+  }
 
   /**
    * Request graceful stop for a specific item. The request is honored at safe points
@@ -63,6 +196,17 @@
   }
 
   // ...
+
+  /**
+   * Adjust concurrency (1..10), persist the new value, and prompt the scheduler.
+   * @param {number} n
+   */
+  function setConcurrency(n) {
+    state.concurrency = Math.max(1, Math.min(10, Number(n || 1)));
+    state.settings.concurrency = state.concurrency;
+    DV.db.put('settings', { key: 'app', value: state.settings });
+    tick();
+  }
 
   /**
    * Process a single item through extract → distill, handling user stop requests and
