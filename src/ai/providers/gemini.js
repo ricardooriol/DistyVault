@@ -42,7 +42,6 @@
       },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
-        tools: [{ google_search: {} }],
         generationConfig: { temperature: 0.3 }
       })
     });
