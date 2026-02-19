@@ -1,20 +1,40 @@
 {
     "name": "distyvault",
-    "version": "0.3.0",
-    "description": "Gather, distill and control your knowledge — privacy-first content distillation powered by AI",
-    "license": "MIT",
     "private": true,
+    "version": "0.4.0",
+    "type": "module",
     "scripts": {
-        "serve": "npx -y serve . -p 3000",
+        "dev": "vite",
+        "build": "vite build",
+        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+        "preview": "vite preview",
         "test": "node --test tests/"
     },
-    "keywords": [
-        "knowledge-management",
-        "ai",
-        "distillation",
-        "browser-app",
-        "indexeddb"
-    ],
+    "dependencies": {
+        "clsx": "^2.1.0",
+        "dayjs": "^1.11.10",
+        "file-saver": "^2.0.5",
+        "idb": "^8.0.0",
+        "jspdf": "^4.2.0",
+        "jszip": "^3.10.1",
+        "lucide-react": "^0.344.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "tailwind-merge": "^2.2.1"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.64",
+        "@types/react-dom": "^18.2.21",
+        "@vitejs/plugin-react": "^4.2.1",
+        "autoprefixer": "^10.4.18",
+        "eslint": "^8.57.0",
+        "eslint-plugin-react": "^7.34.0",
+        "eslint-plugin-react-hooks": "^4.6.0",
+        "eslint-plugin-react-refresh": "^0.4.5",
+        "postcss": "^8.4.35",
+        "tailwindcss": "^3.4.1",
+        "vite": "^5.1.6"
+    },
     "engines": {
         "node": ">=18"
     }

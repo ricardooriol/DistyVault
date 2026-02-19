@@ -43,175 +43,112 @@
     // Use local proxy
     const proxyUrl = '/api/ai?provider=gemini&model=' + encodeURIComponent(model);
 
-    // Aggressive Retry Configuration
-    const MAX_RETRIES = 10;
-    const BASE_DELAY = 1000; // 1 second
+    // 1. Check if aborted before starting request
+    if (signal?.aborted) throw new Error('Aborted by user');
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      // 1. Check if aborted before starting request
-      if (signal?.aborted) throw new Error('Aborted by user');
+    try {
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
+          generationConfig: { temperature: 0.3 }
+        }),
+        signal // Pass signal to fetch to kill network request
+      });
 
-      try {
-        // We still send the prompt as a full JSON object
-        const res = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
-            generationConfig: { temperature: 0.3 }
-          }),
-          signal // 2. Pass signal to fetch to kill network request
-        });
-
-        if (!res.ok) {
-          let msg = `${res.status} ${res.statusText}`;
-          try { const j = await res.json(); msg += ` - ${j.error?.message || JSON.stringify(j)}`; } catch {
-            // try text if json fails
-            try { const t = await res.text(); msg += ` - ${t}`; } catch { }
-          }
-
-          // Check for 503 Service Unavailable / High Demand
-          if (res.status === 503 || msg.includes('High Demand') || msg.includes('Overloaded')) {
-            if (attempt < MAX_RETRIES) {
-              if (signal?.aborted) throw new Error('Aborted by user');
-
-              const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), 10000) + (Math.random() * 500); // Exponential backoff with jitter
-              console.warn(`Gemini 503 (Attempt ${attempt + 1}/${MAX_RETRIES}). Retrying in ${Math.round(delay)}ms...`);
-
-              // Wait with abortion check
-              await new Promise((resolve, reject) => {
-                const timer = setTimeout(resolve, delay);
-                if (signal) {
-                  signal.addEventListener('abort', () => {
-                    clearTimeout(timer);
-                    reject(new Error('Aborted by user'));
-                  });
-                }
-              });
-              continue; // Retry loop
-            }
-          }
-          throw new Error('Gemini API error: ' + msg);
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`;
+        try { const j = await res.json(); msg += ` - ${j.error?.message || JSON.stringify(j)}`; } catch {
+          try { const t = await res.text(); msg += ` - ${t}`; } catch { }
         }
 
-        // Handle Streaming Response
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedText = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+        // Throw specific error types for the service layer to handle
+        if (res.status === 503 || res.status === 504 || msg.includes('High Demand') || msg.includes('Overloaded')) {
+          throw new Error(`RetryableError: ${msg}`);
         }
-        buffer += decoder.decode();
-
-        // Parse accumulated JSON
-        try {
-          // First try standard parse (fastest)
-          const chunks = JSON.parse(buffer);
-          accumulatedText = chunks.map(c =>
-            c.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
-          ).join('');
-        } catch (e) {
-          console.warn('Gemini stream parse failed, attempting robust extraction:', e);
-          // Robust fallback: Extract valid JSON objects by counting braces
-          // This handles missing commas, array brackets, or concatenated objects
-          const jsonObjects = [];
-          let braceCount = 0;
-          let startIndex = -1;
-          let inString = false;
-          let escaped = false;
-
-          for (let i = 0; i < buffer.length; i++) {
-            const char = buffer[i];
-
-            if (inString) {
-              if (escaped) {
-                escaped = false;
-              } else if (char === '\\') {
-                escaped = true;
-              } else if (char === '"') {
-                inString = false;
-              }
-              continue;
-            }
-
-            if (char === '"') {
-              inString = true;
-              continue;
-            }
-
-            if (char === '{') {
-              if (braceCount === 0) startIndex = i;
-              braceCount++;
-            } else if (char === '}') {
-              braceCount--;
-              if (braceCount === 0 && startIndex !== -1) {
-                const jsonStr = buffer.slice(startIndex, i + 1);
-                try {
-                  const obj = JSON.parse(jsonStr);
-                  jsonObjects.push(obj);
-                } catch { /* ignore invalid blocks */ }
-                startIndex = -1;
-              }
-            }
-          }
-
-          if (jsonObjects.length > 0) {
-            accumulatedText = jsonObjects.map(c =>
-              c.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
-            ).join('');
-          } else {
-            // Final desperate fallback: simple regex for text (still better than nothing)
-            // but flawed for quotes. Only use if structure is totally undetectable.
-            const matches = buffer.match(/"text":\s*"([^"]*)"/g);
-            if (matches) {
-              accumulatedText = matches.map(m => {
-                try { return JSON.parse('{' + m + '}').text; } catch { return ''; }
-              }).join('');
-            } else {
-              throw new Error('Failed to parse Gemini response: ' + e.message);
-            }
-          }
-        }
-        return DV.utils.wrapHtml(accumulatedText, extracted.title || 'Distilled');
-
-      } catch (err) {
-        if (signal?.aborted || err.name === 'AbortError' || err.message === 'Aborted by user') {
-          throw new Error('Aborted by user');
-        }
-
-        // Re-throw if it's the last attempt or a fatal error
-        if (attempt >= MAX_RETRIES) throw err;
-
-        // Also catch network errors (fetch failed) and retry them too
-        const msg = String(err.message || err);
-        if (msg.includes('503') || msg.includes('Failed to fetch') || msg.includes('network')) {
-          if (signal?.aborted) throw new Error('Aborted by user');
-
-          const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), 10000) + (Math.random() * 500);
-          console.warn(`Network error (Attempt ${attempt + 1}/${MAX_RETRIES}). Retrying in ${Math.round(delay)}ms...`);
-
-          // Wait with abortion check
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(resolve, delay);
-            if (signal) {
-              signal.addEventListener('abort', () => {
-                clearTimeout(timer);
-                reject(new Error('Aborted by user'));
-              });
-            }
-          });
-          continue;
-        }
-        throw err;
+        throw new Error('Gemini API error: ' + msg);
       }
+
+      // Handle Streaming Response
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+      }
+      buffer += decoder.decode();
+
+      // Robust JSON Parsing
+      // Gemini sends a JSON array of objects. Sometimes the stream cuts off before the closing ']'.
+      let cleanBuffer = buffer.trim();
+
+      // Fix 1: If it starts with '[' but doesn't end with ']', try to close it.
+      if (cleanBuffer.startsWith('[') && !cleanBuffer.endsWith(']')) {
+        // Attempt to close the JSON array securely
+        // If it ends with a comma, remove it
+        if (cleanBuffer.endsWith(',')) cleanBuffer = cleanBuffer.slice(0, -1);
+        // If it's inside an object (ends with '}'), allow closing the array
+        if (cleanBuffer.endsWith('}')) cleanBuffer += ']';
+      }
+
+      let jsonArray;
+      try {
+        jsonArray = JSON.parse(cleanBuffer);
+      } catch (e) {
+        // Fix 2: If standard parse fails, try the "repair" approach
+        // Often it's just a missing ']' or a trailing comma inside the last object
+        try {
+          // Very aggressive repair: try adding brackets/braces until it parses
+          // This is a naive but effective heuristic for simple stream truncations
+          if (cleanBuffer.endsWith('}')) {
+            jsonArray = JSON.parse(cleanBuffer + ']');
+          } else {
+            throw e;
+          }
+        } catch (repairErr) {
+          console.warn('Gemini stream parse failed, attempting manual extraction:', repairErr);
+          return extractTextManually(cleanBuffer);
+        }
+      }
+
+      // Extract text from valid JSON
+      if (Array.isArray(jsonArray)) {
+        const text = jsonArray.map(c =>
+          c.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
+        ).join('');
+        return DV.utils.wrapHtml(text, extracted.title || 'Distilled');
+      }
+
+      return extractTextManually(cleanBuffer);
+
+    } catch (err) {
+      if (signal?.aborted || err.name === 'AbortError' || err.message === 'Aborted by user') {
+        throw new Error('Aborted by user');
+      }
+      // Re-throw for service.js to handle (it catches 'RetryableError')
+      throw err;
     }
+  }
+
+  /**
+   * Fallback: extract text using regex if JSON parsing fails completely.
+   */
+  function extractTextManually(buffer) {
+    const matches = buffer.match(/"text":\s*"([^"]*)"/g);
+    if (matches) {
+      const text = matches.map(m => {
+        try { return JSON.parse('{' + m + '}').text; } catch { return ''; }
+      }).join('');
+      return DV.utils.wrapHtml(text, 'Distilled (Partial)');
+    }
+    throw new Error('Failed to parse Gemini response');
   }
 
   window.DV = window.DV || {};

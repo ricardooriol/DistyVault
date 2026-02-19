@@ -406,7 +406,7 @@ ${inner}
    * @param {AbortSignal} [signal]
    * @returns {Promise<any>}
    */
-  async function retryWithBackoff(fn, maxRetries = 3, signal) {
+  async function retryWithBackoff(fn, maxRetries = 10, signal) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (signal?.aborted) throw new Error('Aborted');
       try {
@@ -414,10 +414,24 @@ ${inner}
       } catch (err) {
         if (signal?.aborted) throw new Error('Aborted');
         const msg = String(err?.message || err);
-        const isRetryable = /\b(429|500|502|503|504)\b/.test(msg) || /rate.?limit|too many requests|overloaded/i.test(msg);
+        // Retry if it's explicitly marked as retryable OR matches common network/server error patterns
+        const isRetryable = msg.includes('RetryableError') ||
+          /\b(429|500|502|503|504)\b/.test(msg) ||
+          /rate.?limit|too many requests|overloaded|network|fetch/i.test(msg);
+
         if (!isRetryable || attempt >= maxRetries) throw err;
-        const delay = Math.pow(3, attempt) * 1000; // 1s, 3s, 9s
-        await new Promise(r => setTimeout(r, delay));
+
+        // Exponential backoff: 1s, 2s, 4s, 8s... capped at 15s
+        const delay = Math.min(Math.pow(2, attempt) * 1000, 15000) + (Math.random() * 500);
+        console.warn(`[Retry] Attempt ${attempt + 1}/${maxRetries} failed: ${msg}. Retrying in ${Math.round(delay)}ms...`);
+
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(resolve, delay);
+          if (signal) signal.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(new Error('Aborted'));
+          });
+        });
       }
     }
   }
