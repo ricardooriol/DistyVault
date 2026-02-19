@@ -266,7 +266,7 @@
     const t = await tx(['items', 'contents', 'settings'], 'readwrite');
     const promises = [];
     const putAll = (store, arr) => arr.forEach(v => {
-      if (v && v.key !== '__proto__' && v.constructor !== Object && v.prototype !== Object) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
         promises.push(new Promise((res, rej) => {
           const r = t.objectStore(store).put(v);
           r.onsuccess = () => res();
