@@ -47,22 +47,36 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-    // Ignore non-http requests (extensions, data:, etc) and non-GET
-    if (!event.request.url.startsWith('http') || event.request.method !== 'GET') return;
+    // 1. Only intercept GET requests
+    if (event.request.method !== 'GET') return;
 
-    // Network-first for everything to ensure fresh code
-    // Fall back to cache if network fails (offline)
+    const url = new URL(event.request.url);
+
+    // 2. Only intercept same-origin requests (app shell)
+    // We let the browser handle CDN caching naturally to avoid CORS/CSP issues in the SW
+    if (url.origin !== self.location.origin) return;
+
+    // 3. Network-first strategy for local app files
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                if (response && response.status === 200) {
+                // If good response, clone and cache
+                if (response && response.status === 200 && response.type === 'basic') {
                     const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache =>
-                        cache.put(event.request, clone).catch(err => console.debug('SW Cache Error:', err))
-                    );
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                 }
                 return response;
             })
-            .catch(() => caches.match(event.request))
+            .catch(() => {
+                // Network failed (offline), try cache
+                return caches.match(event.request).then(response => {
+                    if (response) return response;
+                    // If not in cache and network failed, we can't do anything for assets.
+                    // For navigation requests (HTML), we could return a fallback offline page,
+                    // but for now just return undefined to let the browser show the error.
+                    // actually returning undefined in respondWith throws. We must return a Response.
+                    return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+                });
+            })
     );
 });
