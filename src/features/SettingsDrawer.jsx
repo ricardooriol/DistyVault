@@ -83,8 +83,8 @@ export default function SettingsDrawer({ open, onClose, settings, setSettings })
                                         { v: 'deepseek-reasoner', l: 'DeepSeek Reasoner' },
                                     ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
                                     {local.ai.mode === 'gemini' && [
-                                        { v: 'gemini-3-flash-preview', l: 'Gemini 3 Flash' },
-                                        { v: 'gemini-3-pro-preview', l: 'Gemini 3 Pro' },
+                                        { v: 'gemini-3-flash-preview', l: 'Gemini 3 Flash Preview' },
+                                        { v: 'gemini-3.1-pro-preview', l: 'Gemini 3.1 Pro Preview' },
                                     ].map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
                                     {local.ai.mode === 'grok' && [
                                         { v: 'grok-4', l: 'Grok 4' },

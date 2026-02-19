@@ -40,7 +40,7 @@ function isPrivateHost(hostname) {
   return false;
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // CORS setup
   const origin = req.headers?.origin || '*';
   const allowedOriginPattern = /^https?:\/\/(localhost(:\d+)?|.*\.vercel\.app)$/;
