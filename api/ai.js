@@ -61,12 +61,22 @@ async function handleGemini(req, res, model, corsOrigin) {
     // Use streamGenerateContent to enable streaming response
     const upstreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?key=${encodeURIComponent(apiKey)}`;
 
-    // Read full request body first
-    const bodyBuffers = [];
-    for await (const chunk of req) {
-        bodyBuffers.push(chunk);
+    // Read request body (handle Vercel parsing vs raw stream)
+    let body;
+    if (req.body) {
+        if (typeof req.body === 'string' || Buffer.isBuffer(req.body)) {
+            body = req.body;
+        } else {
+            // Vercel parsed JSON
+            body = JSON.stringify(req.body);
+        }
+    } else {
+        const bodyBuffers = [];
+        for await (const chunk of req) {
+            bodyBuffers.push(chunk);
+        }
+        body = Buffer.concat(bodyBuffers);
     }
-    const body = Buffer.concat(bodyBuffers);
 
     const upstreamRes = await fetch(upstreamUrl, {
         method: 'POST',
@@ -99,25 +109,31 @@ async function handleGemini(req, res, model, corsOrigin) {
     // Node.js http.ServerResponse `res` is a Writable (Node stream).
     // We need to bridge them.
 
-    if (upstreamRes.body && typeof upstreamRes.body.getReader === 'function') {
-        const reader = upstreamRes.body.getReader();
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                res.write(value);
+    if (upstreamRes.body) {
+        // Modern Node.js fetch (undici) returns a web stream
+        if (typeof upstreamRes.body.getReader === 'function') {
+            const reader = upstreamRes.body.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    res.write(value);
+                }
+            } catch (e) {
+                console.error('Stream error', e);
             }
             res.end();
-        } catch (e) {
-            console.error('Stream error', e);
-            res.end(); // Close connection
         }
-    } else if (upstreamRes.body && typeof upstreamRes.body.pipe === 'function') {
-        // Node-fetch style
-        upstreamRes.body.pipe(res);
+        // Node-fetch style (Node stream)
+        else if (typeof upstreamRes.body.pipe === 'function') {
+            upstreamRes.body.pipe(res);
+        }
+        // Fallback for unexpected body types
+        else {
+            const buffer = await upstreamRes.arrayBuffer();
+            res.end(Buffer.from(buffer));
+        }
     } else {
-        // Fallback for text/buffer response (unlikely for stream endpoint but possible)
-        const buffer = await upstreamRes.arrayBuffer();
-        res.end(Buffer.from(buffer));
+        res.end();
     }
 }
