@@ -274,6 +274,8 @@
       const tags = cleaned.split(',')
         .map(t => t.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'))
         .filter(t => t.length >= 2 && t.length <= 30 && !blacklist.has(t))
+        // Strip tags that look like CSS leakage (font-family, body, etc.)
+        .filter(t => !/font|family|inter|arial|helvetica|serif|sans|body|margin|padding|color|display|width|height|border|background|opacity|overflow|position|text-align/.test(t))
         .slice(0, 5);
       return tags.length >= 2 ? tags : [];
     } catch {
