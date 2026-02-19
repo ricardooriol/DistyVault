@@ -7,6 +7,16 @@ import './core/toast';
 import './core/db';
 import './core/queue';
 import './ai/service'; // Assuming it registers AI providers
+import './ai/providers/openai';
+import './ai/providers/gemini';
+import './ai/providers/anthropic';
+import './ai/providers/deepseek';
+import './ai/providers/grok';
+
+import './extractors/youtube';
+import './extractors/url';
+import './extractors/files';
+import './extractors/index';
 import App from './App.jsx';
 
 
