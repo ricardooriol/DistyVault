@@ -212,9 +212,7 @@
 
     let tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks || player?.captions?.playerCaptionsRenderer?.captionTracks || [];
     if (!Array.isArray(tracks) || !tracks.length) {
-    }
-    if (!tracks || !tracks.length) {
-      return { kind: 'youtube', url: inputUrl, title, text: '[No captions available for this video]', videoId: id };
+      throw new Error('No captions available for this video. Cannot distill without text.');
     }
 
     const track = pickBestCaptionTrack(tracks);

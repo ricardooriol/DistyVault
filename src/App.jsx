@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { jsPDF } from 'jspdf';
 /**
  * DistyVault — App shell and business logic
  *
@@ -267,10 +268,6 @@ function App() {
   }
 
   async function makePdfBlobFromHtml(html, title = 'Document') {
-    const { jsPDF } = window.jspdf || {};
-    if (!jsPDF) {
-      return new Blob([html], { type: 'text/html' });
-    }
     const points = parseFormattedPoints(html);
     const text = points ? '' : await htmlToPlainText(html);
     const meta = parseHeaderMeta(html);
