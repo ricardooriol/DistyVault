@@ -124,19 +124,12 @@ export function yieldToBrowser() {
 
 export async function htmlToPlainText(html = '') {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  function getText(node) {
-    if (node.nodeType === 3) return node.nodeValue;
-    if (node.nodeType === 1) {
-      const tag = node.tagName.toLowerCase();
-      if (['style', 'script', 'head', 'meta', 'title', 'link'].includes(tag)) return '';
-      let s = '';
-      for (const child of node.childNodes) s += getText(child);
-      if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'br', 'hr', 'section'].includes(tag)) s += '\n';
-      return s;
-    }
-    return '';
-  }
-  return normalizeText(getText(doc.body || doc.documentElement));
+  ['style', 'script', 'head', 'link', 'meta', 'title', 'svg', 'canvas'].forEach(tag => {
+    const elms = doc.getElementsByTagName(tag);
+    for (let i = elms.length - 1; i >= 0; i--) elms[i].remove();
+  });
+  const body = doc.body || doc.documentElement;
+  return normalizeText(body.innerText || body.textContent || '');
 }
 
 
