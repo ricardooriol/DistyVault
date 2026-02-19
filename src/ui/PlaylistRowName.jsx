@@ -1,5 +1,5 @@
 import React from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from './Icon';
 
 export default function PlaylistRowName({ i, expandedIds, setExpandedIds }) {
     const expanded = expandedIds && expandedIds.has(i.id);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from './Icon';
 
 export default function Modal({ open, onClose, title, children, hideHeader }) {
     const dialogRef = useRef(null);

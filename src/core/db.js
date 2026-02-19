@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 (function () {
   /**
    * IndexedDB utility module providing a simple CRUD API and import/export helpers

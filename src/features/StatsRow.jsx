@@ -1,7 +1,7 @@
 import React from 'react';
-import Icon from '@/components/ui/Icon';
-import { cn } from '@/lib/utils';
-import { STATUS } from '@/lib/constants';
+import Icon from '../ui/Icon';
+import { cn } from '../utils';
+import { STATUS } from '../utils.constants';
 
 export default function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
     const completed = items.filter(i => i.status === STATUS.COMPLETED || i.status === STATUS.READ).length;

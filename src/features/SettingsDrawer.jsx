@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import Icon from '@/components/ui/Icon';
-import { cn } from '@/lib/utils';;
+import Icon from '../ui/Icon';
+import { cn } from '../utils';;
 
 export default function SettingsDrawer({ open, onClose, settings, setSettings }) {
     const DEFAULTS = { ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 };

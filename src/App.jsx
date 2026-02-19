@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 /**
  * DistyVault — App shell and business logic
  *
@@ -6,14 +7,25 @@
  *
  * No build step: loaded in index.html using <script type="text/babel">.
  */
-const { useState, useEffect, useMemo, useRef } = React;
+import { useState, useEffect, useMemo, useRef } from 'react';
+import TopBar from './layout/TopBar';
+import CapturePanel from './features/CapturePanel';
+import StatsRow from './features/StatsRow';
+import CommandBar from './features/CommandBar';
+import Table from './features/Table';
+import SelectionDock from './features/SelectionDock';
+import TagEditorModal from './features/TagEditorModal';
+import SettingsDrawer from './features/SettingsDrawer';
+import ContentModal from './features/ContentModal';
+import ErrorModal from './features/ErrorModal';
+import Modal from './ui/Modal';
+import ErrorBoundary from './ui/ErrorBoundary';
+import Icon from './ui/Icon';
+import { classNames } from './utils';
+import { isYouTubePlaylist, formatDuration } from './utils';
+
 
 const STATUS = DV.queue.STATUS;
-const {
-  TopBar, CapturePanel, StatsRow, CommandBar, Table, SelectionDock,
-  TagEditorModal, SettingsDrawer, ContentModal, ErrorModal, Modal,
-  ErrorBoundary, Icon, classNames, isYouTubePlaylist, formatDuration
-} = DV.components;
 
 /**
  * Yield control to the browser so rendering/painting can catch up.
@@ -688,5 +700,4 @@ a:hover{text-decoration:underline}
 }
 
 // Mount the React root with ErrorBoundary wrapper
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<ErrorBoundary><App /></ErrorBoundary>);
+export default App;

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import Icon from '@/components/ui/Icon';
-import StatusChip from '@/components/ui/StatusChip';
-import PlaylistRowName from '@/components/ui/PlaylistRowName';
-import SourceBadge from '@/components/ui/SourceBadge';
-import TagBadges from '@/components/ui/TagBadges';
-import { cn, relativeTime } from '@/lib/utils';
-import { STATUS } from '@/lib/constants';
+import Icon from '../ui/Icon';
+import StatusChip from '../ui/StatusChip';
+import PlaylistRowName from '../ui/PlaylistRowName';
+import SourceBadge from '../ui/SourceBadge';
+import TagBadges from '../ui/TagBadges';
+import { cn, relativeTime } from '../utils';
+import { STATUS } from '../utils.constants';
 
 export default function Table({ items, allItems, selected, setSelected, onView, onRetry, onDownload, onDelete, onSort, expandedIds, setExpandedIds }) {
     function isPlaylistChild(item) {

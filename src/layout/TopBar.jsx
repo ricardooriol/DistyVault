@@ -1,5 +1,5 @@
 import React from 'react';
-import Icon from '@/components/ui/Icon';
+import Icon from '../ui/Icon';
 
 export default function TopBar({ theme, setTheme, openSettings }) {
     const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Modal from '@/components/ui/Modal';
-import Icon from '@/components/ui/Icon';
+import Modal from '../ui/Modal';
+import Icon from '../ui/Icon';
 
 export default function ContentModal({ item, onClose }) {
     const [html, setHtml] = useState('');

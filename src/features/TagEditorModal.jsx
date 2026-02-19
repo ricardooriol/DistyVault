@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import Modal from '@/components/ui/Modal';
-import Icon from '@/components/ui/Icon';
+import Modal from '../ui/Modal';
+import Icon from '../ui/Icon';
 
 export default function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
     const [input, setInput] = useState('');
