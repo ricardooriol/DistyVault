@@ -576,9 +576,9 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                     <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
                         <tr>
                             <th className="w-[50%] sm:w-[50%] p-2 pl-4 text-left cursor-pointer" onClick={() => onSort && onSort('title')}>Name</th>
-                            <th className="hidden sm:table-cell w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('source')}>Source</th>
+                            <th className="w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('source')}>Source</th>
                             <th className="w-[30%] sm:w-[15%] p-2 text-center cursor-pointer" onClick={() => onSort && onSort('status')}>Status</th>
-                            <th className="hidden sm:table-cell w-[20%] p-2 text-center relative">
+                            <th className="w-[20%] p-2 text-center relative">
                                 <span className="cursor-pointer" onClick={() => onSort && onSort('date')}>Date</span>
                                 <button title="Reset sort" aria-label="Reset sort" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" onClick={() => onSort && onSort('queue')}><Icon name="rotate-ccw" /></button>
                             </th>
@@ -620,8 +620,8 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                                         </div>
                                     )}
                                 </td>
-                                {/* Source column — hidden on mobile */}
-                                <td className="hidden sm:table-cell p-2 text-center">
+                                {/* Source column */}
+                                <td className="p-2 text-center">
                                     {i.kind === 'playlist' ? null : <SourceBadge item={i} />}
                                 </td>
                                 {/* Status column */}
@@ -630,8 +630,8 @@ function Table({ items, allItems, selected, setSelected, onView, onRetry, onDown
                                         <StatusChip status={i.status} onClick={(e) => { e.stopPropagation(); if (i.status === STATUS.ERROR) DV.bus.emit('ui:openError', i); }} />
                                     )}
                                 </td>
-                                {/* Date column — hidden on mobile */}
-                                <td className="hidden sm:table-cell p-2 text-sm text-slate-500 dark:text-slate-400 text-center">
+                                {/* Date column */}
+                                <td className="p-2 text-sm text-slate-500 dark:text-slate-400 text-center">
                                     {i.kind === 'playlist' ? '' : DV.utils.relativeTime(i.createdAt)}
                                 </td>
                             </tr>
