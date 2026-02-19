@@ -240,7 +240,8 @@ function App() {
 
   async function htmlToPlainText(html = '') {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    return (doc.body?.innerText || '').trim();
+    doc.querySelectorAll('style, script, link, meta, head, title').forEach(n => n.remove());
+    return (doc.body?.innerText || doc.documentElement.innerText || '').trim();
   }
 
   function parseFormattedPoints(html = '') {
