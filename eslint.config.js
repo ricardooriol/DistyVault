@@ -52,7 +52,8 @@ export default [
                 process: "readonly",
                 module: "readonly",
                 require: "readonly",
-                __dirname: "readonly"
+                __dirname: "readonly",
+                Buffer: "readonly"
             }
         },
         rules: {
@@ -61,12 +62,6 @@ export default [
             "no-empty": "warn",
             "react/jsx-uses-vars": "error",
             "react/jsx-uses-react": "error"
-        }
-    },
-    {
-        files: ["**/*.config.js"],
-        languageOptions: {
-            sourceType: "commonjs"
         }
     }
 ];
