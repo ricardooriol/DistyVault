@@ -7,7 +7,8 @@ import JSZip from 'jszip';
  *
  * No build step: loaded in index.html using <script type="text/babel">.
  */
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import TopBar from './layout/TopBar';
 import CapturePanel from './features/CapturePanel';
 import StatsRow from './features/StatsRow';
