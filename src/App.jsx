@@ -175,7 +175,7 @@ function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
   );
 }
 
-function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
+function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, tagFilter, setTagFilter, allTags }) {
   const [expanded, setExpanded] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
@@ -274,7 +274,7 @@ function StatusChip({ status, onClick }) {
   return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
 }
 
-function Table({ items, allItems, selected, setSelected, onSort, expandedIds, setExpandedIds }) {
+function Table({ items, allItems, selected, setSelected, expandedIds, setExpandedIds }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
@@ -308,11 +308,10 @@ function Table({ items, allItems, selected, setSelected, onSort, expandedIds, se
         <table className="w-full min-w-[720px] lg:min-w-0 table-fixed rounded-2xl overflow-hidden">
           <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
             <tr>
-              <th className="w-3/5 p-2 pl-4 text-left cursor-pointer" onClick={() => onSort('title')}>Name</th>
-              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('status')}>Status</th>
+              <th className="w-3/5 p-2 pl-4 text-left">Name</th>
+              <th className="w-1/5 p-2 text-center">Status</th>
               <th className="w-1/5 p-2 text-center relative">
-                <span className="cursor-pointer" onClick={() => onSort('duration')}>Duration</span>
-                <button className="absolute right-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100" onClick={() => onSort('queue')}><Icon name="rotate-ccw" /></button>
+                <span>Duration</span>
               </th>
             </tr>
           </thead>
@@ -528,7 +527,7 @@ function App() {
   const [selected, setSelected] = useState([]);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState(localStorage.getItem('dv.sort') || 'queue');
+
   const [theme, setThemeState] = useState(localStorage.getItem('dv.theme') || 'system');
   const [viewItem, setViewItem] = useState(null);
   const [errorItem, setErrorItem] = useState(null);
@@ -614,9 +613,6 @@ function App() {
       if (!q) return true;
       return i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q);
     }).sort((a, b) => {
-      if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
-      if (sort === 'status') return (a.status || '').localeCompare(b.status || '');
-      if (sort === 'duration') return (a.durationMs || 0) - (b.durationMs || 0);
       return (a.queueIndex || 0) - (b.queueIndex || 0);
     });
 
@@ -629,7 +625,7 @@ function App() {
       }
     });
     return out;
-  }, [items, filter, tagFilter, search, sort, expandedIds]);
+  }, [items, filter, tagFilter, search, expandedIds]);
 
   const handleCapture = async (url, files) => {
     try {
@@ -790,8 +786,8 @@ function App() {
       <div className="px-4">
         <CapturePanel onSubmit={handleCapture} />
         <StatsRow items={items} onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))} onStopAll={() => items.forEach(i => DV.queue.requestStop(i.id))} onRetryFailed={async () => { await Promise.all(items.filter(x => x.status === STATUS.ERROR).map(i => DV.queue.resetItem(i.id))); DV.queue.loadQueue(); }} />
-        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
-        <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} onSort={setSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
+        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
+        <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
       <SelectionDock
         count={selected.length}
