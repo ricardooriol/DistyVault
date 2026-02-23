@@ -277,7 +277,8 @@
    * @returns {string[]}
    */
   function parseTags(text = '') {
-    const m = text.match(/TAGS:\s*(.+)$/m);
+    // Match "TAGS:", "Tags:", "**TAGS**:", "TAGS - " etc.
+    const m = text.match(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi);
     if (!m) return [];
     // Aggressively clean up the tags string
     const raw = m[1]
@@ -306,7 +307,7 @@
   function reformatDistilled(html = '', meta) {
     try {
       // Strip the raw TAGS: line from the display body
-      const cleanHtml = html.replace(/TAGS:\s*.+$/m, '').trim();
+      const cleanHtml = html.replace(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi, '').trim();
       const doc = new DOMParser().parseFromString(cleanHtml || '', 'text/html');
       const rawText = (doc.body?.innerText || '').trim();
       const points = parseNumberedList(rawText);

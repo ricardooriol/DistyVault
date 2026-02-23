@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
     const headers = new Headers();
 
     // Default Browser Identity
-    const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+    const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) width/1920 Chrome/120.0.0.0 Safari/537.36 DistyVault/1.0';
     const googleBotUA = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 
     // Forward safe headers from original request if they exist
@@ -40,22 +40,27 @@ module.exports = async (req, res) => {
       headers.set(key, value);
     });
 
-    // Enforce high-success identity
-    headers.set('User-Agent', isNewsletter ? googleBotUA : chromeUA);
-    headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
-    headers.set('Accept-Language', 'en-US,en;q=0.9');
+    if (isYouTube) {
+      headers.set('User-Agent', chromeUA);
+      headers.set('Accept-Language', 'en-US,en;q=0.9');
+    } else {
+      // Enforce high-success identity
+      headers.set('User-Agent', isNewsletter ? googleBotUA : chromeUA);
+      headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
+      headers.set('Accept-Language', 'en-US,en;q=0.9');
 
-    // Stealth/Anti-Bot headers
-    headers.set('Sec-Fetch-Dest', 'document');
-    headers.set('Sec-Fetch-Mode', 'navigate');
-    headers.set('Sec-Fetch-Site', 'none');
-    headers.set('Sec-Fetch-User', '?1');
-    headers.set('Upgrade-Insecure-Requests', '1');
+      // Stealth/Anti-Bot headers
+      headers.set('Sec-Fetch-Dest', 'document');
+      headers.set('Sec-Fetch-Mode', 'navigate');
+      headers.set('Sec-Fetch-Site', 'none');
+      headers.set('Sec-Fetch-User', '?1');
+      headers.set('Upgrade-Insecure-Requests', '1');
 
-    if (!isNewsletter) {
-      headers.set('Sec-Ch-Ua', '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"');
-      headers.set('Sec-Ch-Ua-Mobile', '?0');
-      headers.set('Sec-Ch-Ua-Platform', '"Windows"');
+      if (!isNewsletter) {
+        headers.set('Sec-Ch-Ua', '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"');
+        headers.set('Sec-Ch-Ua-Mobile', '?0');
+        headers.set('Sec-Ch-Ua-Platform', '"Windows"');
+      }
     }
 
     // Special case for YouTube to appear more like a real user

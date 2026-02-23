@@ -219,10 +219,14 @@
 
       const extracted = await DV.extractors.extract(item);
 
-      // Validation: Ensure we actually got content. Bloated error pages from proxies 
-      // often return tiny or empty text.
-      if (!extracted?.text || extracted.text.length < 100) {
-        throw new Error('Insufficient content extracted. The source might be behind a login or blocking extraction.');
+      // Validation: Ensure we actually got content. 
+      // For web URLs, we're strict because proxies often return empty bloat.
+      // For YouTube, we allow the "No captions" placeholder through so distillation can 
+      // handle it (or explicitly fail there).
+      if (item.kind === 'url' && (!extracted?.text || extracted.text.length < 200)) {
+        throw new Error('Insufficient content extracted. The source might be blocking extraction or requires JavaScript.');
+      } else if (!extracted?.text) {
+        throw new Error('Extraction failed to return any content.');
       }
 
       try {
