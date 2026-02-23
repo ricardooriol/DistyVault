@@ -23,25 +23,29 @@ module.exports = async (req, res) => {
   try {
     const targetUrlParsed = new URL(u);
 
+    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com/.test(u);
+
     // 3. Forward the request parameters cleanly
     const headers = new Headers();
     Object.entries(req.headers).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
-      // Drop headers that cause issues with upstream fetch (e.g., host mismatch)
-      if (['host', 'connection', 'content-length', 'origin', 'referer', 'accept-encoding'].includes(lowerKey)) return;
+      // Drop headers that cause issues with upstream fetch (e.g., host mismatch, CORS triggers)
+      if (['host', 'connection', 'content-length', 'origin', 'referer', 'accept-encoding', 'cookie', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform', 'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site', 'sec-fetch-user'].includes(lowerKey)) return;
       headers.set(key, value);
     });
 
-    // YouTube/General extraction requires a standard user agent to avoid bot blocks
-    if (!headers.has('user-agent')) {
-      headers.set('user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) width/1920 Chrome/120.0.0.0 Safari/537.36 DistyVault/1.0');
+    // Substack/Newsletters often allow Googlebot but block generic proxies.
+    if (isNewsletter) {
+      headers.set('user-agent', 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)');
+      headers.set('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8');
+    } else if (!headers.has('user-agent')) {
+      headers.set('user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
     }
 
     const fetchOptions = {
       method: req.method,
       headers,
       redirect: 'follow'
-      // No manual timeout is set here so AI providers and large transcripts have as much time as the server permits
     };
 
     // Forward body if present for state-mutating requests (e.g., AI provider POSTs)

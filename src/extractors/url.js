@@ -32,41 +32,46 @@
     let res = null;
     const timeout = 30000;
 
+    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com/.test(url);
+    const useProxyFirst = isNewsletter || url.includes('youtube.com') || url.includes('youtu.be');
+
     // Helper to check if body looks like a 'blocked' page
     const isBlocked = (html) => {
+      if (!html) return true;
       const h = html.toLowerCase();
-      return h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser');
+      return h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser') || h.length < 200;
     };
 
-    // Attempt 1: Direct Fetch
-    try {
-      res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow' }, timeout);
-    } catch (e) { res = null; }
+    // Attempt 1: Direct Fetch (Skip for known blockers to avoid ugly console errors)
+    if (!useProxyFirst) {
+      try {
+        res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow' }, timeout);
+      } catch (e) { res = null; }
+    }
 
-    // Attempt 2: Local API Proxy
+    // Attempt 2: Local API Proxy (Our most powerful steering)
     if (!res || !res.ok) {
       try {
         res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
       } catch (e) { res = null; }
     }
 
-    // Attempt 3: Public Proxy 1 (corsproxy.io)
+    // Attempt 3: Public Proxy (Last resort)
     if (!res || !res.ok) {
       try {
         res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
       } catch (e) { res = null; }
     }
 
-    // Attempt 4: Public Proxy 2 (AllOrigins)
     if (!res || !res.ok) {
+      const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
       try {
-        const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
         res = await DV.utils.fetchWithTimeout(ao, { redirect: 'follow' }, timeout);
       } catch (e) { res = null; }
     }
 
     if (!res || !res.ok) {
-      throw new Error(`CORS exhaustion: Failed to reach ${url}. The site may be blocking automated access.`);
+      throw new Error(`Bypass Exhausted: ${url} is heavily protected. Copy/Paste the text manually into a .txt file and drag it here.`);
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
@@ -101,10 +106,16 @@
   async function peekTitle(inputUrl) {
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
-    let res;
-    try {
-      res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000);
-    } catch {
+    let res = null;
+    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com/.test(url);
+
+    if (!isNewsletter) {
+      try {
+        res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000);
+      } catch { res = null; }
+    }
+
+    if (!res || !res.ok) {
       try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
       if (!res || !res.ok) {
         try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
