@@ -749,11 +749,21 @@ function App() {
         });
       }
 
-      // Add Footer on last page
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text('DistyVault · 2026', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      // Add professional Footer on every page
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+
+        // Brand (Bottom Left)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text('DistyVault 2026', margin, pageHeight - 10);
+
+        // Page Numbers (Bottom Right)
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      }
 
       const b = doc.output('blob');
       if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);

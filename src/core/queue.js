@@ -307,7 +307,24 @@
    * Load items, rebuild the in-memory queue order, notify listeners, and schedule work.
    */
   async function loadQueue() {
-    const items = await DV.db.getAll('items');
+    let items = await DV.db.getAll('items');
+
+    // Resolve "Zombies": Items stuck in active states from previous sessions
+    let modified = false;
+    for (const item of items) {
+      if (item.status === STATUS.EXTRACTING || item.status === STATUS.DISTILLING) {
+        item.status = STATUS.PENDING;
+        item.error = null;
+        item.durationMs = 0;
+        await DV.db.put('items', item);
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      items = await DV.db.getAll('items');
+    }
+
     state.queue = items.sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0)).map(i => i.id);
     DV.bus.emit('items:loaded', items);
     syncLocalSummary(items);
