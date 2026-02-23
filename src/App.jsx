@@ -555,8 +555,13 @@ function App() {
     localStorage.setItem('dv.theme', t);
     const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', isDark);
-    window.postMessage({ type: 'dv-theme', isDark }, '*');
-    document.querySelectorAll('iframe').forEach(f => { try { f.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*'); } catch { } });
+
+    // Notify all iframes of the theme change
+    const msg = { type: 'dv-theme', isDark };
+    window.postMessage(msg, '*');
+    document.querySelectorAll('iframe').forEach(f => {
+      try { f.contentWindow.postMessage(msg, '*'); } catch (e) { }
+    });
   };
 
   const allTags = useMemo(() => {
@@ -650,7 +655,9 @@ function App() {
 function ErrorModal({ item, onClose }) {
   return (
     <Modal open={!!item} onClose={onClose} title="Error Detail">
-      <div className="p-4 bg-rose-50 text-rose-700 rounded-lg whitespace-pre-wrap text-sm">{item?.error || 'Unknown error'}</div>
+      <div className="p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-200 rounded-lg whitespace-pre-wrap text-sm border border-rose-100 dark:border-rose-800/50">
+        {item?.error || 'Unknown error'}
+      </div>
     </Modal>
   );
 }
@@ -660,10 +667,39 @@ function ContentModal({ item, onClose }) {
   useEffect(() => {
     if (item) DV.db.get('contents', item.id).then(c => setHtml(c?.html || ''));
   }, [item]);
+
+  const onIframeLoad = (e) => {
+    try {
+      const win = e.target.contentWindow;
+      const doc = e.target.contentDocument;
+      if (!win || !doc) return;
+
+      // Inject "View Mode" specific style: hide footer
+      const style = doc.createElement('style');
+      style.textContent = '.dv-footer { display: none !important; }';
+      doc.head.appendChild(style);
+
+      // Trigger initial theme sync
+      const isDark = document.documentElement.classList.contains('dark');
+      win.postMessage({ type: 'dv-theme', isDark }, '*');
+    } catch (err) { }
+  };
+
   return (
     <Modal open={!!item} onClose={onClose} title={item?.title} hideHeader>
-      <div className="p-4 min-h-[400px]">
-        {html ? <iframe srcDoc={html} className="w-full h-[60vh] border-none" /> : <div className="text-center text-slate-500 mt-20">No data ready</div>}
+      <div className="p-2 min-h-[400px]">
+        {html ? (
+          <iframe
+            srcDoc={html}
+            onLoad={onIframeLoad}
+            className="w-full h-[75vh] border-none rounded-lg"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[40vh] text-slate-500">
+            <Icon name="loader" className="animate-spin mb-4" />
+            <span>Loading content...</span>
+          </div>
+        )}
       </div>
     </Modal>
   );
