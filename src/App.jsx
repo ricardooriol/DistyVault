@@ -1,111 +1,87 @@
 /**
- * DistyVault — React application shell and UI logic.
- * No-build, client-side only architecture.
+ * DistyVault — React application shell and UI logic
  *
- * Responsibilities:
- * - Application state management (items, settings, selection).
- * - UI Orchestration (TopBar, Capture, Stats, Table, Modals).
- * - Process coordination (bulk retry/stop, export/import).
- * - Theme and standard utility propagation.
+ * This file is intentionally plain React (UMD) executed via Babel-in-browser.
+ * It wires the UI to DV core modules available on window.DV (db, queue, bus, ai, extractors, toast).
  */
 const { useState, useEffect, useMemo, useRef } = React;
 const { classNames, yieldToBrowser, saveBlob, formatDuration, sanitizeFilename } = DV.utils;
 const STATUS = DV.queue.STATUS;
 
-// --- Sub-components (Generic UI) ---
-
-/** Standard Icon component wrapping Lucide/Feather */
+/**
+ * Icon — wrapper for lucide/feather UMD icon sets.
+ */
 function Icon({ name, size = 20, className, strokeWidth = 2 }) {
   const wrapRef = useRef(null);
   useEffect(() => {
     try {
       const wrap = wrapRef.current;
       if (!wrap) return;
-      wrap.innerHTML = `<i data-lucide="${name}" style="width:100%;height:100%;display:block" aria-hidden="true"></i>`;
-      if (window.lucide?.createIcons) {
+      wrap.innerHTML = '';
+      const i = document.createElement('i');
+      i.setAttribute('data-lucide', name);
+      i.style.width = '100%';
+      i.style.height = '100%';
+      i.style.display = 'block';
+      i.setAttribute('aria-hidden', 'true');
+      wrap.appendChild(i);
+      if (window.lucide && window.lucide.createIcons) {
         window.lucide.createIcons({ attrs: { 'stroke-width': String(strokeWidth) } });
-      } else if (window.feather?.replace) {
-        wrap.firstChild.setAttribute('data-feather', name);
+      } else if (window.feather && window.feather.replace) {
+        i.setAttribute('data-feather', name);
+        i.removeAttribute('data-lucide');
         window.feather.replace({ 'stroke-width': strokeWidth });
       }
       const svg = wrap.querySelector('svg');
       if (svg) {
-        Object.assign(svg.style, { width: size + 'px', height: size + 'px', display: 'block' });
         svg.setAttribute('width', String(size));
         svg.setAttribute('height', String(size));
+        svg.style.width = size + 'px';
+        svg.style.height = size + 'px';
+        svg.style.display = 'block';
+        svg.style.margin = 'auto';
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       }
     } catch { }
   }, [name, size, strokeWidth]);
-  return <span ref={wrapRef} className={classNames('dv-icon pointer-events-none inline-flex items-center justify-center', className)} style={{ width: size, height: size }} />;
+  return React.createElement('span', {
+    ref: wrapRef,
+    className: ['dv-icon pointer-events-none inline-flex items-center justify-center', className || ''].join(' '),
+    style: { width: size + 'px', height: size + 'px', display: 'inline-flex' },
+    'aria-hidden': true
+  });
 }
-
-/** Standard Modal component */
-function Modal({ open, onClose, title, children, hideHeader }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose}></div>
-      <div className="relative max-w-3xl w-full p-6 sm:p-8 rounded-[2rem] border border-slate-200/50 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl animate-in fade-in zoom-in duration-300">
-        {!hideHeader && (
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</h3>
-            <button onClick={onClose} className="p-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 transition-colors"><Icon name="x" size={24} /></button>
-          </div>
-        )}
-        {hideHeader && (
-          <button onClick={onClose} className="absolute top-6 right-6 p-2 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur z-50 shadow-sm border border-slate-200 dark:border-white/10 hover:scale-110 transition-all">
-            <Icon name="x" size={24} />
-          </button>
-        )}
-        <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/** Status badge with distinct branding */
-function StatusChip({ status, onClick }) {
-  const map = {
-    [STATUS.PENDING]: 'bg-slate-100 text-slate-500 border-slate-200',
-    [STATUS.EXTRACTING]: 'bg-brand-50 text-brand-600 border-brand-100 dark:bg-brand-900/10 dark:text-brand-400 dark:border-brand-800/30',
-    [STATUS.DISTILLING]: 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/10 dark:text-indigo-400 dark:border-indigo-800/30',
-    [STATUS.COMPLETED]: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-800/30 font-bold',
-    [STATUS.ERROR]: 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:border-rose-800/30',
-    [STATUS.STOPPED]: 'bg-slate-100 text-slate-400 border-slate-200 animate-pulse'
-  };
-  return (
-    <span onClick={onClick} className={classNames('px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-[0.1em] border transition-all cursor-default select-none shadow-sm', map[status] || 'bg-slate-100')}>
-      {status}
-    </span>
-  );
-}
-
-// --- Layout Fragments ---
 
 function TopBar({ theme, setTheme, openSettings }) {
-  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+  const themeIcon = isDark ? 'moon' : 'sun';
+  const logoSrc = isDark ? 'logos/logo_no_bg_w.png' : 'logos/logo_no_bg_b.png';
+
   return (
-    <nav className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-white/5">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
-            <img src={isDark ? 'logos/logo_no_bg_w.png' : 'logos/logo_no_bg_w.png'} className="w-7 h-7" alt="Logo" />
-          </div>
+    <div className="sticky top-0 z-40 glass bg-white/80 dark:bg-slate-900/70 border-b border-slate-300 dark:border-white/10">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src={logoSrc} alt="DistyVault" className="w-8 h-8 rounded-full shadow" />
           <div>
-            <h1 className="text-lg font-black tracking-tighter text-slate-900 dark:text-white leading-none">DISTYVAULT</h1>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 uppercase font-bold tracking-[0.2em]">Inference Powered Repository</p>
+            <div className="font-semibold text-slate-900 dark:text-slate-100 font-sans">DistyVault</div>
+            <div className="text-xs text-slate-600 dark:text-slate-300 font-sans">Gather, distill and control your knowledge</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="p-2.5 rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800 hover:scale-110 active:scale-95 transition-all shadow-sm">
-            <Icon name={isDark ? 'sun' : 'moon'} size={20} />
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800"
+          >
+            <Icon name={themeIcon} />
           </button>
-          <button onClick={openSettings} className="p-2.5 rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800 hover:scale-110 active:scale-95 transition-all shadow-sm">
-            <Icon name="settings" size={20} />
+          <button onClick={openSettings} title="Settings" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+            <Icon name="settings" />
           </button>
         </div>
       </div>
-    </nav>
+    </div>
   );
 }
 
@@ -114,109 +90,380 @@ function CapturePanel({ onSubmit }) {
   const [files, setFiles] = useState([]);
   const dropRef = useRef(null);
 
-  const submit = async () => {
-    const u = url.trim();
-    if (!u && !files.length) return;
-    await onSubmit(u, files);
-    setUrl(''); setFiles([]);
-  };
+  function choose(evt) {
+    const f = Array.from(evt.target.files || []);
+    if (f.length) setFiles(prev => [...prev, ...f]);
+  }
 
-  const onDrop = (e) => { e.preventDefault(); setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]); onLeave(); };
-  const onOver = (e) => { e.preventDefault(); dropRef.current?.classList.add('ring-4', 'ring-brand-500/20', 'bg-brand-500/5'); };
-  const onLeave = () => dropRef.current?.classList.remove('ring-4', 'ring-brand-500/20', 'bg-brand-500/5');
+  function onDrop(e) {
+    e.preventDefault();
+    const f = Array.from(e.dataTransfer.files || []);
+    if (f.length) setFiles(prev => [...prev, ...f]);
+    dropRef.current?.classList.remove('ring-2', 'ring-brand-500');
+  }
+
+  function onDragOver(e) { e.preventDefault(); dropRef.current?.classList.add('ring-2', 'ring-brand-500'); }
+  function onDragLeave() { dropRef.current?.classList.remove('ring-2', 'ring-brand-500'); }
+
+  async function submit() {
+    const trimmed = url.trim();
+    await onSubmit(trimmed, files);
+    setUrl('');
+    setFiles([]);
+  }
 
   return (
-    <section ref={dropRef} onDrop={onDrop} onDragOver={onOver} onDragLeave={onLeave} className="max-w-6xl mx-auto mt-8 p-6 rounded-[2.5rem] border border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-800/20 glass transition-all shadow-xl shadow-slate-200/20 dark:shadow-none">
-      <div className="flex gap-4 flex-wrap sm:flex-nowrap">
-        <div className="flex-1 min-w-0 relative group">
-          <input
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="Capture URL, YouTube Video or Playlist..."
-            className="w-full h-14 pl-14 pr-6 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 focus:ring-4 focus:ring-brand-500/20 outline-none text-slate-900 dark:text-white font-medium transition-all group-hover:border-slate-300 dark:group-hover:border-white/20"
-          />
-          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-600 dark:text-brand-400"><Icon name="globe" size={24} /></div>
-        </div>
-        <div className="flex gap-3">
-          <label className="h-14 w-14 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 hover:scale-105 transition-all shadow-sm">
-            <input type="file" multiple className="hidden" onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files)])} />
-            <Icon name="upload-cloud" size={24} className="text-slate-400" />
+    <div ref={dropRef} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onLeave} className="max-w-6xl mx-auto mt-6 p-4 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex-1 min-w-0 relative">
+            <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && url.trim()) submit(); }} placeholder="Paste a URL or YouTube link" className="w-full h-12 pl-10 pr-3 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900/60 outline-none text-slate-900 dark:text-slate-100" />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-900 dark:text-white"><Icon name="link" /></div>
+          </div>
+          <label className="h-12 w-12 rounded-xl border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer text-slate-900 dark:text-white">
+            <input type="file" multiple className="hidden" onChange={choose} />
+            <Icon name="paperclip" />
           </label>
-          <button onClick={submit} className="h-14 px-8 rounded-3xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black tracking-widest uppercase text-xs shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3">
-            <Icon name="zap" size={20} className="fill-current" />
-            <span>Process</span>
-          </button>
+          <button onClick={submit} className="h-12 w-12 rounded-xl bg-brand-700 text-white hover:bg-brand-800 flex items-center justify-center"><Icon name="wand-2" /></button>
         </div>
+        {files.length > 0 && (
+          <div className="text-sm flex items-center gap-2 flex-wrap">
+            {files.slice(0, 6).map((f, i) => (
+              <div key={i} className="px-2 py-1 border rounded-full text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 flex items-center gap-2">
+                <span className="truncate max-w-[160px]">{f.name}</span>
+                <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-slate-700"><Icon name="x" /></button>
+              </div>
+            ))}
+            {files.length > 6 && <span className="text-slate-500">+{files.length - 6} more</span>}
+            <button onClick={() => setFiles([])} className="ml-auto inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white">
+              <Icon name="trash-2" />
+              <span>Remove all</span>
+            </button>
+          </div>
+        )}
       </div>
-      {files.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-          {files.map((f, i) => (
-            <div key={i} className="px-4 py-2 rounded-2xl bg-slate-100 dark:bg-black/20 text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-3 border border-slate-200 dark:border-white/5 group">
-              <Icon name="file-text" size={14} className="opacity-50" />
-              <span className="truncate max-w-[150px]">{f.name}</span>
-              <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500 transition-colors"><Icon name="trash-2" size={14} /></button>
-            </div>
-          ))}
-          <button onClick={() => setFiles([])} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 rounded-xl transition-all ml-auto">Clear Queue</button>
-        </div>
-      )}
-    </section>
+    </div>
+  );
+  function onLeave() { dropRef.current?.classList.remove('ring-2', 'ring-brand-500'); }
+}
+
+function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
+  const completed = items.filter(i => i.status === STATUS.COMPLETED).length;
+  const inprog = items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
+  const errors = items.filter(i => i.status === STATUS.ERROR).length;
+
+  const Card = ({ label, count, action, actionText }) => (
+    <div className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-white/20">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="flex items-center justify-between mt-1">
+        <div className="text-xl font-semibold text-slate-900 dark:text-white">{count}</div>
+        {action && (
+          <button onClick={action} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10">
+            {actionText}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-6xl mx-auto mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <Card label="Completed" count={completed} action={completed ? onDownloadAll : null} actionText={<Icon name="arrow-down-to-line" />} />
+      <Card label="In Progress" count={inprog} action={inprog ? onStopAll : null} actionText={<Icon name="square" />} />
+      <Card label="Errors" count={errors} action={errors ? onRetryFailed : null} actionText={<Icon name="refresh-ccw" />} />
+    </div>
   );
 }
 
-// --- Refined Logic Helpers ---
+function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
+  const [expanded, setExpanded] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef(null);
+  const searchRef = useRef(null);
+  const importInputRef = useRef(null);
 
-const pdfFileName = (title) => `${sanitizeFilename(title || 'distilled_result')}.pdf`;
+  useEffect(() => {
+    function onDoc(e) { if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); }
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
+  }, [filterOpen]);
 
-async function makePdfBlobFromHtml(html, title = 'DistyVault Result') {
-  const { jsPDF } = window.jspdf || {};
-  if (!jsPDF) return new Blob([html], { type: 'text/html' });
+  return (
+    <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
+      <div className="flex items-center gap-3">
+        <button onClick={() => { setExpanded(!expanded); if (expanded) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800', expanded && 'ring-2 ring-brand-500')}><Icon name="search" /></button>
+        {expanded && <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="h-9 flex-1 min-w-0 max-w-[400px] px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100" />}
 
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  const points = (window.DV && DV.parseFormattedPoints) ? DV.parseFormattedPoints(html) : null;
-  const rawText = points ? '' : html.replace(/<[^>]+>/g, ' ').trim();
-  const margin = 50, pw = doc.internal.pageSize.getWidth(), mw = pw - margin * 2;
+        <div className="relative z-20" ref={filterRef}>
+          <button onClick={() => setFilterOpen(!filterOpen)} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+            <Icon name={filter === 'all' ? 'asterisk' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : 'file'} />
+          </button>
+          {filterOpen && (
+            <div className="absolute left-1/2 -translate-x-1/2 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50 flex flex-col gap-1">
+              {[{ k: 'all', i: 'asterisk' }, { k: 'url', i: 'link' }, { k: 'youtube', i: 'video' }, { k: 'file', i: 'file' }].map(f => (
+                <button key={f.k} onClick={() => { setFilter(f.k); setFilterOpen(false); }} className={classNames('w-9 h-9 flex items-center justify-center rounded-lg', filter === f.k ? 'bg-slate-100 dark:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/10')}><Icon name={f.i} /></button>
+              ))}
+            </div>
+          )}
+        </div>
 
-  // Header
-  doc.setFillColor(79, 70, 229); // brand-600
-  doc.rect(0, 0, pw, 80, 'F');
-  doc.setTextColor(255);
-  doc.setFont('helvetica', 'bold').setFontSize(24).text(title.slice(0, 40), margin, 50);
+        {allTags && allTags.length > 0 && (
+          <div className="flex items-center gap-1 overflow-x-auto max-w-[40%] no-scrollbar">
+            <button onClick={() => setTagFilter('')} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0', !tagFilter ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300')}>All</button>
+            {allTags.map(tag => (
+              <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0 truncate max-w-[120px]', tagFilter === tag ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300')}>{tag}</button>
+            ))}
+          </div>
+        )}
 
-  let y = 130;
-  doc.setFontSize(11).setFont('helvetica', 'normal').setTextColor(40);
+        <div className="ml-auto flex items-center gap-2">
+          <input type="file" accept=".zip" className="hidden" ref={importInputRef} onChange={e => { if (e.target.files[0]) onImport(e.target.files[0]); e.target.value = ''; }} />
+          <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800"><Icon name="download" /></button>
+          <button onClick={onExport} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800"><span style={{ transform: 'rotate(180deg)' }}><Icon name="download" /></span></button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  if (points) {
-    for (const p of points) {
-      if (y > 750) { doc.addPage(); y = 60; }
-      doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(79, 70, 229).text(p.head, margin, y); y += 22;
-      doc.setFont('helvetica', 'normal').setFontSize(11).setTextColor(60);
-      for (const para of p.paras) {
-        const lines = doc.splitTextToSize(para, mw);
-        for (const l of lines) {
-          if (y > 780) { doc.addPage(); y = 60; }
-          doc.text(l, margin, y); y += 16;
-        }
-        y += 10;
-      }
-      y += 15;
-    }
-  } else {
-    const lines = doc.splitTextToSize(rawText, mw);
-    for (const l of lines) {
-      if (y > 780) { doc.addPage(); y = 60; }
-      doc.text(l, margin, y); y += 16;
+function StatusChip({ status, onClick }) {
+  const map = {
+    [STATUS.PENDING]: 'bg-slate-200 text-slate-700',
+    [STATUS.EXTRACTING]: 'bg-amber-200 text-amber-900',
+    [STATUS.DISTILLING]: 'bg-indigo-200 text-indigo-900',
+    [STATUS.COMPLETED]: 'bg-emerald-200 text-emerald-900',
+    [STATUS.ERROR]: 'bg-rose-200 text-rose-900',
+    [STATUS.STOPPED]: 'bg-slate-300 text-slate-800'
+  };
+  return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
+}
+
+function Table({ items, allItems, selected, setSelected, onSort, expandedIds, setExpandedIds }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [items]);
+
+  function onRowClick(item) {
+    if (item.kind === 'playlist') {
+      const isSelected = selected.includes(item.id);
+      const childIds = allItems.filter(x => x.parentId === item.id).map(x => x.id);
+      if (isSelected) setSelected(prev => prev.filter(id => id !== item.id && !childIds.includes(id)));
+      else setSelected(prev => [...new Set([...prev, item.id, ...childIds])]);
+    } else if (item.parentId) {
+      const isSelected = selected.includes(item.id);
+      let next = isSelected ? selected.filter(id => id !== item.id) : [...selected, item.id];
+      const siblings = allItems.filter(x => x.parentId === item.parentId);
+      if (siblings.every(s => next.includes(s.id))) next = [...new Set([...next, item.parentId])];
+      else next = next.filter(id => id !== item.parentId);
+      setSelected(next);
+    } else {
+      setSelected(prev => prev.includes(item.id) ? prev.filter(x => x !== item.id) : [...prev, item.id]);
     }
   }
 
-  // Footer on last page
-  doc.setFontSize(9).setTextColor(160).text(`Generated by DistyVault · ${new Date().toLocaleDateString()}`, margin, doc.internal.pageSize.getHeight() - 40);
-
-  return doc.output('blob');
+  return (
+    <div className="max-w-6xl mx-auto mt-4 rounded-2xl border border-slate-300 dark:border-white/20 overflow-hidden">
+      <div className="overflow-x-auto w-full">
+        {/* Table needs horizontal scroll on mobile (max-w/min-w container) but 1 view on desktop */}
+        <table className="w-full min-w-[720px] lg:min-w-0 table-fixed rounded-2xl overflow-hidden">
+          <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
+            <tr>
+              <th className="w-3/5 p-2 pl-4 text-left cursor-pointer" onClick={() => onSort('title')}>Name</th>
+              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('status')}>Status</th>
+              <th className="w-1/5 p-2 text-center relative">
+                <span className="cursor-pointer" onClick={() => onSort('duration')}>Duration</span>
+                <button className="absolute right-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100" onClick={() => onSort('queue')}><Icon name="rotate-ccw" /></button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {!items.length && <tr><td colSpan={3} className="p-6 text-center text-slate-500">No items found</td></tr>}
+            {items.map(i => (
+              <tr key={i.id} onClick={() => onRowClick(i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) && 'bg-brand-50/70 dark:bg-brand-600/10')}>
+                <td className={classNames('p-2 pl-4 text-left', i.parentId && 'pl-8')}>
+                  <div className="overflow-hidden">
+                    {i.kind === 'playlist' ? (
+                      <div className="flex items-center gap-2">
+                        <button className="p-1" onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}>
+                          <span className={classNames('transition-transform inline-block', expandedIds.has(i.id) && 'rotate-90')}><Icon name="chevron-right" /></span>
+                        </button>
+                        <div className="font-medium truncate">{i.title}</div>
+                      </div>
+                    ) : (
+                      <div className="font-medium truncate">{i.title || i.url}</div>
+                    )}
+                    {i.tags?.length > 0 && (
+                      <div className="flex gap-1 mt-1">{i.tags.map(t => <span key={t} className="px-1.5 py-0 text-[10px] rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700/40">{t}</span>)}</div>
+                    )}
+                    {!i.tags?.length && i.url && <div className="text-xs text-slate-500 truncate mt-1">{i.url}</div>}
+                  </div>
+                </td>
+                <td className="p-2 text-center">
+                  {i.kind !== 'playlist' && <StatusChip status={i.status} onClick={e => { if (i.status === STATUS.ERROR) { e.stopPropagation(); DV.bus.emit('ui:openError', i); } }} />}
+                </td>
+                <td className="p-2 text-sm text-center">
+                  {i.kind !== 'playlist' && (i.status === STATUS.EXTRACTING || i.status === STATUS.DISTILLING ? formatDuration(now - (i.startedAt || now)) : (i.durationMs ? formatDuration(i.durationMs) : '-'))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
-// --- Main Application ---
+function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
+  if (!count) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow">
+      <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar">
+        {count === 1 && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>}
+        <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
+        {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
+        <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="arrow-down-to-line" /><span>Download</span></button>
+        <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="tag" /><span>Tag</span></button>
+        <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
+        <span className="mx-2 h-5 w-px bg-slate-300/60" />
+        <div className="text-sm font-medium">{count} selected</div>
+        {!allSelected && <button onClick={onSelectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30">Select all</button>}
+        <button onClick={onUnselectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30">Unselect all</button>
+      </div>
+    </div>
+  );
+}
+
+function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
+  const [input, setInput] = useState('');
+  const currentTags = useMemo(() => {
+    const s = new Set();
+    items.filter(i => selectedIds.includes(i.id)).forEach(i => (i.tags || []).forEach(t => s.add(t)));
+    return Array.from(s).sort();
+  }, [items, selectedIds]);
+
+  async function add(t) {
+    const tag = (t || input).trim().toLowerCase();
+    if (!tag) return;
+    for (const id of selectedIds) {
+      const it = items.find(i => i.id === id);
+      const ex = it?.tags || [];
+      if (!ex.includes(tag)) await DV.queue.updateTags(id, [...ex, tag]);
+    }
+    setInput('');
+  }
+
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose} title="Manage Tags">
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="New tag…" className="flex-1 h-9 px-3 rounded-lg border border-slate-350 dark:border-white/20 bg-white dark:bg-slate-900 outline-none text-sm" />
+          <button onClick={() => add()} className="h-9 px-4 rounded-lg bg-brand-700 text-white text-sm">Add</button>
+        </div>
+        {allTags.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">Recommended</div>
+            <div className="flex flex-wrap gap-1">
+              {allTags.filter(t => !currentTags.includes(t)).map(t => (
+                <button key={t} onClick={() => add(t)} className="px-2 py-0.5 text-xs rounded-full border border-slate-300 dark:border-white/20 hover:bg-slate-50">{t}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {currentTags.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">Applied</div>
+            <div className="flex flex-wrap gap-1">
+              {currentTags.map(t => (
+                <span key={t} className="px-2 py-0.5 text-xs rounded-full bg-brand-100 text-brand-700 border border-brand-200 flex items-center gap-1">
+                  {t}
+                  <button onClick={async () => { for (const id of selectedIds) { const it = items.find(i => i.id === id); const ex = it?.tags || []; await DV.queue.updateTags(id, ex.filter(x => x !== t)); } }}><Icon name="x" size={12} /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function Modal({ open, onClose, title, children, hideHeader }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative max-w-2xl w-full p-4 rounded-2xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 shadow-xl">
+        {!hideHeader && (
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-lg font-semibold">{title}</div>
+            <button onClick={onClose} className="p-1"><Icon name="x" /></button>
+          </div>
+        )}
+        <div className="max-h-[70vh] overflow-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsDrawer({ open, onClose, settings, setSettings }) {
+  const [local, setLocal] = useState(settings);
+  useEffect(() => { setLocal(settings); }, [settings]);
+
+  const providers = [
+    { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-4o', l: 'GPT-4o' }, { v: 'o1', l: 'o1' }] },
+    { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-3-7-sonnet-latest', l: 'Claude 3.7 Sonnet' }, { v: 'claude-3-5-sonnet-latest', l: 'Claude 3.5 Sonnet' }] },
+    { id: 'gemini', name: 'Gemini', models: [{ v: 'gemini-2.0-flash', l: 'Gemini 2.0 Flash' }, { v: 'gemini-1.5-pro', l: 'Gemini 1.5 Pro' }] },
+    { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek-V3' }, { v: 'deepseek-reasoner', l: 'DeepSeek-R1' }] },
+    { id: 'grok', name: 'Grok', models: [{ v: 'grok-2-1212', l: 'Grok 2' }, { v: 'grok-2-vision-1212', l: 'Grok 2 Vision' }] }
+  ];
+
+  return (
+    <div className={classNames('fixed inset-0 z-50 transition-opacity', open ? 'opacity-100' : 'opacity-0 pointer-events-none')}>
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className={classNames('absolute right-0 top-0 h-full w-full max-w-sm p-6 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-white/10 transition-transform duration-300', open ? 'translate-x-0' : 'translate-x-full')}>
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-xl font-bold">Settings</div>
+          <button onClick={onClose}><Icon name="x" size={24} /></button>
+        </div>
+        <div className="space-y-6">
+          <div>
+            <div className="text-sm font-medium mb-1">Provider</div>
+            <select value={local.ai.mode} onChange={e => setLocal({ ...local, ai: { ...local.ai, mode: e.target.value, model: '' } })} className="w-full h-10 px-2 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none">
+              <option value="">None</option>
+              {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          {local.ai.mode && (
+            <div>
+              <div className="text-sm font-medium mb-1">Model</div>
+              <select value={local.ai.model} onChange={e => setLocal({ ...local, ai: { ...local.ai, model: e.target.value } })} className="w-full h-10 px-2 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none">
+                <option value="">Default</option>
+                {providers.find(p => p.id === local.ai.mode)?.models.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-medium mb-1">API Key</div>
+            <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} className="w-full h-10 px-3 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none" placeholder="sk-..." />
+          </div>
+          <div>
+            <div className="text-sm font-medium mb-1 flex justify-between">
+              <span>Concurrency</span>
+              <span className="font-bold">{local.concurrency}</span>
+            </div>
+            <input type="range" min="1" max="10" value={local.concurrency} onChange={e => setLocal({ ...local, concurrency: parseInt(e.target.value) })} className="w-full" />
+          </div>
+          <button onClick={() => { setSettings(local); onClose(); DV.toast('Settings updated'); }} className="w-full h-12 bg-brand-700 text-white font-bold rounded-xl mt-4">Save Configuration</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [items, setItems] = useState([]);
@@ -231,107 +478,76 @@ function App() {
   const [settings, setSettings] = useState({ ai: { mode: '', model: '', apiKey: '' }, concurrency: 1 });
   const [tagFilter, setTagFilter] = useState('');
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
-  const [contentIndex, setContentIndex] = useState(new Map());
   const [expandedIds, setExpandedIds] = useState(new Set());
 
-  // Initialization & Centralized Sync
+  // Init & Events
   useEffect(() => {
     const refresh = async () => setItems(await DV.db.getAll('items'));
-    const off1 = DV.bus.on('items:loaded', (loaded) => setItems(loaded));
-    const off2 = DV.bus.on('items:added', refresh);
-    const off3 = DV.bus.on('items:updated', refresh);
-    const off4 = DV.bus.on('ui:openError', setErrorItem);
-
+    const offAdd = DV.bus.on('items:added', refresh);
+    const offUpd = DV.bus.on('items:updated', refresh);
+    const offLoad = DV.bus.on('items:loaded', (i) => setItems(i));
+    const offErr = DV.bus.on('ui:openError', setErrorItem);
     DV.queue.loadSettings().then(() => setSettings(DV.queue.getSettings()));
     DV.queue.loadQueue();
-
-    return () => { off1(); off2(); off3(); off4(); };
+    return () => { offAdd(); offUpd(); offLoad(); offErr(); };
   }, []);
 
-  // Theme Core
   const setTheme = (t) => {
     setThemeState(t);
     localStorage.setItem('dv.theme', t);
     const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', isDark);
     window.postMessage({ type: 'dv-theme', isDark }, '*');
-    document.querySelectorAll('iframe').forEach(fr => { try { fr.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*'); } catch { } });
+    document.querySelectorAll('iframe').forEach(f => { try { f.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*'); } catch { } });
   };
 
-  // searchable index (debounced)
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      const contents = await DV.db.getAll('contents');
-      const idx = new Map();
-      contents.forEach(c => {
-        if (c.html && !c.id.endsWith(':file')) {
-          const cleanText = c.html.replace(/<[^>]+>/g, ' ').toLowerCase().slice(0, 8000);
-          idx.set(c.id, cleanText);
-        }
-      });
-      setContentIndex(idx);
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [items.length]);
-
-  // Derived: Filtering & Sorting
   const allTags = useMemo(() => {
     const s = new Set();
     items.forEach(i => (i.tags || []).forEach(t => s.add(t)));
     return Array.from(s).sort();
   }, [items]);
 
-  const filteredSortedItems = useMemo(() => {
-    const q = search.toLowerCase();
-    return items
-      .filter(i => {
-        if (filter !== 'all' && i.kind !== filter && !(filter === 'youtube' && i.kind === 'playlist')) return false;
-        if (tagFilter && !(i.tags || []).includes(tagFilter)) return false;
-        if (!q) return true;
-        const bodyMatch = contentIndex.get(i.id)?.includes(q);
-        return i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q) || i.fileName?.toLowerCase().includes(q) || bodyMatch;
-      })
-      .sort((a, b) => {
-        if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
-        if (sort === 'status') return (a.status || '').localeCompare(b.status || '');
-        if (sort === 'duration') return (a.durationMs || 0) - (b.durationMs || 0);
-        if (sort === 'queue') return (a.queueIndex || 0) - (b.queueIndex || 0);
-        return (b.createdAt || 0) - (a.createdAt || 0);
-      });
-  }, [items, filter, tagFilter, search, sort, contentIndex]);
-
-  // Visibility: Flat View with Grouped Children
   const displayItems = useMemo(() => {
+    const q = search.toLowerCase();
+    const filtered = items.filter(i => {
+      if (filter !== 'all' && i.kind !== filter && !(filter === 'youtube' && i.kind === 'playlist')) return false;
+      if (tagFilter && !(i.tags || []).includes(tagFilter)) return false;
+      if (!q) return true;
+      return i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q);
+    }).sort((a, b) => {
+      if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
+      if (sort === 'status') return (a.status || '').localeCompare(b.status || '');
+      if (sort === 'duration') return (a.durationMs || 0) - (b.durationMs || 0);
+      return (a.queueIndex || 0) - (b.queueIndex || 0);
+    });
+
     const out = [];
-    const parents = filteredSortedItems.filter(i => !i.parentId);
-    const children = filteredSortedItems.filter(i => i.parentId);
+    const parents = filtered.filter(i => !i.parentId);
     parents.forEach(p => {
       out.push(p);
       if (expandedIds.has(p.id)) {
-        children.filter(c => c.parentId === p.id).forEach(c => out.push(c));
+        filtered.filter(c => c.parentId === p.id).forEach(c => out.push(c));
       }
     });
     return out;
-  }, [filteredSortedItems, expandedIds]);
+  }, [items, filter, tagFilter, search, sort, expandedIds]);
 
-  // Feature Handlers
   const handleCapture = async (url, files) => {
     try {
       if (url) {
-        const isPl = DV.extractors.isYouTubePlaylist?.(url);
-        if (isPl) {
+        if (DV.extractors.isYouTubePlaylist?.(url)) {
           const pl = await DV.extractors.extractYouTubePlaylist(url);
-          const parent = await DV.queue.addItem({ kind: 'playlist', url, title: pl.title });
-          for (const v of pl.items.slice(0, 100)) await DV.queue.addItem({ kind: 'youtube', url: v.url, title: v.title, parentId: parent.id });
+          const pr = await DV.queue.addItem({ kind: 'playlist', url, title: pl.title });
+          for (const it of pl.items) await DV.queue.addItem({ ...it, kind: 'youtube', parentId: pr.id });
         } else {
           const kind = DV.extractors.isYouTube?.(url) ? 'youtube' : 'url';
-          const rec = await DV.queue.addItem({ kind, url, title: url });
+          const r = await DV.queue.addItem({ kind, url, title: 'Loading...' });
           const peek = kind === 'youtube' ? await DV.extractors.peekYouTubeTitle?.(url) : await DV.extractors.peekTitle?.(url);
-          if (peek?.title) await DV.queue.updateItem(rec.id, { title: peek.title, url: peek.url || url });
+          if (peek?.title) await DV.queue.updateItem(r.id, { title: peek.title });
         }
       }
-      for (const f of files) await DV.queue.addItem({ kind: 'file', title: f.name, file: f, fileName: f.name, size: f.size, fileType: f.type });
-      DV.toast('Added to Vault Queue', { type: 'success' });
+      for (const f of files) await DV.queue.addItem({ kind: 'file', title: f.name, file: f });
+      DV.toast('Items processing');
     } catch (e) { DV.toast(e.message, { type: 'error' }); }
   };
 
@@ -343,492 +559,57 @@ function App() {
       await yieldToBrowser();
       const content = await DV.db.get('contents', it.id);
       if (content?.html) {
-        const blob = await makePdfBlobFromHtml(content.html, it.title);
-        if (zip) zip.file(pdfFileName(it.title), blob);
-        else return saveBlob(blob, pdfFileName(it.title));
+        const doc = new jspdf.jsPDF();
+        doc.text(it.title, 10, 10);
+        doc.text(content.html.replace(/<[^>]+>/g, ' ').slice(0, 10000), 10, 20);
+        const b = doc.output('blob');
+        if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
+        else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
       }
     }
-    if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_results.zip');
-  };
-
-  const handleDeleteBulk = async (ids) => {
-    if (!confirm(`Permanently remove ${ids.length} item(s) from database?`)) return;
-    for (const id of ids) { await DV.db.del('items', id); await DV.db.del('contents', id); await DV.db.del('contents', id + ':file'); }
-    setSelected([]);
-    DV.queue.loadQueue();
-  };
-
-  const handleRetryBulk = async (ids) => {
-    for (const id of ids) {
-      await DV.queue.updateItem(id, { status: STATUS.PENDING, error: null, durationMs: 0, startedAt: null });
-    }
-    DV.queue.loadQueue();
-    setSelected([]);
-    DV.toast('Processing Re-queued');
-  };
-
-  const handleStopBulk = async (ids) => {
-    ids.forEach(id => DV.queue.requestStop(id));
-    setTimeout(() => DV.queue.loadQueue(), 200);
-    DV.toast('Halt Requested');
+    if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
   };
 
   return (
-    <div className="min-h-full pb-32">
+    <div className="min-h-full pb-20 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans">
       <TopBar theme={theme} setTheme={setTheme} openSettings={() => setSettingsOpen(true)} />
-
-      <div className="px-6 space-y-10">
+      <div className="px-4">
         <CapturePanel onSubmit={handleCapture} />
-
-        <StatsRow
-          items={items}
-          onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))}
-          onStopAll={() => handleStopBulk(items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).map(i => i.id))}
-          onRetryFailed={() => handleRetryBulk(items.filter(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED).map(i => i.id))}
-        />
-
-        <CommandBar
-          filter={filter} setFilter={setFilter}
-          search={search} setSearch={setSearch}
-          sort={sort} setSort={setSort}
-          tagFilter={tagFilter} setTagFilter={setTagFilter}
-          allTags={allTags}
-          onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'distyvault_export.zip')}
-          onImport={async (file) => { await DV.db.importFromZip(file); DV.queue.loadQueue(); DV.toast('Vault Imported'); }}
-        />
-
-        <Table
-          items={displayItems}
-          selected={selected} setSelected={setSelected}
-          expandedIds={expandedIds} setExpandedIds={setExpandedIds}
-          onSort={(k) => { setSort(k); if (k === 'queue') DV.queue.loadQueue(); }}
-        />
-
-        <SelectionDock
-          count={selected.length}
-          selectedIds={selected}
-          items={items}
-          onDownload={() => handleDownloadBulk(selected)}
-          onDelete={() => handleDeleteBulk(selected)}
-          onRetry={() => handleRetryBulk(selected)}
-          onStop={() => handleStopBulk(selected)}
-          onTag={() => setTagEditorOpen(true)}
-          onUnselectAll={() => setSelected([])}
-          onSelectAll={() => setSelected(displayItems.map(i => i.id))}
-          onView={() => setViewItem(items.find(i => i.id === selected[0]))}
-        />
+        <StatsRow items={items} onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))} onStopAll={() => items.forEach(i => DV.queue.requestStop(i.id))} onRetryFailed={async () => { for (const i of items.filter(x => x.status === STATUS.ERROR)) await DV.queue.updateItem(i.id, { status: STATUS.PENDING }); DV.queue.loadQueue(); }} />
+        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
+        <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} onSort={setSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
+      <SelectionDock count={selected.length} anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))} allSelected={selected.length === items.length} onView={() => setViewItem(items.find(i => i.id === selected[0]))} onRetry={async () => { for (const id of selected) await DV.queue.updateItem(id, { status: STATUS.PENDING }); DV.queue.loadQueue(); setSelected([]); }} onDownload={() => handleDownloadBulk(selected)} onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); DV.queue.loadQueue(); setSelected([]); } }} onStop={() => selected.forEach(id => DV.queue.requestStop(id))} onSelectAll={() => setSelected(items.map(i => i.id))} onUnselectAll={() => setSelected([])} onTag={() => setTagEditorOpen(true)} />
 
-      <ContentModal item={viewItem} onClose={() => setViewItem(null)} />
-      <ErrorModal item={errorItem} onClose={() => setErrorItem(null)} />
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={s => { setSettings(s); DV.queue.setSettings(s); DV.queue.setConcurrency(s.concurrency); }} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={s => { setSettings(s); DV.queue.setSettings(s); }} />
       <TagEditorModal open={tagEditorOpen} onClose={() => setTagEditorOpen(false)} selectedIds={selected} items={items} allTags={allTags} />
-
-      <footer className="mt-32 py-12 text-center text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-slate-600 opacity-50">DistyVault — Client Side Analysis — {new Date().getFullYear()}</footer>
+      <ErrorModal item={errorItem} onClose={() => setErrorItem(null)} />
+      <ContentModal item={viewItem} onClose={() => setViewItem(null)} />
     </div>
   );
 }
 
-// --- Specialized Components ---
-
-function Table({ items, selected, setSelected, expandedIds, setExpandedIds, onSort }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [items]);
-
-  const toggle = (id, e) => {
-    if (e.shiftKey && selected.length > 0) {
-      const last = selected[selected.length - 1];
-      const start = items.findIndex(i => i.id === last);
-      const end = items.findIndex(i => i.id === id);
-      if (start !== -1 && end !== -1) {
-        const slice = items.slice(Math.min(start, end), Math.max(start, end) + 1).map(i => i.id);
-        setSelected(prev => [...new Set([...prev, ...slice])]);
-        return;
-      }
-    }
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
+function ErrorModal({ item, onClose }) {
   return (
-    <div className="max-w-6xl mx-auto rounded-[3rem] border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/40 overflow-hidden shadow-2xl">
-      <div className="overflow-x-auto custom-scrollbar">
-        <table className="w-full text-left border-collapse min-w-[700px]">
-          <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 dark:border-white/5">
-            <tr>
-              <th className="p-6 cursor-pointer hover:text-brand-500 transition-colors" onClick={() => onSort('title')}>Source Asset</th>
-              <th className="p-6 text-center cursor-pointer hover:text-brand-500 transition-colors" onClick={() => onSort('status')}>Progress</th>
-              <th className="p-6 text-right cursor-pointer hover:text-brand-500 transition-colors" onClick={() => onSort('duration')}>Computing Time</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-            {!items.length && <tr><td colSpan="3" className="p-24 text-center text-slate-400 italic font-medium opacity-30">No matching items found in your vault</td></tr>}
-            {items.map(i => (
-              <tr key={i.id} onClick={(e) => toggle(i.id, e)} className={classNames('hover:bg-slate-50 dark:hover:bg-white/5 transition-all cursor-pointer group select-none', selected.includes(i.id) && 'bg-brand-50/50 dark:bg-brand-600/10')}>
-                <td className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={classNames('w-1 h-10 rounded-full transition-all shrink-0', selected.includes(i.id) ? 'bg-brand-500 scale-y-100' : 'bg-transparent scale-y-50 group-hover:bg-slate-200 dark:group-hover:bg-white/10 group-hover:scale-y-100')}></div>
-                    {i.kind === 'playlist' && (
-                      <button onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); n.has(i.id) ? n.delete(i.id) : n.add(i.id); return n; }); }} className="p-2 rounded-2xl bg-slate-100 dark:bg-white/5 hover:scale-110 active:scale-90 transition-all">
-                        <Icon name={expandedIds.has(i.id) ? 'chevron-down' : 'chevron-right'} size={18} />
-                      </button>
-                    )}
-                    <div className={classNames('min-w-0 transition-opacity', i.parentId && 'ml-12 opacity-70')}>
-                      <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm tracking-tight">{i.title || i.url}</div>
-                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-1.5 font-bold uppercase tracking-widest">{i.url || i.fileName || (i.kind === 'playlist' ? 'Playlisted Collection' : 'Unknown Data Source')}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-6 text-center"><StatusChip status={i.status} /></td>
-                <td className="p-6 text-right">
-                  <div className="text-[11px] font-black text-slate-600 dark:text-slate-400 tabular-nums">
-                    {[STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status) ? formatDuration(now - (i.startedAt || now)) : (i.durationMs ? formatDuration(i.durationMs) : '—')}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
-  const c = items.filter(i => i.status === STATUS.COMPLETED).length;
-  const p = items.filter(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status)).length;
-  const e = items.filter(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED).length;
-
-  const Stat = ({ label, count, color, icon, onAction, actionIcon }) => (
-    <div className={classNames('p-6 rounded-[2rem] border flex justify-between items-center group transition-all duration-500 hover:shadow-lg', color)}>
-      <div className="flex items-center gap-5">
-        <div className="w-14 h-14 rounded-3xl bg-white dark:bg-black/20 flex items-center justify-center shadow-inner">
-          <Icon name={icon} size={28} />
-        </div>
-        <div>
-          <div className="text-[10px] uppercase font-black opacity-50 tracking-[0.2em]">{label}</div>
-          <div className="text-3xl font-black mt-1 leading-none tracking-tighter tabular-nums">{count}</div>
-        </div>
-      </div>
-      {count > 0 && onAction && (
-        <button onClick={onAction} title={`Action for ${label}`} className="p-3.5 bg-white/60 dark:bg-white/5 rounded-2xl shadow-sm hover:scale-110 active:scale-95 transition-all text-current">
-          <Icon name={actionIcon} size={24} />
-        </button>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Stat label="Completed" count={c} color="bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100/50 dark:border-emerald-800/20 text-emerald-700 dark:text-emerald-400" icon="check-circle" actionIcon="arrow-down-to-line" onAction={onDownloadAll} />
-      <Stat label="Processing" count={p} color="bg-brand-50 dark:bg-brand-900/10 border-brand-100/50 dark:border-brand-800/20 text-brand-700 dark:text-brand-400" icon="zap" actionIcon="stop-circle" onAction={onStopAll} />
-      <Stat label="Warnings" count={e} color="bg-rose-50 dark:bg-rose-900/10 border-rose-100/50 dark:border-rose-800/20 text-rose-700 dark:text-rose-400" icon="alert-octagon" actionIcon="refresh-cw" onAction={onRetryFailed} />
-    </div>
-  );
-}
-
-function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, allTags, tagFilter, setTagFilter }) {
-  const [expanded, setExpanded] = useState(false);
-  const importRef = useRef(null);
-
-  const filters = [
-    { k: 'all', l: 'All Assets' },
-    { k: 'url', l: 'Web Pages' },
-    { k: 'youtube', l: 'YouTube Content' },
-    { k: 'file', l: 'Local Records' }
-  ];
-
-  return (
-    <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-5 bg-white/60 dark:bg-slate-800/30 p-3 rounded-[2.5rem] border border-slate-200 dark:border-white/5 glass shadow-xl">
-      <div className={classNames('relative flex items-center transition-all duration-500 overflow-hidden', expanded || search ? 'flex-1' : 'w-14')}>
-        <button onClick={() => setExpanded(!expanded)} className="p-3.5 rounded-3xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors shrink-0 text-brand-600 dark:text-brand-400"><Icon name="search" size={24} /></button>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Filter keywords, sources, or content..."
-          className="flex-1 bg-transparent px-4 text-sm font-bold placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none"
-        />
-        {(expanded || search) && <button onClick={() => { setSearch(''); setExpanded(false); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors mr-2"><Icon name="x-circle" size={18} /></button>}
-      </div>
-
-      <div className="h-10 w-px bg-slate-200 dark:bg-white/10 hidden sm:block" />
-
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-        {filters.map(f => (
-          <button key={f.k} onClick={() => setFilter(f.k)} className={classNames('px-5 py-2.5 rounded-3xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap', filter === f.k ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xl' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5')}>
-            {f.l}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 hidden md:block" />
-
-      <div className="flex items-center gap-2 px-1">
-        <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="h-10 px-4 rounded-2xl bg-slate-100 dark:bg-white/5 border-none text-[10px] uppercase font-black tracking-widest outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
-          <option value="">By Tag</option>
-          {allTags.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
-        </select>
-        <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-2" />
-        <input type="file" ref={importRef} className="hidden" accept=".zip" onChange={e => { if (e.target.files[0]) onImport(e.target.files[0]); e.target.value = ''; }} />
-        <button onClick={() => importRef.current?.click()} className="p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" title="Import Vault Zip"><Icon name="upload" size={20} /></button>
-        <button onClick={onExport} className="p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" title="Export Total Archive"><Icon name="download" size={20} /></button>
-      </div>
-    </div>
-  );
-}
-
-function SelectionDock({ count, selectedIds, items, onView, onDownload, onDelete, onRetry, onStop, onTag, onUnselectAll, onSelectAll }) {
-  if (!count) return null;
-  const anyActive = selectedIds.some(id => {
-    const it = items.find(x => x.id === id);
-    return it && [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status);
-  });
-
-  return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 glass bg-slate-900/95 text-white p-4 rounded-[2.5rem] shadow-2xl flex items-center gap-8 animate-in slide-in-from-bottom-20 duration-500 border border-white/10 backdrop-blur-2xl">
-      <div className="flex flex-col items-center border-r border-white/10 pr-8 mr-2">
-        <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50">Selected</div>
-        <div className="text-2xl font-black leading-none mt-1">{count}</div>
-      </div>
-      <div className="flex gap-2">
-        {count === 1 && <button onClick={onView} className="p-4 bg-white/10 hover:bg-white/20 rounded-3xl transition-all hover:scale-110 active:scale-90" title="Inspect Results"><Icon name="eye" size={24} /></button>}
-        <button onClick={onDownload} className="p-4 bg-white/10 hover:bg-white/20 rounded-3xl transition-all hover:scale-110 active:scale-90" title="Export as PDF"><Icon name="file-down" size={24} /></button>
-        {anyActive ? (
-          <button onClick={onStop} className="p-4 bg-rose-500/20 hover:bg-rose-500/40 rounded-3xl transition-all hover:scale-110 active:scale-90 text-rose-400" title="Abort Task"><Icon name="stop-circle" size={24} /></button>
-        ) : (
-          <button onClick={onRetry} className="p-4 bg-white/10 hover:bg-white/20 rounded-3xl transition-all hover:scale-110 active:scale-90" title="Re-process Assets"><Icon name="refresh-cw" size={24} /></button>
-        )}
-        <button onClick={onTag} className="p-4 bg-white/10 hover:bg-white/20 rounded-3xl transition-all hover:scale-110 active:scale-90" title="Categorize"><Icon name="tag" size={24} /></button>
-        <button onClick={onDelete} className="p-4 bg-rose-600 hover:bg-rose-700 rounded-3xl transition-all hover:scale-110 active:scale-90 text-white shadow-xl shadow-rose-900/40" title="Destroy Records"><Icon name="trash-2" size={24} /></button>
-      </div>
-      <div className="flex flex-col gap-1 ml-4 border-l border-white/10 pl-8">
-        <button onClick={onSelectAll} className="text-[9px] font-black uppercase tracking-widest hover:text-brand-400 opacity-60 hover:opacity-100 transition-all">Select View</button>
-        <button onClick={onUnselectAll} className="text-[9px] font-black uppercase tracking-widest hover:text-rose-400 opacity-60 hover:opacity-100 transition-all">Deselect All</button>
-      </div>
-    </div>
-  );
-}
-
-function TagEditorModal({ open, onClose, selectedIds, items, allTags }) {
-  const [tagInput, setTagInput] = useState('');
-
-  const add = async (t) => {
-    const tag = (t || tagInput).trim().toLowerCase();
-    if (!tag) return;
-    for (const id of selectedIds) {
-      const item = items.find(i => i.id === id);
-      const tags = [...new Set([...(item?.tags || []), tag])];
-      await DV.queue.updateTags(id, tags);
-    }
-    setTagInput('');
-  };
-
-  const remove = async (tag) => {
-    for (const id of selectedIds) {
-      const item = items.find(i => i.id === id);
-      if (item && item.tags && item.tags.includes(tag)) {
-        const n = item.tags.filter(tx => tx !== tag);
-        await DV.queue.updateTags(id, n);
-      }
-    }
-  };
-
-  const currentTags = useMemo(() => {
-    const s = new Set();
-    items.filter(i => selectedIds.includes(i.id)).forEach(i => (i.tags || []).forEach(t => s.add(t)));
-    return Array.from(s).sort();
-  }, [selectedIds, items]);
-
-  return (
-    <Modal open={open} onClose={onClose} title={`Categorizing ${selectedIds.length} Asset(s)`}>
-      <div className="space-y-8 py-6 px-2">
-        <div className="flex gap-4">
-          <input
-            autoFocus
-            value={tagInput}
-            onChange={e => setTagInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && add()}
-            placeholder="Introduce new tag..."
-            className="flex-1 h-14 px-5 rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/40 outline-none focus:ring-4 focus:ring-brand-500/20 font-bold transition-all"
-          />
-          <button onClick={() => add()} className="px-8 h-14 rounded-[1.5rem] bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black tracking-widest shadow-xl active:scale-95 transition-all">COMMIT</button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-          <div className="space-y-4">
-            <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] block">Persistent Tags</label>
-            <div className="flex flex-wrap gap-2">
-              {currentTags.length ? currentTags.map(t => (
-                <span key={t} className="px-4 py-2 rounded-2xl bg-brand-500 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg shadow-brand-500/20 animate-in fade-in zoom-in">
-                  {t}
-                  <button onClick={() => remove(t)} className="hover:scale-125 transition-transform"><Icon name="x" size={14} /></button>
-                </span>
-              )) : <div className="text-xs text-slate-400 font-medium italic p-4 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center">Untagged selection</div>}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] block">Vault Index</label>
-            <div className="flex flex-wrap gap-2">
-              {allTags.filter(t => !currentTags.includes(t)).map(t => (
-                <button key={t} onClick={() => add(t)} className="px-4 py-2 rounded-2xl border border-slate-200 dark:border-white/10 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/5 transition-all">{t}</button>
-              ))}
-              {!allTags.length && <div className="text-[10px] text-slate-400 font-bold uppercase py-4">Global index empty</div>}
-            </div>
-          </div>
-        </div>
-      </div>
+    <Modal open={!!item} onClose={onClose} title="Error Detail">
+      <div className="p-4 bg-rose-50 text-rose-700 rounded-lg whitespace-pre-wrap text-sm">{item?.error || 'Unknown error'}</div>
     </Modal>
   );
 }
 
-function SettingsDrawer({ open, onClose, settings, setSettings }) {
-  const [local, setLocal] = useState(settings);
-  useEffect(() => { setLocal(settings); }, [settings]);
-
-  // Model Metadata
-  const providers = [
-    { id: 'openai', name: 'OpenAI Core', models: [{ v: 'gpt-4o', l: 'GPT-4o Omnis' }, { v: 'gpt-4o-mini', l: 'GPT-4o Micro' }, { v: 'o1', l: 'O1 Reasoning' }, { v: 'o3-mini', l: 'O3 Mini Reasoning' }] },
-    { id: 'anthropic', name: 'Anthropic Claude', models: [{ v: 'claude-3-5-sonnet-latest', l: 'Claude 3.5 Sonnet' }, { v: 'claude-3-7-sonnet-latest', l: 'Claude 3.7 Sonnet' }, { v: 'claude-3-5-opus-latest', l: 'Claude 3.5 Opus' }] },
-    { id: 'gemini', name: 'Google Gemini', models: [{ v: 'gemini-2.0-flash', l: 'Gemini 2.0 Flash' }, { v: 'gemini-2.0-flash-lite', l: 'Gemini 2.0 Lite' }, { v: 'gemini-1.5-pro', l: 'Gemini 1.5 Pro' }] },
-    { id: 'deepseek', name: 'DeepSeek Research', models: [{ v: 'deepseek-chat', l: 'DeepSeek-V3 C' }, { v: 'deepseek-reasoner', l: 'DeepSeek-R1 R' }] },
-    { id: 'grok', name: 'xAI Grok', models: [{ v: 'grok-2-1212', l: 'Grok 2' }, { v: 'grok-2-vision-1212', l: 'Grok 2 Vision' }] }
-  ];
-
-  const save = () => { setSettings(local); onClose(); DV.toast('System Preferences Synced', { type: 'success' }); };
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[60] flex justify-end">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 h-full p-10 shadow-[0_0_100px_rgba(0,0,0,0.4)] border-l border-slate-200 dark:border-white/10 flex flex-col animate-in slide-in-from-right duration-500">
-        <div className="flex justify-between items-center mb-16">
-          <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white">NODE CONFIG</h2>
-          <button onClick={onClose} className="p-4 hover:bg-slate-100 dark:hover:bg-white/5 rounded-[1.5rem] transition-colors"><Icon name="x" size={28} /></button>
-        </div>
-
-        <div className="space-y-12 flex-1 overflow-y-auto no-scrollbar pb-10">
-          <div className="space-y-6">
-            <label className="text-[10px] uppercase font-black text-brand-600 tracking-[0.3em] flex items-center gap-3"><Icon name="cpu" size={20} /> Inference Layer</label>
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Provider Service</span>
-                <select value={local.ai.mode} onChange={e => setLocal({ ...local, ai: { ...local.ai, mode: e.target.value, model: '' } })} className="w-full h-14 px-5 rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/40 outline-none focus:ring-4 focus:ring-brand-500/20 font-black tracking-tight cursor-pointer">
-                  <option value="">DEACTIVATED</option>
-                  {providers.map(p => <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>)}
-                </select>
-              </div>
-
-              {local.ai.mode && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Computation Model</span>
-                  <select value={local.ai.model} onChange={e => setLocal({ ...local, ai: { ...local.ai, model: e.target.value } })} className="w-full h-14 px-5 rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-brand-900/10 outline-none focus:ring-4 focus:ring-brand-500/20 font-bold transition-all cursor-pointer">
-                    <option value="">SELECT TARGET MODEL</option>
-                    {providers.find(p => p.id === local.ai.mode)?.models.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                  </select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Authorization Secret</span>
-                <div className="relative">
-                  <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} placeholder="••••••••••••••••" className="w-full h-14 px-5 rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/40 outline-none focus:ring-4 focus:ring-brand-500/20 font-mono tracking-[0.4em]" />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none"><Icon name="key" size={20} /></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <label className="text-[10px] uppercase font-black text-brand-600 tracking-[0.3em] flex items-center gap-3"><Icon name="layers" size={20} /> Concurrency Multiplier</label>
-            <div className="px-4">
-              <input type="range" min="1" max="10" step="1" value={local.concurrency} onChange={e => setLocal({ ...local, concurrency: parseInt(e.target.value) })} className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-brand-600" />
-              <div className="mt-6 flex justify-between items-center bg-slate-50 dark:bg-black/20 p-5 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-inner">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Channels</div>
-                <div className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{local.concurrency}</div>
-              </div>
-              <p className="mt-3 text-[9px] text-slate-500 font-bold italic leading-relaxed">Higher values increase processing speed but may hit provider rate limits.</p>
-            </div>
-          </div>
-        </div>
-
-        <button onClick={save} className="w-full h-16 bg-brand-600 hover:bg-brand-700 text-white font-black rounded-3xl shadow-2xl shadow-brand-500/30 active:scale-[0.97] transition-all flex items-center justify-center gap-4 uppercase tracking-[0.4em] text-xs">
-          <Icon name="check-circle" size={24} /> Sync Config
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const ErrorModal = ({ item, onClose }) => (
-  <Modal open={!!item} onClose={onClose} title="Diagnostic Report">
-    <div className="p-8 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-[2.5rem] shadow-inner">
-      <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20"><Icon name="alert-triangle" size={28} /></div>
-        <div>
-          <div className="text-[10px] font-black text-rose-400 uppercase tracking-widest">System Failure recorded</div>
-          <div className="text-lg font-black text-rose-900 dark:text-rose-100 italic tracking-tight">{item?.title || 'Execution Fault'}</div>
-        </div>
-      </div>
-      <div className="text-xs text-rose-700 dark:text-rose-300 whitespace-pre-wrap leading-relaxed font-bold bg-white/50 dark:bg-black/40 p-6 rounded-[2rem] border border-rose-200 dark:border-white/5 shadow-sm max-h-[40vh] overflow-y-auto custom-scrollbar">{item?.error || 'No detailed traceback available for this exception.'}</div>
-    </div>
-  </Modal>
-);
-
-const ContentModal = ({ item, onClose }) => {
+function ContentModal({ item, onClose }) {
   const [html, setHtml] = useState('');
-  const [loading, setLoading] = useState(false);
-  const iframeRef = useRef(null);
-
   useEffect(() => {
-    if (!item) return;
-    setLoading(true);
-    DV.db.get('contents', item.id).then(c => {
-      setHtml((window.DV?.buildViewerHtml && c?.html) ? DV.buildViewerHtml(c.html) : (c?.html || ''));
-      setLoading(false);
-    });
-  }, [item?.id]);
-
-  useEffect(() => {
-    if (html && iframeRef.current) {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTimeout(() => {
-        try { iframeRef.current.contentWindow.postMessage({ type: 'dv-theme', isDark }, '*'); } catch { }
-      }, 100);
-    }
-  }, [html]);
-
+    if (item) DV.db.get('contents', item.id).then(c => setHtml(c?.html || ''));
+  }, [item]);
   return (
     <Modal open={!!item} onClose={onClose} title={item?.title} hideHeader>
-      <div className="relative min-h-[550px] rounded-[2rem] overflow-hidden border border-slate-100 dark:border-white/5 shadow-inner bg-slate-50 dark:bg-black/20">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/90 dark:bg-slate-900/90 z-20 backdrop-blur-xl animate-in fade-in duration-500">
-            <div className="flex flex-col items-center gap-6">
-              <div className="relative">
-                <div className="w-16 h-16 border-[6px] border-brand-500/10 border-t-brand-500 rounded-full animate-spin"></div>
-                <div className="absolute inset-0 flex items-center justify-center text-brand-600"><Icon name="database" size={24} /></div>
-              </div>
-              <div className="text-[10px] font-black uppercase tracking-[0.5em] text-brand-600 animate-pulse">Accessing Vault...</div>
-            </div>
-          </div>
-        )}
-        {html ? (
-          <iframe ref={iframeRef} srcDoc={html} className="w-full h-[78vh] border-none shadow-2xl" />
-        ) : !loading && (
-          <div className="h-[78vh] flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 gap-6">
-            <Icon name="file-search" size={64} className="opacity-20" />
-            <div className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Analysis payload not found</div>
-          </div>
-        )}
+      <div className="p-4 min-h-[400px]">
+        {html ? <iframe srcDoc={html} className="w-full h-[60vh] border-none" /> : <div className="text-center text-slate-500 mt-20">No data ready</div>}
       </div>
     </Modal>
   );
-};
+}
 
-// Start Runtime (Initialization)
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
