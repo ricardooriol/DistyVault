@@ -679,7 +679,7 @@ function App() {
       };
 
       // 1. Title
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('Helvetica', 'bold');
       doc.setFontSize(24);
       doc.setTextColor(15, 23, 42); // slate-900
       const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
@@ -687,16 +687,29 @@ function App() {
       y += (titleLines.length * 10) + 4;
 
       // 2. Metadata (Source & Date)
-      doc.setFont('helvetica', 'normal');
+      const sourceLabel = it.url || 'Universal Extraction';
+      const fullDate = content.meta?.dateText || new Date().toLocaleString();
+      const dateOnlyDate = fullDate.split(/[ ,]+/)[0];
+
       doc.setFontSize(11);
       doc.setTextColor(100, 116, 139); // slate-500
-      const sourceLabel = it.url || 'Universal Extraction';
-      const dateLabel = content.meta?.dateText || new Date().toLocaleString();
 
-      const metaText = `Source: ${sourceLabel}\nDate: ${dateLabel}`;
-      const metaLines = doc.splitTextToSize(metaText, wrapWidth);
-      doc.text(metaLines, margin, y);
-      y += (metaLines.length * 5) + 6;
+      // Draw "Source:"
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Source: ', margin, y);
+      let offset = doc.getTextWidth ? doc.getTextWidth('Source: ') : 15;
+      doc.setFont('Helvetica', 'normal');
+      const sl = doc.splitTextToSize(sourceLabel, wrapWidth - offset);
+      doc.text(sl, margin + offset, y);
+      y += (sl.length * 5) + 3;
+
+      // Draw "Date:"
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Date: ', margin, y);
+      offset = doc.getTextWidth ? doc.getTextWidth('Date: ') : 11;
+      doc.setFont('Helvetica', 'normal');
+      doc.text(dateOnlyDate, margin + offset, y);
+      y += 10;
 
       // 3. Divider Line
       doc.setDrawColor(226, 232, 240); // slate-200
@@ -708,40 +721,41 @@ function App() {
       const points = helper.querySelectorAll('.dv-point, .dv-item, section');
       if (points.length > 0) {
         points.forEach(p => {
-          const head = p.querySelector('.dv-head, h2, h3, b, strong')?.innerText?.trim() || '';
-          const body = p.querySelector('.dv-body, p, div:last-child')?.innerText?.trim() || '';
+          let headText = (p.querySelector('.dv-head, h2, h3, b, strong')?.textContent || '').trim();
+          let pTags = Array.from(p.querySelectorAll('.dv-body p'));
+          let bodyText = pTags.length > 0 ? pTags.map(el => el.textContent.trim()).join('\n\n') : (p.querySelector('.dv-body')?.textContent || '').trim();
 
-          if (!head && !body) return;
+          if (!headText && !bodyText) return;
 
           // Header
-          if (head) {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(15);
+          if (headText) {
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(14);
             doc.setTextColor(15, 23, 42);
-            const hl = doc.splitTextToSize(head, wrapWidth);
-            checkPage(hl.length * 8 + 10);
+            const hl = doc.splitTextToSize(headText, wrapWidth);
+            checkPage(hl.length * 7 + 8);
             doc.text(hl, margin, y);
-            y += (hl.length * 7) + 1;
+            y += (hl.length * 6) + 3;
           }
 
           // Body
-          if (body) {
-            doc.setFont('helvetica', 'normal');
+          if (bodyText) {
+            doc.setFont('Helvetica', 'normal');
             doc.setFontSize(12);
             doc.setTextColor(51, 65, 85); // slate-700
-            const bl = doc.splitTextToSize(body, wrapWidth);
-            checkPage(bl.length * 7 + 12);
+            const bl = doc.splitTextToSize(bodyText, wrapWidth);
+            checkPage(bl.length * 6 + 10);
             doc.text(bl, margin, y);
-            y += (bl.length * 6) + 9;
+            y += (bl.length * 6) + 8;
           }
         });
       } else {
         // Fallback for simple text/HTML
-        const raw = helper.body.innerText.trim();
-        doc.setFont('helvetica', 'normal');
+        const raw = helper.body.textContent || '';
+        doc.setFont('Helvetica', 'normal');
         doc.setFontSize(12);
         doc.setTextColor(51, 65, 85);
-        const rl = doc.splitTextToSize(raw, wrapWidth);
+        const rl = doc.splitTextToSize(raw.trim(), wrapWidth);
         rl.forEach(line => {
           checkPage(8);
           doc.text(line, margin, y);
@@ -754,14 +768,12 @@ function App() {
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
 
-        // Brand (Bottom Left)
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        // Brand & Page Numbers
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(11);
         doc.setTextColor(148, 163, 184); // slate-400
-        doc.text('DistyVault 2026', margin, pageHeight - 10);
 
-        // Page Numbers (Bottom Right)
-        doc.setFont('helvetica', 'normal');
+        doc.text('DistyVault', margin, pageHeight - 10);
         doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
       }
 
