@@ -156,6 +156,7 @@
 
       5. TAGS SECTION (MANDATORY)
       At the very end of your response, after the last numbered point, providing ONE line starting exactly with "TAGS: " followed by 3 to 5 high-quality, relevant categorization tags separated by commas.
+      CRITICAL: Output absolutely NOTHING after the TAGS line. No signatures, no summaries, no "Here are your tags", and NO HTML tags.
       Example: TAGS: Psychology, Habit Formation, Productivity
     `;
 
@@ -278,7 +279,18 @@
   function parseTags(text = '') {
     const m = text.match(/TAGS:\s*(.+)$/m);
     if (!m) return [];
-    return m[1].split(',').map(s => s.trim().toLowerCase()).filter(s => s && s.length < 30);
+    // Aggressively clean up the tags string
+    const raw = m[1]
+      .replace(/<\/?[^>]+(>|$)/g, '') // Remove any HTML tags
+      .replace(/["'\[\]\{\}]/g, '')   // Remove quotes/brackets
+      .trim();
+
+    return raw.split(/[,;|]/).map(s => {
+      return s.trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9#\s-]/g, '') // Only allow alphanumeric, spaces, hashes, dashes
+        .trim();
+    }).filter(s => s && s.length >= 2 && s.length < 30);
   }
 
   window.DV = window.DV || {};

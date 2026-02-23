@@ -23,15 +23,29 @@ module.exports = async (req, res) => {
   try {
     const targetUrlParsed = new URL(u);
     const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|beehiiv\.com|newsletter/.test(u);
+    const isYouTube = /youtube\.com|youtu\.be/.test(u);
 
     // 3. Forward the request parameters with "Human Mimicry"
     const headers = new Headers();
+
+    // Default Browser Identity
     const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
     const googleBotUA = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 
+    // Forward safe headers from original request if they exist
+    Object.entries(req.headers).forEach(([key, value]) => {
+      const k = key.toLowerCase();
+      if (['host', 'connection', 'content-length', 'origin', 'referer', 'accept-encoding', 'cookie', 'x-vercel-id', 'x-vercel-forwarded-for'].includes(k)) return;
+      if (k.startsWith('sec-')) return; // Let us set these
+      headers.set(key, value);
+    });
+
+    // Enforce high-success identity
     headers.set('User-Agent', isNewsletter ? googleBotUA : chromeUA);
     headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
     headers.set('Accept-Language', 'en-US,en;q=0.9');
+
+    // Stealth/Anti-Bot headers
     headers.set('Sec-Fetch-Dest', 'document');
     headers.set('Sec-Fetch-Mode', 'navigate');
     headers.set('Sec-Fetch-Site', 'none');
@@ -42,6 +56,11 @@ module.exports = async (req, res) => {
       headers.set('Sec-Ch-Ua', '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"');
       headers.set('Sec-Ch-Ua-Mobile', '?0');
       headers.set('Sec-Ch-Ua-Platform', '"Windows"');
+    }
+
+    // Special case for YouTube to appear more like a real user
+    if (isYouTube) {
+      headers.set('Referer', 'https://www.google.com/');
     }
 
     const fetchOptions = {
