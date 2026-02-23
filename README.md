@@ -1,73 +1,79 @@
-# React + TypeScript + Vite
+# DistyVault
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Turn any source into structured knowledge. DistyVault extracts content from web pages, YouTube videos, playlists, and local files, then distills it into clear, concise summaries using the AI provider of your choice. Everything runs in your browser. No server, no signup, no data leaves your device except the API call you control.
 
-Currently, two official plugins are available:
+**Live app:** https://distyvault.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Why
 
-## React Compiler
+Most content is buried in noise. Long articles, hour-long videos, dense PDFs. DistyVault pulls the signal out. You point it at a source, pick a model, and get back structured key points that are actually useful. Your API key, your data, your exports.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## How it works
 
-## Expanding the ESLint configuration
+**Capture** anything by pasting a URL, a YouTube link (single video or full playlist), or dropping local files (PDF, DOCX, images, HTML, plain text).
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Distill** using your own API key with any of five providers: OpenAI, Google Gemini, Anthropic Claude, DeepSeek, or Grok. The app prepares a structured prompt, sends your content to the provider, and formats the response into a clean, readable document with numbered key points.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Manage** your queue with search, filters, sorting, bulk selection, retry, and stop controls. Export individual results as PDF or download everything as a ZIP archive. Import and export your full database for backup or portability.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Supported sources
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Web pages**: articles, blog posts, documentation, any public URL
+- **YouTube**: single videos (transcript extraction) and playlists (auto-expands up to 100 entries)
+- **Local files**: PDF (text layer with OCR fallback), DOCX, images (Tesseract OCR), HTML, plain text
+
+## Supported providers
+
+| Provider | Default model |
+|---|---|
+| Google Gemini | Gemini 3 Flash |
+| OpenAI | GPT-5 Mini |
+| Anthropic Claude | Claude Sonnet 4.5 |
+| DeepSeek | DeepSeek Chat |
+| Grok (xAI) | Grok 4 |
+
+You can select any available model from the settings panel.
+
+## Privacy
+
+- API keys are stored in your browser and sent directly to the provider you select. They never touch any intermediary server.
+- All extracted content and distilled output lives in your browser's IndexedDB. Nothing is stored remotely.
+- A minimal proxy endpoint (`/api/fetch`) is used only when a target URL blocks cross-origin requests. It enforces protocol restrictions, timeouts, and response size limits.
+
+## Architecture
+
+The app is a single-page client-side application with no build step. It loads React (UMD) and Babel standalone via CDN, transpiling JSX at runtime.
+
+```
+index.html              Entry point, script loading, theme init
+src/
+  App.jsx               UI components and application state
+  core/
+    db.js               IndexedDB operations, ZIP import/export
+    queue.js            Item lifecycle, scheduling, concurrency
+    eventBus.js         Pub/sub for inter-module communication
+    toast.js            Transient notifications
+  extractors/
+    index.js            Dispatcher by item type
+    url.js              Web page content extraction
+    youtube.js          YouTube video/playlist handling
+    files.js            PDF, DOCX, image, and text extraction
+  ai/
+    service.js          Prompt preparation, provider orchestration
+    providers/
+      openai.js         OpenAI chat completions
+      gemini.js         Google Gemini generateContent
+      anthropic.js      Anthropic Claude messages
+      deepseek.js       DeepSeek chat completions
+      grok.js           xAI Grok chat completions
+api/
+  fetch.js              CORS proxy with protocol/size/timeout guards
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Contributing
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The project runs from static hosting with in-browser transpilation. For larger contributions (new extractors, providers, or packaging changes), open an issue first to discuss scope and design.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## License
+
+Copyright 2026. All rights reserved.
