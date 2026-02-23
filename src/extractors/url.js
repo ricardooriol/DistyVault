@@ -31,15 +31,14 @@
 
     let res = null;
     const timeout = 30000;
-
-    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com/.test(url);
-    const useProxyFirst = isNewsletter || url.includes('youtube.com') || url.includes('youtu.be');
+    const isStealthDomain = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|beehiiv\.com|newsletter/.test(url);
+    const useProxyFirst = isStealthDomain || url.includes('youtube.com') || url.includes('youtu.be');
 
     // Helper to check if body looks like a 'blocked' page
     const isBlocked = (html) => {
       if (!html) return true;
       const h = html.toLowerCase();
-      return h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser') || h.length < 200;
+      return (h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser')) && h.length < 1000;
     };
 
     // Attempt 1: Direct Fetch (Skip for known blockers to avoid ugly console errors)
