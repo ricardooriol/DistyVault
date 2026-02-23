@@ -649,15 +649,15 @@ function App() {
 
       // 1. Title
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
+      doc.setFontSize(24);
       doc.setTextColor(15, 23, 42); // slate-900
       const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
       doc.text(titleLines, margin, y);
-      y += (titleLines.length * 10) + 5;
+      y += (titleLines.length * 11) + 6;
 
       // 2. Metadata (Source & Date)
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(100, 116, 139); // slate-500
       const sourceLabel = it.url || 'Universal Extraction';
       const dateLabel = content.meta?.dateText || new Date().toLocaleString();
@@ -665,13 +665,13 @@ function App() {
       const metaText = `Source: ${sourceLabel}\nDate: ${dateLabel}`;
       const metaLines = doc.splitTextToSize(metaText, wrapWidth);
       doc.text(metaLines, margin, y);
-      y += (metaLines.length * 5) + 8;
+      y += (metaLines.length * 6) + 10;
 
       // 3. Divider Line
       doc.setDrawColor(226, 232, 240); // slate-200
       doc.setLineWidth(0.5);
       doc.line(margin, y, pageWidth - margin, y);
-      y += 15;
+      y += 18;
 
       // 4. Content Points
       const points = helper.querySelectorAll('.dv-point, .dv-item, section');
@@ -685,36 +685,36 @@ function App() {
           // Header
           if (head) {
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
+            doc.setFontSize(15);
             doc.setTextColor(15, 23, 42);
             const hl = doc.splitTextToSize(head, wrapWidth);
-            checkPage(hl.length * 7 + 10);
+            checkPage(hl.length * 8 + 12);
             doc.text(hl, margin, y);
-            y += (hl.length * 7) + 2;
+            y += (hl.length * 8) + 4;
           }
 
           // Body
           if (body) {
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
+            doc.setFontSize(12);
             doc.setTextColor(51, 65, 85); // slate-700
             const bl = doc.splitTextToSize(body, wrapWidth);
-            checkPage(bl.length * 5 + 15);
+            checkPage(bl.length * 7 + 18);
             doc.text(bl, margin, y);
-            y += (bl.length * 5) + 10;
+            y += (bl.length * 7) + 12;
           }
         });
       } else {
         // Fallback for simple text/HTML
         const raw = helper.body.innerText.trim();
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
+        doc.setFontSize(12);
         doc.setTextColor(51, 65, 85);
         const rl = doc.splitTextToSize(raw, wrapWidth);
         rl.forEach(line => {
-          checkPage(6);
+          checkPage(8);
           doc.text(line, margin, y);
-          y += 5;
+          y += 7;
         });
       }
 
