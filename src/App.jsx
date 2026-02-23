@@ -671,7 +671,7 @@ function App() {
       doc.setTextColor(15, 23, 42); // slate-900
       const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
       doc.text(titleLines, margin, y);
-      y += (titleLines.length * 11) + 6;
+      y += (titleLines.length * 10) + 4;
 
       // 2. Metadata (Source & Date)
       doc.setFont('helvetica', 'normal');
@@ -683,13 +683,13 @@ function App() {
       const metaText = `Source: ${sourceLabel}\nDate: ${dateLabel}`;
       const metaLines = doc.splitTextToSize(metaText, wrapWidth);
       doc.text(metaLines, margin, y);
-      y += (metaLines.length * 6) + 10;
+      y += (metaLines.length * 5) + 6;
 
       // 3. Divider Line
       doc.setDrawColor(226, 232, 240); // slate-200
       doc.setLineWidth(0.5);
       doc.line(margin, y, pageWidth - margin, y);
-      y += 18;
+      y += 10;
 
       // 4. Content Points
       const points = helper.querySelectorAll('.dv-point, .dv-item, section');
@@ -706,9 +706,9 @@ function App() {
             doc.setFontSize(15);
             doc.setTextColor(15, 23, 42);
             const hl = doc.splitTextToSize(head, wrapWidth);
-            checkPage(hl.length * 8 + 12);
+            checkPage(hl.length * 8 + 10);
             doc.text(hl, margin, y);
-            y += (hl.length * 8) + 4;
+            y += (hl.length * 7) + 1;
           }
 
           // Body
@@ -717,9 +717,9 @@ function App() {
             doc.setFontSize(12);
             doc.setTextColor(51, 65, 85); // slate-700
             const bl = doc.splitTextToSize(body, wrapWidth);
-            checkPage(bl.length * 7 + 18);
+            checkPage(bl.length * 7 + 12);
             doc.text(bl, margin, y);
-            y += (bl.length * 7) + 12;
+            y += (bl.length * 6) + 9;
           }
         });
       } else {
@@ -732,7 +732,7 @@ function App() {
         rl.forEach(line => {
           checkPage(8);
           doc.text(line, margin, y);
-          y += 7;
+          y += 6;
         });
       }
 
