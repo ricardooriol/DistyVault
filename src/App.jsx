@@ -4,7 +4,7 @@
  * This file is intentionally plain React (UMD) executed via Babel-in-browser.
  * It wires the UI to DV core modules available on window.DV (db, queue, bus, ai, extractors, toast).
  */
-const { useState, useEffect, useMemo, useRef } = React;
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
 const { classNames, yieldToBrowser, saveBlob, formatDuration, sanitizeFilename } = DV.utils;
 const STATUS = DV.queue.STATUS;
 

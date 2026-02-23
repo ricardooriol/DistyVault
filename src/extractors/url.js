@@ -30,40 +30,52 @@
     if (!url) throw new Error('No URL');
 
     let res = null;
-    const timeout = 30000; // 30s hard limit for the whole chain
+    const timeout = 30000;
+
+    // Helper to check if body looks like a 'blocked' page
+    const isBlocked = (html) => {
+      const h = html.toLowerCase();
+      return h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser');
+    };
 
     // Attempt 1: Direct Fetch
     try {
       res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow' }, timeout);
-    } catch (e) {
-      res = null;
-    }
+    } catch (e) { res = null; }
 
     // Attempt 2: Local API Proxy
     if (!res || !res.ok) {
       try {
         res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
-      } catch (e) {
-        res = null;
-      }
+      } catch (e) { res = null; }
     }
 
-    // Attempt 3: Public CORS Proxy
+    // Attempt 3: Public Proxy 1 (corsproxy.io)
     if (!res || !res.ok) {
       try {
         res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
-      } catch (e) {
-        throw new Error('All extraction methods failed (CORS blocked). Try manual copy-paste.');
-      }
+      } catch (e) { res = null; }
+    }
+
+    // Attempt 4: Public Proxy 2 (AllOrigins)
+    if (!res || !res.ok) {
+      try {
+        const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        res = await DV.utils.fetchWithTimeout(ao, { redirect: 'follow' }, timeout);
+      } catch (e) { res = null; }
     }
 
     if (!res || !res.ok) {
-      throw new Error(`Failed to reach source (${res?.status || 'Network Error'}). CORS bypass exhausted.`);
+      throw new Error(`CORS exhaustion: Failed to reach ${url}. The site may be blocking automated access.`);
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
     const ctype = (res.headers.get('content-type') || '').toLowerCase();
     const body = await res.text();
+
+    if (isBlocked(body)) {
+      throw new Error('CORS block detected: The site returned a "JS required" or "Access Denied" page.');
+    }
 
     if (ctype.includes('text/plain') || !/html/.test(ctype)) {
       const text = DV.utils.normalizeText(body);
