@@ -253,8 +253,8 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
 
           <div className="ml-auto flex items-center gap-2">
             <input type="file" accept=".zip" className="hidden" ref={importInputRef} onChange={e => { if (e.target.files[0]) onImport(e.target.files[0]); e.target.value = ''; }} />
-            <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="upload" /></button>
             <button onClick={onExport} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="download" /></button>
+            <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="upload" /></button>
           </div>
         </div>
       </div>
