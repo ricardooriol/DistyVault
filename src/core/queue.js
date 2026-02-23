@@ -212,7 +212,7 @@
 
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
-      item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start, durationMs: 0 });
+      item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start });
 
       const extracted = await DV.extractors.extract(item);
       try {
@@ -226,13 +226,13 @@
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
 
-      let html, tags;
+      let html, aiTags;
       let attempts = 0;
       while (attempts < 3) {
         try {
           const res = await DV.ai.distill(extracted, state.settings.ai);
           html = res.html;
-          tags = res.tags;
+          aiTags = res.tags;
           break;
         } catch (e) {
           attempts++;
@@ -246,15 +246,23 @@
       }
 
       const durationMs = Date.now() - (item.startedAt || start);
-      if (tags?.length) {
-        const union = Array.from(new Set([...(item.tags || []), ...tags]));
-        await updateTags(id, union);
-      }
+
+      // Merge tags safely by fetching latest from DB
+      const current = await DV.db.get('items', id);
+      const combinedTags = Array.from(new Set([
+        ...(current?.tags || []),
+        ...(aiTags || [])
+      ])).map(t => t.trim().toLowerCase()).filter(Boolean);
 
       await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
-      await updateItem(id, { status: STATUS.COMPLETED, durationMs });
+      await updateItem(id, {
+        status: STATUS.COMPLETED,
+        durationMs,
+        tags: combinedTags
+      });
     } catch (err) {
-      const durationMs = Date.now() - (item.startedAt || start);
+      const current = await DV.db.get('items', id);
+      const durationMs = Date.now() - (current?.startedAt || start);
       await updateItem(id, { status: state.stopRequested.has(id) ? STATUS.STOPPED : STATUS.ERROR, error: String(err?.message || err), durationMs });
     } finally {
       state.processing.delete(id);
