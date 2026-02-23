@@ -240,33 +240,9 @@
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
 
-      let html, aiTags;
-      let attempts = 0;
-
-      const DISTILL_TIMEOUT = 300000; // 5 minutes
-
-      while (attempts < 3) {
-        try {
-          // Wrap distillation in a timeout
-          const distillPromise = DV.ai.distill(extracted, state.settings.ai);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Distillation timed out after 5 minutes')), DISTILL_TIMEOUT)
-          );
-
-          const res = await Promise.race([distillPromise, timeoutPromise]);
-          html = res.html;
-          aiTags = res.tags;
-          break;
-        } catch (e) {
-          attempts++;
-          const isRetryable = /503|429|Service Unavailable|Rate Limit/i.test(e.message);
-          if (isRetryable && attempts < 3) {
-            await new Promise(r => setTimeout(r, attempts * 2000));
-            continue;
-          }
-          throw e;
-        }
-      }
+      const res = await DV.ai.distill(extracted, state.settings.ai);
+      const html = res.html;
+      const aiTags = res.tags;
 
       const durationMs = Date.now() - (item.startedAt || start);
 

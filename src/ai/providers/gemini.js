@@ -32,25 +32,55 @@
     const model = ['gemini-3.1-pro-preview', 'gemini-3-flash-preview'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro-preview';
     if (!apiKey) throw new Error('Gemini API key required');
 
-    const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
-        tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0.3 }
-      })
-    });
+    let attempts = 0;
+    while (attempts < 3) {
+      attempts++;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute max per chunk
 
-    if (!res.ok) {
-      let msg = `${res.status} ${res.statusText}`;
-      try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
-      throw new Error('Gemini API error: ' + msg);
+      try {
+        const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
+            tools: [{ google_search: {} }],
+            generationConfig: { temperature: 0.3 }
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          let msg = `${res.status} ${res.statusText}`;
+          try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
+          const err = new Error('Gemini API error: ' + msg);
+          err.status = res.status;
+          throw err;
+        }
+
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+        if (!text) throw new Error('Gemini API returned an empty response or was blocked by safety filters.');
+
+        return DV.utils.wrapHtml(text, extracted.title || 'Distilled');
+
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const isRetryable = err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
+
+        if (isRetryable && attempts < 3) {
+          // Exponential backoff: 2s, 4s...
+          await new Promise(r => setTimeout(r, attempts * 2000));
+          continue;
+        }
+
+        // Give a descriptive error message on final failure
+        if (err.name === 'AbortError') throw new Error('Gemini API timed out after 5 minutes.');
+        throw err;
+      }
     }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
-    return DV.utils.wrapHtml(text, extracted.title || 'Distilled');
   }
 
   window.DV = window.DV || {};
