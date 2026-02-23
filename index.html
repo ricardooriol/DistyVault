@@ -10,6 +10,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DistyVault</title>
   <meta name="description" content="Gather, distill and control your knowledge" />
+  <script>
+    // Silence non-production CDN warnings (Tailwind/Babel) to keep the console clean
+    (function () {
+      const log = console.log, warn = console.warn, info = console.info;
+      const isSlop = (m) => typeof m === 'string' && (m.includes('tailwindcss.com') || m.includes('Babel'));
+      console.log = (...a) => isSlop(a[0]) ? null : log(...a);
+      console.warn = (...a) => isSlop(a[0]) ? null : warn(...a);
+      console.info = (...a) => isSlop(a[0]) ? null : info(...a);
+    })();
+  </script>
   <!-- TailwindCSS via CDN (dark mode via 'class') -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
