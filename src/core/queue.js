@@ -109,11 +109,11 @@
     const now = Date.now();
     const id = item.id || DV.db.uid();
     const autoTags = (item.tags || []).slice();
-    if (item.kind === 'youtube') autoTags.push('source:youtube');
-    else if (item.kind === 'file') autoTags.push('source:file');
+    if (item.kind === 'youtube') autoTags.push('youtube');
+    else if (item.kind === 'file') autoTags.push('file');
     else if (item.kind === 'url' && item.url) {
-      if (item.url.includes('substack.com')) autoTags.push('source:substack');
-      else autoTags.push('source:web');
+      if (item.url.includes('substack.com')) autoTags.push('substack');
+      else autoTags.push('web');
     }
     const tags = Array.from(new Set(autoTags.map(t => t.toLowerCase().trim()))).filter(Boolean);
 
@@ -228,9 +228,18 @@
 
       let html, aiTags;
       let attempts = 0;
+
+      const DISTILL_TIMEOUT = 300000; // 5 minutes
+
       while (attempts < 3) {
         try {
-          const res = await DV.ai.distill(extracted, state.settings.ai);
+          // Wrap distillation in a timeout
+          const distillPromise = DV.ai.distill(extracted, state.settings.ai);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Distillation timed out after 5 minutes')), DISTILL_TIMEOUT)
+          );
+
+          const res = await Promise.race([distillPromise, timeoutPromise]);
           html = res.html;
           aiTags = res.tags;
           break;
@@ -324,11 +333,11 @@
     if (!item) return;
     await DV.db.del('contents', id);
     const autoTags = [];
-    if (item.kind === 'youtube') autoTags.push('source:youtube');
-    else if (item.kind === 'file') autoTags.push('source:file');
+    if (item.kind === 'youtube') autoTags.push('youtube');
+    else if (item.kind === 'file') autoTags.push('file');
     else if (item.kind === 'url' && item.url) {
-      if (item.url.includes('substack.com')) autoTags.push('source:substack');
-      else autoTags.push('source:web');
+      if (item.url.includes('substack.com')) autoTags.push('substack');
+      else autoTags.push('web');
     }
     return await updateItem(id, {
       status: STATUS.PENDING,

@@ -627,9 +627,23 @@ function App() {
       await yieldToBrowser();
       const content = await DV.db.get('contents', it.id);
       if (content?.html) {
+        // Content scrubbing: remove style/script tags and then strip remaining HTML
+        const scrubbed = content.html
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
         const doc = new jspdf.jsPDF();
-        doc.text(it.title, 10, 10);
-        doc.text(content.html.replace(/<[^>]+>/g, ' ').slice(0, 10000), 10, 20);
+        const splitTitle = doc.splitTextToSize(it.title, 180);
+        doc.setFontSize(16);
+        doc.text(splitTitle, 10, 20);
+        doc.setFontSize(10);
+        const splitBody = doc.splitTextToSize(scrubbed, 180);
+        doc.text(splitBody, 10, 35);
+
         const b = doc.output('blob');
         if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
         else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
@@ -647,7 +661,7 @@ function App() {
         <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
         <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} onSort={setSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
-      <SelectionDock count={selected.length} anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))} allSelected={selected.length === items.length} onView={() => setViewItem(items.find(i => i.id === selected[0]))} onRetry={async () => { for (const id of selected) await DV.queue.resetItem(id); DV.queue.loadQueue(); setSelected([]); }} onDownload={() => handleDownloadBulk(selected)} onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); DV.queue.loadQueue(); setSelected([]); } }} onStop={() => selected.forEach(id => DV.queue.requestStop(id))} onSelectAll={() => setSelected(items.map(i => i.id))} onUnselectAll={() => setSelected([])} onTag={() => setTagEditorOpen(true)} />
+      <SelectionDock count={selected.length} anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))} allSelected={selected.length === items.length} onView={() => setViewItem(items.find(i => i.id === selected[0]))} onRetry={async () => { for (const id of selected) await DV.queue.resetItem(id); setSelected([]); DV.queue.loadQueue(); }} onDownload={() => handleDownloadBulk(selected)} onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); setSelected([]); DV.queue.loadQueue(); } }} onStop={() => selected.forEach(id => DV.queue.requestStop(id))} onSelectAll={() => setSelected(items.map(i => i.id))} onUnselectAll={() => setSelected([])} onTag={() => setTagEditorOpen(true)} />
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={s => { setSettings(s); DV.queue.setSettings(s); }} />
       <TagEditorModal open={tagEditorOpen} onClose={() => setTagEditorOpen(false)} selectedIds={selected} items={items} allTags={allTags} />
