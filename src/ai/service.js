@@ -229,6 +229,11 @@
           Re-number all points sequentially starting from 1.
           Preserve all unique insights and do not lose any information.
           Output ONLY the merged numbered list — no introductions, no commentary.
+          
+          CRITICAL: TAGS SECTION (MANDATORY)
+          At the very end of your response, after the last numbered point, you MUST provide ONE line starting exactly with "TAGS: " followed by 3 to 5 high-quality, relevant categorization tags separated by commas.
+          Output absolutely NOTHING after the TAGS line.
+          Example: TAGS: Psychology, Habit Formation, Productivity
         `;
         const mergeContent = chunkResults.map((r, i) => `--- Part ${i + 1} ---\n${r}`).join('\n\n');
         const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified document:\n\n${mergeContent}`;
