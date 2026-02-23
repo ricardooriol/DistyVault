@@ -353,12 +353,12 @@ function Table({ items, allItems, selected, setSelected, onSort, expandedIds, se
   );
 }
 
-function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
+function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag, canView }) {
   if (!count) return null;
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow">
       <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar">
-        {count === 1 && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>}
+        {canView && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>}
         <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
         {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
         <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="arrow-down-to-line" /><span>Download</span></button>
@@ -661,7 +661,20 @@ function App() {
         <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
         <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} onSort={setSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
-      <SelectionDock count={selected.length} anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))} allSelected={selected.length === items.length} onView={() => setViewItem(items.find(i => i.id === selected[0]))} onRetry={async () => { for (const id of selected) await DV.queue.resetItem(id); setSelected([]); DV.queue.loadQueue(); }} onDownload={() => handleDownloadBulk(selected)} onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); setSelected([]); DV.queue.loadQueue(); } }} onStop={() => selected.forEach(id => DV.queue.requestStop(id))} onSelectAll={() => setSelected(items.map(i => i.id))} onUnselectAll={() => setSelected([])} onTag={() => setTagEditorOpen(true)} />
+      <SelectionDock
+        count={selected.length}
+        anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))}
+        allSelected={selected.length === items.length}
+        canView={selected.length === 1 && items.find(i => i.id === selected[0])?.status === STATUS.COMPLETED}
+        onView={() => setViewItem(items.find(i => i.id === selected[0]))}
+        onRetry={async () => { for (const id of selected) await DV.queue.resetItem(id); setSelected([]); DV.queue.loadQueue(); }}
+        onDownload={() => handleDownloadBulk(selected)}
+        onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); setSelected([]); DV.queue.loadQueue(); } }}
+        onStop={() => selected.forEach(id => DV.queue.requestStop(id))}
+        onSelectAll={() => setSelected(items.map(i => i.id))}
+        onUnselectAll={() => setSelected([])}
+        onTag={() => setTagEditorOpen(true)}
+      />
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={s => { setSettings(s); DV.queue.setSettings(s); }} />
       <TagEditorModal open={tagEditorOpen} onClose={() => setTagEditorOpen(false)} selectedIds={selected} items={items} allTags={allTags} />
