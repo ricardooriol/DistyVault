@@ -22,7 +22,6 @@ module.exports = async (req, res) => {
 
   try {
     const targetUrlParsed = new URL(u);
-    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(u);
     const isYouTube = /youtube\.com|youtu\.be/.test(u);
 
     // 3. Forward the request parameters with "Human Mimicry"
@@ -44,8 +43,8 @@ module.exports = async (req, res) => {
       headers.set('User-Agent', chromeUA);
       headers.set('Accept-Language', 'en-US,en;q=0.9');
     } else {
-      // Enforce high-success identity
-      headers.set('User-Agent', isNewsletter ? googleBotUA : chromeUA);
+      // Enforce high-success identity universally
+      headers.set('User-Agent', googleBotUA);
       headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
       headers.set('Accept-Language', 'en-US,en;q=0.9');
 
@@ -55,12 +54,6 @@ module.exports = async (req, res) => {
       headers.set('Sec-Fetch-Site', 'none');
       headers.set('Sec-Fetch-User', '?1');
       headers.set('Upgrade-Insecure-Requests', '1');
-
-      if (!isNewsletter) {
-        headers.set('Sec-Ch-Ua', '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"');
-        headers.set('Sec-Ch-Ua-Mobile', '?0');
-        headers.set('Sec-Ch-Ua-Platform', '"Windows"');
-      }
     }
 
     // Special case for YouTube to appear more like a real user

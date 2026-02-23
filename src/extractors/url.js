@@ -31,31 +31,21 @@
 
     let res = null;
     const timeout = 30000;
-    const isStealthDomain = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(url);
-    const useProxyFirst = isStealthDomain || url.includes('youtube.com') || url.includes('youtu.be');
 
     // Helper to check if body looks like a 'blocked' page
     const isBlocked = (html) => {
       if (!html) return true;
       const h = html.toLowerCase();
-      return (h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser')) && h.length < 1000;
+      // Added 'just a moment...' to catch general CloudFlare blocks universally
+      return (h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser') || h.includes('just a moment')) && h.length < 1500;
     };
 
-    // Attempt 1: Direct Fetch (Skip for known blockers to avoid ugly console errors)
-    if (!useProxyFirst) {
-      try {
-        res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow' }, timeout);
-      } catch (e) { res = null; }
-    }
+    // Attempt 1: Local API Proxy (Our most powerful steering, universally applied to prevent browser CORS errors)
+    try {
+      res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
+    } catch (e) { res = null; }
 
-    // Attempt 2: Local API Proxy (Our most powerful steering)
-    if (!res || !res.ok) {
-      try {
-        res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
-      } catch (e) { res = null; }
-    }
-
-    // Attempt 3: Public Proxy (Last resort)
+    // Attempt 2: Public Proxy (Last resort)
     if (!res || !res.ok) {
       try {
         res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
@@ -106,19 +96,11 @@
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
     let res = null;
-    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(url);
 
-    if (!isNewsletter) {
-      try {
-        res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000);
-      } catch { res = null; }
-    }
+    try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
 
     if (!res || !res.ok) {
-      try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
-      if (!res || !res.ok) {
-        try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
-      }
+      try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
     }
     if (!res || !res.ok) return null;
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
