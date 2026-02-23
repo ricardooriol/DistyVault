@@ -315,6 +315,30 @@
     } catch { }
   }
 
+  /**
+   * Fully reset an item's processed data and set back to PENDING.
+   * Clears duration, tags, contents, and errors.
+   */
+  async function resetItem(id) {
+    const item = await DV.db.get('items', id);
+    if (!item) return;
+    await DV.db.del('contents', id);
+    const autoTags = [];
+    if (item.kind === 'youtube') autoTags.push('source:youtube');
+    else if (item.kind === 'file') autoTags.push('source:file');
+    else if (item.kind === 'url' && item.url) {
+      if (item.url.includes('substack.com')) autoTags.push('source:substack');
+      else autoTags.push('source:web');
+    }
+    return await updateItem(id, {
+      status: STATUS.PENDING,
+      error: null,
+      durationMs: 0,
+      startedAt: null,
+      tags: Array.from(new Set(autoTags)).filter(Boolean)
+    });
+  }
+
   window.DV = window.DV || {};
-  window.DV.queue = { STATUS, addItem, updateItem, updateTags, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, syncLocalSummary };
+  window.DV.queue = { STATUS, addItem, updateItem, resetItem, updateTags, requestStop, setConcurrency, loadQueue, clearAll, setSettings, loadSettings, getSettings, syncLocalSummary };
 })();

@@ -42,11 +42,20 @@
       try {
         res = await DV.utils.fetchWithTimeout(proxied, { redirect: 'follow' });
       } catch (e) {
-        const msg = String(e?.message || e);
-        if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL (proxy)');
-        throw new Error('Fetch failed and proxy fallback failed: ' + msg);
+        res = null;
       }
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (res.statusText || '') + ' (via proxy)');
+    }
+
+    if (!res || !res.ok) {
+      const bypass = 'https://corsproxy.io/?' + encodeURIComponent(url);
+      try {
+        res = await DV.utils.fetchWithTimeout(bypass, { redirect: 'follow' });
+      } catch (e) {
+        const msg = String(e?.message || e);
+        if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL (cors-bypass)');
+        throw new Error('All fetch methods failed (Direct, API Proxy, Public Proxy): ' + msg);
+      }
+      if (!res.ok) throw new Error('CORS Bypass failed: HTTP ' + res.status);
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
@@ -82,6 +91,9 @@
       res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,*/*;q=0.5' } }, 7000);
     } catch {
       try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+      if (!res || !res.ok) {
+        try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+      }
     }
     if (!res || !res.ok) return null;
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
