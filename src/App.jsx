@@ -538,18 +538,35 @@ function App() {
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState(new Set());
 
+  const refreshTimeoutRef = useRef(null);
+  const refresh = useCallback(() => {
+    if (refreshTimeoutRef.current) return;
+    refreshTimeoutRef.current = setTimeout(async () => {
+      try {
+        const all = await DV.db.getAll('items');
+        setItems(all);
+      } finally {
+        refreshTimeoutRef.current = null;
+      }
+    }, 100);
+  }, []);
+
   // Init & Events
   useEffect(() => {
-    const refresh = async () => setItems(await DV.db.getAll('items'));
     const offAdd = DV.bus.on('items:added', refresh);
     const offUpd = DV.bus.on('items:updated', refresh);
     const offLoad = DV.bus.on('items:loaded', (i) => setItems(i));
     const offErr = DV.bus.on('ui:openError', setErrorItem);
-    const offProgress = DV.bus.on('queue:progress', refresh); // Listen for queue progress
+    const offProgress = DV.bus.on('queue:progress', refresh);
+
     DV.queue.loadSettings().then(() => setSettings(DV.queue.getSettings()));
     DV.queue.loadQueue();
-    return () => { offAdd(); offUpd(); offLoad(); offErr(); offProgress(); };
-  }, []);
+
+    return () => {
+      offAdd(); offUpd(); offLoad(); offErr(); offProgress();
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+    };
+  }, [refresh]);
 
   const setTheme = (t) => {
     setThemeState(t);

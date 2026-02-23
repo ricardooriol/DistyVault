@@ -206,6 +206,9 @@
     if (state.processing.has(id)) return;
     state.processing.add(id);
 
+    // Immediate UI feedback that this item is being picked up
+    DV.bus.emit('queue:progress');
+
     const start = Date.now();
     let item = await DV.db.get('items', id);
     if (!item) { state.processing.delete(id); return; }
@@ -215,6 +218,13 @@
       item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start });
 
       const extracted = await DV.extractors.extract(item);
+
+      // Validation: Ensure we actually got content. Bloated error pages from proxies 
+      // often return tiny or empty text.
+      if (!extracted?.text || extracted.text.length < 100) {
+        throw new Error('Insufficient content extracted. The source might be behind a login or blocking extraction.');
+      }
+
       try {
         const newTitle = extracted?.title || item.title;
         const newUrl = extracted?.url || item.url;
@@ -285,18 +295,32 @@
    * Scheduler: fills available concurrency slots with oldest pending items.
    */
   async function tick() {
-    const active = state.processing.size;
-    const want = Math.max(0, state.concurrency - active);
-    if (want <= 0) return;
+    if (state.isTicking) return;
+    state.isTicking = true;
 
-    const items = await DV.db.getAll('items');
-    const pending = items
-      .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
-      .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0));
+    try {
+      const active = state.processing.size;
+      const want = Math.max(0, state.concurrency - active);
+      if (want <= 0) return;
 
-    for (const itm of pending.slice(0, want)) {
-      processOne(itm.id);
+      const items = await DV.db.getAll('items');
+      const pending = items
+        .filter(i => i.status === STATUS.PENDING && i.kind !== 'playlist')
+        .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0));
+
+      for (const itm of pending.slice(0, want)) {
+        // Double-check processing set inside the loop to catch overlaps
+        if (!state.processing.has(itm.id)) {
+          processOne(itm.id);
+        }
+      }
+    } finally {
+      state.isTicking = false;
     }
+
+    // Refresh memory queue
+    const all = await DV.db.getAll('items');
+    state.queue = all.sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0)).map(i => i.id);
   }
 
   /**
