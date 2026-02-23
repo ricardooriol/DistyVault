@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
 
   try {
     const targetUrlParsed = new URL(u);
-    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|beehiiv\.com|newsletter/.test(u);
+    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(u);
     const isYouTube = /youtube\.com|youtu\.be/.test(u);
 
     // 3. Forward the request parameters with "Human Mimicry"

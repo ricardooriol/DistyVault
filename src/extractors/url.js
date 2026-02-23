@@ -31,7 +31,7 @@
 
     let res = null;
     const timeout = 30000;
-    const isStealthDomain = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|beehiiv\.com|newsletter/.test(url);
+    const isStealthDomain = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(url);
     const useProxyFirst = isStealthDomain || url.includes('youtube.com') || url.includes('youtu.be');
 
     // Helper to check if body looks like a 'blocked' page
@@ -106,7 +106,7 @@
     let url = normalizeUrl(inputUrl);
     if (!url) return null;
     let res = null;
-    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com/.test(url);
+    const isNewsletter = /substack\.com|thedankoe\.com|beehiiv\.com|medium\.com|bytebytego\.com|ghost\.io|stoicwisdoms\.com|newsletter/.test(url);
 
     if (!isNewsletter) {
       try {
