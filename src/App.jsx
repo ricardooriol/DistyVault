@@ -232,18 +232,18 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
           </div>
 
           <div className="relative" ref={tagsRef}>
-            <button onClick={() => setTagsOpen(!tagsOpen)} className={classNames('h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 flex items-center gap-2 text-xs font-medium transition-colors bg-white dark:bg-slate-800', tagFilter ? 'text-brand-600 border-brand-500' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')}>
-              <Icon name="tag" size={14} />
+            <button onClick={() => setTagsOpen(!tagsOpen)} className={classNames('h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 flex items-center gap-2 text-sm font-medium transition-colors bg-white dark:bg-slate-800', tagFilter ? 'text-brand-600 border-brand-500' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')}>
+              <Icon name="tag" size={16} />
               <span>{tagFilter || 'All Tags'}</span>
-              <Icon name="chevron-down" size={12} className={classNames('transition-transform', tagsOpen && 'rotate-180')} />
+              <Icon name="chevron-down" size={14} className={classNames('transition-transform', tagsOpen && 'rotate-180')} />
             </button>
             {tagsOpen && (
-              <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-xl z-20 flex flex-col min-w-[140px] max-h-60 overflow-y-auto no-scrollbar">
-                <button onClick={() => { setTagFilter(''); setTagsOpen(false); }} className={classNames('w-full px-3 py-2 text-left rounded-lg text-xs', !tagFilter ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
+              <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-xl z-20 flex flex-col min-w-[160px] max-h-64 overflow-y-auto no-scrollbar">
+                <button onClick={() => { setTagFilter(''); setTagsOpen(false); }} className={classNames('w-full px-3 py-3 text-left rounded-lg text-sm flex items-center', !tagFilter ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
                   All Tags
                 </button>
                 {allTags.map(tag => (
-                  <button key={tag} onClick={() => { setTagFilter(tag); setTagsOpen(false); }} className={classNames('w-full px-3 py-2 text-left rounded-lg text-xs truncate', tagFilter === tag ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
+                  <button key={tag} onClick={() => { setTagFilter(tag); setTagsOpen(false); }} className={classNames('w-full px-3 py-3 text-left rounded-lg text-sm truncate flex items-center', tagFilter === tag ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
                     #{tag}
                   </button>
                 ))}
