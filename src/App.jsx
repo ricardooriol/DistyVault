@@ -545,9 +545,10 @@ function App() {
     const offUpd = DV.bus.on('items:updated', refresh);
     const offLoad = DV.bus.on('items:loaded', (i) => setItems(i));
     const offErr = DV.bus.on('ui:openError', setErrorItem);
+    const offProgress = DV.bus.on('queue:progress', refresh); // Listen for queue progress
     DV.queue.loadSettings().then(() => setSettings(DV.queue.getSettings()));
     DV.queue.loadQueue();
-    return () => { offAdd(); offUpd(); offLoad(); offErr(); };
+    return () => { offAdd(); offUpd(); offLoad(); offErr(); offProgress(); };
   }, []);
 
   const setTheme = (t) => {
@@ -736,7 +737,7 @@ function App() {
       <TopBar theme={theme} setTheme={setTheme} openSettings={() => setSettingsOpen(true)} />
       <div className="px-4">
         <CapturePanel onSubmit={handleCapture} />
-        <StatsRow items={items} onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))} onStopAll={() => items.forEach(i => DV.queue.requestStop(i.id))} onRetryFailed={async () => { for (const i of items.filter(x => x.status === STATUS.ERROR)) await DV.queue.resetItem(i.id); DV.queue.loadQueue(); }} />
+        <StatsRow items={items} onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))} onStopAll={() => items.forEach(i => DV.queue.requestStop(i.id))} onRetryFailed={async () => { await Promise.all(items.filter(x => x.status === STATUS.ERROR).map(i => DV.queue.resetItem(i.id))); DV.queue.loadQueue(); }} />
         <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} sort={sort} setSort={setSort} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
         <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} onSort={setSort} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
@@ -746,9 +747,9 @@ function App() {
         allSelected={selected.length === items.length}
         canView={selected.length === 1 && items.find(i => i.id === selected[0])?.status === STATUS.COMPLETED}
         onView={() => setViewItem(items.find(i => i.id === selected[0]))}
-        onRetry={async () => { for (const id of selected) await DV.queue.resetItem(id); setSelected([]); DV.queue.loadQueue(); }}
+        onRetry={async () => { await Promise.all(selected.map(id => DV.queue.resetItem(id))); setSelected([]); DV.queue.loadQueue(); }}
         onDownload={() => handleDownloadBulk(selected)}
-        onDelete={async () => { if (confirm('Delete?')) { for (const id of selected) await DV.db.del('items', id); setSelected([]); DV.queue.loadQueue(); } }}
+        onDelete={async () => { if (confirm('Delete?')) { await Promise.all(selected.map(id => DV.db.del('items', id))); setSelected([]); DV.queue.loadQueue(); } }}
         onStop={() => selected.forEach(id => DV.queue.requestStop(id))}
         onSelectAll={() => setSelected(items.map(i => i.id))}
         onUnselectAll={() => setSelected([])}
