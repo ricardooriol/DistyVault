@@ -415,11 +415,11 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
   useEffect(() => { setLocal(settings); }, [settings]);
 
   const providers = [
-    { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-4o', l: 'GPT-4o' }, { v: 'o1', l: 'o1' }] },
-    { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-3-7-sonnet-latest', l: 'Claude 3.7 Sonnet' }, { v: 'claude-3-5-sonnet-latest', l: 'Claude 3.5 Sonnet' }] },
-    { id: 'gemini', name: 'Gemini', models: [{ v: 'gemini-2.0-flash', l: 'Gemini 2.0 Flash' }, { v: 'gemini-1.5-pro', l: 'Gemini 1.5 Pro' }] },
+    { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-5.2', l: 'GPT-5.2' }, { v: 'gpt-5.2-pro', l: 'GPT-5.2 Pro' }] },
+    { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-opus-4.6', l: 'Claude Opus 4.6' }, { v: 'claude-sonnet-4.6', l: 'Claude Sonnet 4.6' }] },
+    { id: 'gemini', name: 'Gemini', models: [{ v: 'gemini-3.1-pro-preview', l: 'Gemini 3.1 Pro' }, { v: 'gemini-3-flash-preview', l: 'Gemini 3 Flash' }] },
     { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek-V3' }, { v: 'deepseek-reasoner', l: 'DeepSeek-R1' }] },
-    { id: 'grok', name: 'Grok', models: [{ v: 'grok-2-1212', l: 'Grok 2' }, { v: 'grok-2-vision-1212', l: 'Grok 2 Vision' }] }
+    { id: 'grok', name: 'Grok', models: [{ v: 'grok-4.1-fast', l: 'Grok 4.1 Fast' }, { v: 'grok-4.1-fast-non-reasoning', l: 'Grok 4.1 Fast (Non-Reasoning)' }] }
   ];
 
   return (
