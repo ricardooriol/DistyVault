@@ -29,33 +29,36 @@
     url = normalizeUrl(url);
     if (!url) throw new Error('No URL');
 
-    let res;
+    let res = null;
+    const timeout = 30000; // 30s hard limit for the whole chain
+
+    // Attempt 1: Direct Fetch
     try {
-      res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow', headers: { 'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8' } });
-    } catch (err) {
-      const msg = String(err?.message || err);
-      if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL');
+      res = await DV.utils.fetchWithTimeout(url, { mode: 'cors', redirect: 'follow' }, timeout);
+    } catch (e) {
       res = null;
     }
+
+    // Attempt 2: Local API Proxy
     if (!res || !res.ok) {
-      const proxied = '/api/fetch?url=' + encodeURIComponent(url);
       try {
-        res = await DV.utils.fetchWithTimeout(proxied, { redirect: 'follow' });
+        res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
       } catch (e) {
         res = null;
       }
     }
 
+    // Attempt 3: Public CORS Proxy
     if (!res || !res.ok) {
-      const bypass = 'https://corsproxy.io/?' + encodeURIComponent(url);
       try {
-        res = await DV.utils.fetchWithTimeout(bypass, { redirect: 'follow' });
+        res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
       } catch (e) {
-        const msg = String(e?.message || e);
-        if (/abort/i.test(msg)) throw new Error('Network timeout while fetching URL (cors-bypass)');
-        throw new Error('All fetch methods failed (Direct, API Proxy, Public Proxy): ' + msg);
+        throw new Error('All extraction methods failed (CORS blocked). Try manual copy-paste.');
       }
-      if (!res.ok) throw new Error('CORS Bypass failed: HTTP ' + res.status);
+    }
+
+    if (!res || !res.ok) {
+      throw new Error(`Failed to reach source (${res?.status || 'Network Error'}). CORS bypass exhausted.`);
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
