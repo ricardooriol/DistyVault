@@ -178,48 +178,82 @@ function StatsRow({ items, onDownloadAll, onStopAll, onRetryFailed }) {
 function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, sort, setSort, tagFilter, setTagFilter, allTags }) {
   const [expanded, setExpanded] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const filterRef = useRef(null);
-  const searchRef = useRef(null);
+  const tagsRef = useRef(null);
   const importInputRef = useRef(null);
 
   useEffect(() => {
-    function onDoc(e) { if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); }
-    document.addEventListener('click', onDoc);
-    return () => document.removeEventListener('click', onDoc);
-  }, [filterOpen]);
+    function onDoc(e) {
+      if (filterOpen && filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
+      if (tagsOpen && tagsRef.current && !tagsRef.current.contains(e.target)) setTagsOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [filterOpen, tagsOpen]);
 
   return (
-    <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass">
-      <div className="flex items-center gap-3">
-        <button onClick={() => { setExpanded(!expanded); if (expanded) setSearch(''); }} className={classNames('w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800', expanded && 'ring-2 ring-brand-500')}><Icon name="search" /></button>
-        {expanded && <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="h-9 flex-1 min-w-0 max-w-[400px] px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100" />}
+    <div className="max-w-6xl mx-auto mt-6 px-4 py-3 rounded-2xl border border-slate-400 dark:border-white/20 bg-white/90 dark:bg-slate-800/60 glass relative overflow-hidden">
+      {/* Search Overlay */}
+      <div className={classNames('absolute inset-0 z-50 bg-white dark:bg-slate-900 px-4 flex items-center gap-3 transition-transform duration-200', expanded ? 'translate-y-0' : '-translate-y-full')}>
+        <Icon name="search" className="text-slate-400" />
+        <input
+          autoFocus={expanded}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search items..."
+          className="flex-1 bg-transparent outline-none text-slate-900 dark:text-slate-100 font-medium"
+        />
+        <button onClick={() => { setExpanded(false); setSearch(''); }} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg">
+          <Icon name="x" />
+        </button>
+      </div>
 
-        <div className="relative z-20" ref={filterRef}>
-          <button onClick={() => setFilterOpen(!filterOpen)} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-            <Icon name={filter === 'all' ? 'asterisk' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : 'file'} />
+      <div className="flex items-center gap-3">
+        <button onClick={() => setExpanded(true)} className="w-9 h-9 shrink-0 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10">
+          <Icon name="search" />
+        </button>
+
+        <div className="relative" ref={filterRef}>
+          <button onClick={() => setFilterOpen(!filterOpen)} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center text-slate-900 dark:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10">
+            <Icon name={filter === 'all' ? 'layers' : filter === 'url' ? 'link' : filter === 'youtube' ? 'video' : 'file'} />
           </button>
           {filterOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-lg z-50 flex flex-col gap-1">
-              {[{ k: 'all', i: 'asterisk' }, { k: 'url', i: 'link' }, { k: 'youtube', i: 'video' }, { k: 'file', i: 'file' }].map(f => (
-                <button key={f.k} onClick={() => { setFilter(f.k); setFilterOpen(false); }} className={classNames('w-9 h-9 flex items-center justify-center rounded-lg', filter === f.k ? 'bg-slate-100 dark:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/10')}><Icon name={f.i} /></button>
+            <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-xl z-20 flex flex-col min-w-[120px]">
+              {[{ k: 'all', i: 'layers', l: 'All Items' }, { k: 'url', i: 'link', l: 'URLs' }, { k: 'youtube', i: 'video', l: 'YouTube' }, { k: 'file', i: 'file', l: 'Files' }].map(f => (
+                <button key={f.k} onClick={() => { setFilter(f.k); setFilterOpen(false); }} className={classNames('w-full px-3 py-2 flex items-center gap-2 rounded-lg text-sm transition-colors', filter === f.k ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
+                  <Icon name={f.i} size={16} />
+                  <span>{f.l}</span>
+                </button>
               ))}
             </div>
           )}
         </div>
 
-        {allTags && allTags.length > 0 && (
-          <div className="flex items-center gap-1 overflow-x-auto max-w-[40%] no-scrollbar">
-            <button onClick={() => setTagFilter('')} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0', !tagFilter ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300')}>All</button>
-            {allTags.map(tag => (
-              <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)} className={classNames('px-2 py-0.5 text-xs rounded-full border shrink-0 truncate max-w-[120px]', tagFilter === tag ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300')}>{tag}</button>
-            ))}
-          </div>
-        )}
+        <div className="relative" ref={tagsRef}>
+          <button onClick={() => setTagsOpen(!tagsOpen)} className={classNames('h-9 px-3 rounded-lg border border-slate-400 dark:border-white/30 flex items-center gap-2 text-sm font-medium transition-colors bg-white dark:bg-slate-800', tagFilter ? 'text-brand-600 border-brand-500' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10')}>
+            <Icon name="tag" size={16} />
+            <span>{tagFilter || 'All Tags'}</span>
+            <Icon name="chevron-down" size={14} className={classNames('transition-transform', tagsOpen && 'rotate-180')} />
+          </button>
+          {tagsOpen && (
+            <div className="absolute left-0 mt-2 p-1 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800 shadow-xl z-20 flex flex-col min-w-[160px] max-h-60 overflow-y-auto no-scrollbar">
+              <button onClick={() => { setTagFilter(''); setTagsOpen(false); }} className={classNames('w-full px-3 py-2 text-left rounded-lg text-sm', !tagFilter ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
+                All Tags
+              </button>
+              {allTags.map(tag => (
+                <button key={tag} onClick={() => { setTagFilter(tag); setTagsOpen(false); }} className={classNames('w-full px-3 py-2 text-left rounded-lg text-sm truncate', tagFilter === tag ? 'bg-brand-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300')}>
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           <input type="file" accept=".zip" className="hidden" ref={importInputRef} onChange={e => { if (e.target.files[0]) onImport(e.target.files[0]); e.target.value = ''; }} />
-          <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800"><Icon name="download" /></button>
-          <button onClick={onExport} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800"><span style={{ transform: 'rotate(180deg)' }}><Icon name="download" /></span></button>
+          <button onClick={() => importInputRef.current?.click()} title="Import" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="upload" /></button>
+          <button onClick={onExport} title="Export" className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="download" /></button>
         </div>
       </div>
     </div>
