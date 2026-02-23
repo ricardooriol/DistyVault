@@ -36,6 +36,8 @@
     settings: defaultSettings
   };
 
+  let queueCounter = Date.now();
+
   /**
    * Compute aggregate counts for UI summary and quick metrics.
    * Playlists are counted separately and excluded from progress states.
@@ -133,7 +135,7 @@
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
       error: null,
       durationMs: 0,
-      queueIndex: state.queue.length,
+      queueIndex: ++queueCounter,
     };
     await DV.db.put('items', record);
     if (item.file) {
@@ -365,6 +367,7 @@
       error: null,
       durationMs: 0,
       startedAt: null,
+      queueIndex: ++queueCounter,
       tags: Array.from(new Set(autoTags)).filter(Boolean)
     });
   }
