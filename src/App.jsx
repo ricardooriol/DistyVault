@@ -539,16 +539,29 @@ function App() {
   const [expandedIds, setExpandedIds] = useState(new Set());
 
   const refreshTimeoutRef = useRef(null);
+  const pendingRefresh = useRef(false);
+
   const refresh = useCallback(() => {
-    if (refreshTimeoutRef.current) return;
-    refreshTimeoutRef.current = setTimeout(async () => {
+    if (refreshTimeoutRef.current) {
+      pendingRefresh.current = true;
+      return;
+    }
+
+    const execute = async () => {
       try {
         const all = await DV.db.getAll('items');
         setItems(all);
       } finally {
-        refreshTimeoutRef.current = null;
+        if (pendingRefresh.current) {
+          pendingRefresh.current = false;
+          refreshTimeoutRef.current = setTimeout(execute, 20);
+        } else {
+          refreshTimeoutRef.current = null;
+        }
       }
-    }, 100);
+    };
+
+    refreshTimeoutRef.current = setTimeout(execute, 20);
   }, []);
 
   // Init & Events
