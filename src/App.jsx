@@ -560,7 +560,12 @@ function App() {
     const msg = { type: 'dv-theme', isDark };
     window.postMessage(msg, '*');
     document.querySelectorAll('iframe').forEach(f => {
-      try { f.contentWindow.postMessage(msg, '*'); } catch (e) { }
+      try {
+        f.contentWindow.postMessage(msg, '*');
+        if (f.contentDocument && f.contentDocument.documentElement) {
+          f.contentDocument.documentElement.classList.toggle('dark', isDark);
+        }
+      } catch (e) { }
     });
   };
 
@@ -674,13 +679,23 @@ function ContentModal({ item, onClose }) {
       const doc = e.target.contentDocument;
       if (!win || !doc) return;
 
-      // Inject "View Mode" specific style: hide footer
+      // Inject style: hide footer AND force dark mode support for old items
       const style = doc.createElement('style');
-      style.textContent = '.dv-footer { display: none !important; }';
+      style.textContent = `
+        .dv-footer { display: none !important; }
+        html.dark body { color: #f1f5f9 !important; background: #0f172a !important; }
+        html.dark .dv-head { color: #ffffff !important; }
+        html.dark .dv-meta { color: #94a3b8 !important; }
+        html.dark .dv-link { color: #818cf8 !important; }
+        html.dark hr { border-top-color: #1e293b !important; }
+      `;
       doc.head.appendChild(style);
 
-      // Trigger initial theme sync
+      // Trigger initial theme sync via direct class injection (works for old and new)
       const isDark = document.documentElement.classList.contains('dark');
+      doc.documentElement.classList.toggle('dark', isDark);
+
+      // Still send message for new items that use the listener
       win.postMessage({ type: 'dv-theme', isDark }, '*');
     } catch (err) { }
   };
