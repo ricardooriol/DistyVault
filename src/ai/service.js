@@ -34,20 +34,6 @@
   }
 
   /**
-   * Map of provider keys to their respective client objects exposed on the global `DV`.
-   * Indirection allows lazy binding to providers loaded on the page and isolates lookups
-   * in a single place.
-   * @returns {{[key:string]: { distill: Function, test?: Function }}}
-   */
-  const map = () => ({
-    openai: DV.aiProviders.openai,
-    gemini: DV.aiProviders.gemini,
-    anthropic: DV.aiProviders.anthropic,
-    deepseek: DV.aiProviders.deepseek,
-    grok: DV.aiProviders.grok,
-  });
-
-  /**
    * Orchestrate AI-based distillation for extracted content using the selected provider.
    * Prepares a rigorous system directive and user content, then delegates to the provider
    * `distill` method. The provider returns HTML which is post-processed into a standardized
@@ -69,12 +55,13 @@
    * @returns {Promise<string>} Standardized HTML document containing the distilled content
    */
   async function distill(extracted, aiSettings) {
-    const key = (aiSettings?.mode);
+    const key = (aiSettings?.mode || '').toLowerCase();
     if (!key) throw new Error('No AI provider selected. Open Settings and choose a provider.');
-    const provider = map()[key];
+    const provider = window.DV?.aiProviders?.[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
     const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
-    const fullText = extracted.text || '';
+    const fullText = (extracted.text || '').trim();
+    if (!fullText) throw new Error('No text content available to distill.');
 
     // High-specificity system directive that enforces the output format for downstream parsing
     const directive = dedent`
@@ -175,6 +162,7 @@
      * with CHUNK_OVERLAP overlap between adjacent chunks.
      */
     function chunkText(text) {
+      if (!text) return [];
       if (text.length <= CHUNK_SIZE) return [text];
       const chunks = [];
       let start = 0;
@@ -185,10 +173,11 @@
           break;
         }
         // Find paragraph break near the boundary
-        const searchRegion = text.slice(end - 300, end + 300);
+        const regionStart = Math.max(0, end - 300);
+        const searchRegion = text.slice(regionStart, end + 300);
         const breakIdx = searchRegion.lastIndexOf('\n\n');
         if (breakIdx !== -1) {
-          end = end - 300 + breakIdx;
+          end = regionStart + breakIdx;
         }
         chunks.push(text.slice(start, end));
         start = Math.max(start + 1, end - CHUNK_OVERLAP);
@@ -267,9 +256,9 @@
    * @returns {Promise<boolean>} true if the provider is reachable/authorized
    */
   async function test(aiSettings) {
-    const key = (aiSettings?.mode);
+    const key = (aiSettings?.mode || '').toLowerCase();
     if (!key) throw new Error('No AI provider selected.');
-    const provider = map()[key];
+    const provider = window.DV?.aiProviders?.[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
     if (typeof provider.test === 'function') return await provider.test(aiSettings);
     await provider.distill({ title: 'Test', text: 'ping' }, aiSettings);

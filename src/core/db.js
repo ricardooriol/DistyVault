@@ -1,4 +1,4 @@
-(function() {
+(function () {
   /**
    * IndexedDB utility module providing a simple CRUD API and import/export helpers
    * for DistyVault data. Encapsulates database versioning, object stores, and
@@ -109,6 +109,22 @@
   }
 
   /**
+   * Clear all records from a single store.
+   * Resolves when the transaction completes.
+   * @param {string} store
+   * @returns {Promise<void>}
+   */
+  async function clear(store) {
+    const t = await tx([store], 'readwrite');
+    await new Promise((res, rej) => {
+      const r = t.objectStore(store).clear();
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
+    await new Promise(res => t.oncomplete = res);
+  }
+
+  /**
    * Retrieve all records from a store.
    * @param {string} store
    * @returns {Promise<any[]>}
@@ -133,7 +149,7 @@
     const [items, contents, settings] = await Promise.all([
       getAll('items'), getAll('contents'), getAll('settings')
     ]);
-  zip.file('items.json', JSON.stringify(items, null, 2));
+    zip.file('items.json', JSON.stringify(items, null, 2));
     const manifest = [];
     for (const c of contents) {
       const entry = { ...c };
@@ -198,5 +214,5 @@
   }
 
   window.DV = window.DV || {};
-  window.DV.db = { open, put, get, del, getAll, exportAllToZip, importFromZip, uid };
+  window.DV.db = { open, put, get, del, clear, getAll, exportAllToZip, importFromZip, uid };
 })();

@@ -10,7 +10,7 @@
   function buildPayload(settings) {
     const prepared = settings?.__prepared || {};
     return {
-      model: settings?.model || 'claude-sonnet-4.5-latest',
+      model: ['claude-opus-4.6', 'claude-sonnet-4.6'].includes(settings?.model) ? settings.model : 'claude-opus-4.6',
       max_tokens: 16384,
       system: prepared.messages?.[0]?.content || '',
       messages: [
@@ -49,7 +49,7 @@
     const data = await res.json();
     const text = (data.content?.[0]?.text) || '';
     const title = extracted.title || extracted.fileName || extracted.url || 'Distilled';
-    return wrapHtml(text, title);
+    return DV.utils.wrapHtml(text, title);
   }
 
   /**
@@ -70,11 +70,6 @@
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }
-
-  function wrapHtml(inner, title = 'Distilled') {
-    return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title><style>body{font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:20px;color:#0f172a}h1,h2,h3{margin:16px 0 8px}p{margin:10px 0;}pre{background:#f1f5f9;padding:12px;border-radius:8px;overflow:auto}</style></head><body>${inner}</body></html>`;
-  }
-  function escapeHtml(s = '') { return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
   window.DV = window.DV || {};
   window.DV.aiProviders = window.DV.aiProviders || {};

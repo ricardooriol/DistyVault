@@ -266,9 +266,7 @@
    * Clear all items and contents from storage, reset local summary, and notify listeners.
    */
   async function clearAll() {
-    const items = await DV.db.getAll('items');
-    await Promise.all(items.map(i => DV.db.del('items', i.id)));
-    await Promise.all(items.flatMap(i => [DV.db.del('contents', i.id), DV.db.del('contents', i.id + ':file')]));
+    await Promise.all([DV.db.clear('items'), DV.db.clear('contents')]);
     state.queue = [];
     DV.bus.emit('items:loaded', []);
     try {
