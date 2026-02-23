@@ -413,6 +413,7 @@ function Modal({ open, onClose, title, children, hideHeader }) {
 function SettingsDrawer({ open, onClose, settings, setSettings }) {
   const [local, setLocal] = useState(settings);
   useEffect(() => { setLocal(settings); }, [settings]);
+  const [testing, setTesting] = useState(false);
 
   const providers = [
     { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-5.2', l: 'GPT-5.2' }, { v: 'gpt-5.2-pro', l: 'GPT-5.2 Pro' }] },
@@ -421,6 +422,18 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
     { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek-V3' }, { v: 'deepseek-reasoner', l: 'DeepSeek-R1' }] },
     { id: 'grok', name: 'Grok', models: [{ v: 'grok-4.1-fast', l: 'Grok 4.1 Fast' }, { v: 'grok-4.1-fast-non-reasoning', l: 'Grok 4.1 Fast (Non-Reasoning)' }] }
   ];
+
+  async function testKey() {
+    try {
+      setTesting(true);
+      await DV.ai.test(local.ai);
+      DV.toast('API connection successful!', { type: 'success' });
+    } catch (e) {
+      DV.toast(e.message || 'API test failed', { type: 'error' });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <div className={classNames('fixed inset-0 z-50 transition-opacity', open ? 'opacity-100' : 'opacity-0 pointer-events-none')}>
@@ -449,7 +462,16 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
           )}
           <div>
             <div className="text-sm font-medium mb-1">API Key</div>
-            <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} className="w-full h-10 px-3 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none" placeholder="sk-..." />
+            <div className="flex gap-2">
+              <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} className="flex-1 h-10 px-3 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none" placeholder="sk-..." />
+              <button
+                onClick={testKey}
+                disabled={testing || !local.ai.apiKey}
+                className={classNames('px-3 rounded-lg border border-slate-400 dark:border-white/20 bg-slate-50 dark:bg-slate-800 text-xs font-bold transition-colors', testing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}
+              >
+                {testing ? '...' : 'Test'}
+              </button>
+            </div>
           </div>
           <div>
             <div className="text-sm font-medium mb-1 flex justify-between">
