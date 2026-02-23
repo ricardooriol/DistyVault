@@ -253,8 +253,8 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
 
           <div className="ml-auto flex items-center gap-2">
             <input type="file" accept=".zip" className="hidden" ref={importInputRef} onChange={e => { if (e.target.files[0]) onImport(e.target.files[0]); e.target.value = ''; }} />
-            <button onClick={onExport} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="download" /></button>
-            <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="upload" /></button>
+            <button onClick={() => importInputRef.current?.click()} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="download" /></button>
+            <button onClick={onExport} className="w-9 h-9 rounded-lg border border-slate-400 dark:border-white/30 flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-white/10"><Icon name="upload" /></button>
           </div>
         </div>
       </div>
@@ -786,7 +786,11 @@ function App() {
       <div className="px-4">
         <CapturePanel onSubmit={handleCapture} />
         <StatsRow items={items} onDownloadAll={() => handleDownloadBulk(items.filter(i => i.status === STATUS.COMPLETED).map(i => i.id))} onStopAll={() => items.forEach(i => DV.queue.requestStop(i.id))} onRetryFailed={async () => { await Promise.all(items.filter(x => x.status === STATUS.ERROR).map(i => DV.queue.resetItem(i.id))); DV.queue.loadQueue(); }} />
-        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => saveBlob(await DV.db.exportAllToZip(), 'export.zip')} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
+        <CommandBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} onExport={async () => {
+          const d = new Date();
+          const p = n => String(n).padStart(2, '0');
+          saveBlob(await DV.db.exportAllToZip(), `DistyVault_export_${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}.zip`);
+        }} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
         <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
       </div>
       <SelectionDock
