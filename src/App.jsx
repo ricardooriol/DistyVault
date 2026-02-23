@@ -623,31 +623,110 @@ function App() {
     const targets = items.filter(i => ids.includes(i.id) && i.status === STATUS.COMPLETED);
     if (!targets.length) return;
     const zip = targets.length > 1 ? new JSZip() : null;
+
     for (const it of targets) {
       await yieldToBrowser();
       const content = await DV.db.get('contents', it.id);
-      if (content?.html) {
-        // Content scrubbing: remove style/script tags and then strip remaining HTML
-        const scrubbed = content.html
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+      if (!content || !content.html) continue;
 
-        const doc = new jspdf.jsPDF();
-        const splitTitle = doc.splitTextToSize(it.title, 180);
-        doc.setFontSize(16);
-        doc.text(splitTitle, 10, 20);
+      const doc = new jspdf.jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const wrapWidth = pageWidth - (margin * 2);
+      let y = 30;
+
+      const helper = new DOMParser().parseFromString(content.html, 'text/html');
+
+      const checkPage = (height) => {
+        if (y + height > pageHeight - 25) {
+          doc.addPage();
+          y = 25;
+          return true;
+        }
+        return false;
+      };
+
+      // 1. Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.setTextColor(15, 23, 42); // slate-900
+      const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
+      doc.text(titleLines, margin, y);
+      y += (titleLines.length * 10) + 5;
+
+      // 2. Metadata (Source & Date)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139); // slate-500
+      const sourceLabel = it.url || 'Universal Extraction';
+      const dateLabel = content.meta?.dateText || new Date().toLocaleString();
+
+      const metaText = `Source: ${sourceLabel}\nDate: ${dateLabel}`;
+      const metaLines = doc.splitTextToSize(metaText, wrapWidth);
+      doc.text(metaLines, margin, y);
+      y += (metaLines.length * 5) + 8;
+
+      // 3. Divider Line
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 15;
+
+      // 4. Content Points
+      const points = helper.querySelectorAll('.dv-point, .dv-item, section');
+      if (points.length > 0) {
+        points.forEach(p => {
+          const head = p.querySelector('.dv-head, h2, h3, b, strong')?.innerText?.trim() || '';
+          const body = p.querySelector('.dv-body, p, div:last-child')?.innerText?.trim() || '';
+
+          if (!head && !body) return;
+
+          // Header
+          if (head) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(15, 23, 42);
+            const hl = doc.splitTextToSize(head, wrapWidth);
+            checkPage(hl.length * 7 + 10);
+            doc.text(hl, margin, y);
+            y += (hl.length * 7) + 2;
+          }
+
+          // Body
+          if (body) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(51, 65, 85); // slate-700
+            const bl = doc.splitTextToSize(body, wrapWidth);
+            checkPage(bl.length * 5 + 15);
+            doc.text(bl, margin, y);
+            y += (bl.length * 5) + 10;
+          }
+        });
+      } else {
+        // Fallback for simple text/HTML
+        const raw = helper.body.innerText.trim();
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        const splitBody = doc.splitTextToSize(scrubbed, 180);
-        doc.text(splitBody, 10, 35);
-
-        const b = doc.output('blob');
-        if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
-        else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
+        doc.setTextColor(51, 65, 85);
+        const rl = doc.splitTextToSize(raw, wrapWidth);
+        rl.forEach(line => {
+          checkPage(6);
+          doc.text(line, margin, y);
+          y += 5;
+        });
       }
+
+      // Add Footer on last page
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text('DistyVault · 2026', pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+      const b = doc.output('blob');
+      if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
+      else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
     }
     if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
   };
