@@ -152,6 +152,11 @@
       2. Implementation details reveal critical trade-offs
 
       The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.
+
+
+      5. TAGS SECTION (MANDATORY)
+      At the very end of your response, after the last numbered point, providing ONE line starting exactly with "TAGS: " followed by 3 to 5 high-quality, relevant categorization tags separated by commas.
+      Example: TAGS: Psychology, Habit Formation, Productivity
     `;
 
     const CHUNK_SIZE = 10000;
@@ -236,16 +241,16 @@
       }
     }
 
+    const tags = parseTags(rawHtml);
     const now = new Date();
     const meta = {
       title,
       sourceUrl: extracted.url || '',
       sourceName: extracted.fileName || extracted.url || title,
-      // Prefer dayjs when present for deterministic formatting; fall back to locale string otherwise
       dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
     };
     const formatted = reformatDistilled(rawHtml, meta);
-    return formatted;
+    return { html: formatted, tags };
   }
 
   /**
@@ -265,6 +270,17 @@
     return true;
   }
 
+  /**
+   * Parse a comma-separated list of tags from a string starting with "TAGS:".
+   * @param {string} text
+   * @returns {string[]}
+   */
+  function parseTags(text = '') {
+    const m = text.match(/TAGS:\s*(.+)$/m);
+    if (!m) return [];
+    return m[1].split(',').map(s => s.trim().toLowerCase()).filter(s => s && s.length < 30);
+  }
+
   window.DV = window.DV || {};
   window.DV.ai = { distill, test };
   /**
@@ -277,10 +293,12 @@
    */
   function reformatDistilled(html = '', meta) {
     try {
-      const doc = new DOMParser().parseFromString(html || '', 'text/html');
+      // Strip the raw TAGS: line from the display body
+      const cleanHtml = html.replace(/TAGS:\s*.+$/m, '').trim();
+      const doc = new DOMParser().parseFromString(cleanHtml || '', 'text/html');
       const rawText = (doc.body?.innerText || '').trim();
       const points = parseNumberedList(rawText);
-      if (!points.length) return html;
+      if (!points.length) return cleanHtml;
       const body = points.map(pt => {
         const head = escapeHtml(`${pt.n}. ${pt.head}`);
         const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');

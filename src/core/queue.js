@@ -108,6 +108,15 @@
   async function addItem(item) {
     const now = Date.now();
     const id = item.id || DV.db.uid();
+    const autoTags = (item.tags || []).slice();
+    if (item.kind === 'youtube') autoTags.push('source:youtube');
+    else if (item.kind === 'file') autoTags.push('source:file');
+    else if (item.kind === 'url' && item.url) {
+      if (item.url.includes('substack.com')) autoTags.push('source:substack');
+      else autoTags.push('source:web');
+    }
+    const tags = Array.from(new Set(autoTags.map(t => t.toLowerCase().trim()))).filter(Boolean);
+
     const record = {
       id,
       kind: item.kind,
@@ -118,7 +127,7 @@
       fileType: item.fileType || null,
       size: item.size || 0,
       hasFile: !!item.file,
-      tags: item.tags || [],
+      tags,
       createdAt: now,
       updatedAt: now,
       status: item.kind === 'playlist' ? null : STATUS.PENDING,
@@ -216,9 +225,31 @@
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
-      const html = await DV.ai.distill(extracted, state.settings.ai);
+
+      let html, tags;
+      let attempts = 0;
+      while (attempts < 3) {
+        try {
+          const res = await DV.ai.distill(extracted, state.settings.ai);
+          html = res.html;
+          tags = res.tags;
+          break;
+        } catch (e) {
+          attempts++;
+          const isRetryable = /503|429|Service Unavailable|Rate Limit/i.test(e.message);
+          if (isRetryable && attempts < 3) {
+            await new Promise(r => setTimeout(r, attempts * 2000));
+            continue;
+          }
+          throw e;
+        }
+      }
 
       const durationMs = Date.now() - (item.startedAt || start);
+      if (tags?.length) {
+        const union = Array.from(new Set([...(item.tags || []), ...tags]));
+        await updateTags(id, union);
+      }
 
       await DV.db.put('contents', { id, html, meta: { ...extracted, durationMs } });
       await updateItem(id, { status: STATUS.COMPLETED, durationMs });
