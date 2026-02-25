@@ -52,6 +52,30 @@ function Icon({ name, size = 20, className, strokeWidth = 2 }) {
   });
 }
 
+function formatSize(bytes) {
+  if (!bytes) return '-';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  if (i < 0) return '0 B';
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function getKindLabel(kind) {
+  if (kind === 'youtube') return 'YouTube';
+  if (kind === 'playlist') return 'Playlist';
+  if (kind === 'file') return 'File';
+  if (kind === 'url') return 'Web';
+  return kind || 'Unknown';
+}
+
+function getKindIcon(kind) {
+  if (kind === 'youtube' || kind === 'playlist') return 'video';
+  if (kind === 'url') return 'link';
+  if (kind === 'file') return 'file';
+  return 'file';
+}
+
 function TopBar({ theme, setTheme, openSettings }) {
   const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
@@ -274,7 +298,7 @@ function StatusChip({ status, onClick }) {
   return <span onClick={onClick} className={classNames('px-2 py-1 rounded-full text-xs cursor-default', map[status])}>{status}</span>;
 }
 
-function Table({ items, allItems, selected, setSelected, expandedIds, setExpandedIds }) {
+function Table({ items, allItems, selected, setSelected, expandedIds, setExpandedIds, sort, onSort }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const active = items.some(it => [STATUS.EXTRACTING, STATUS.DISTILLING].includes(it.status));
@@ -308,15 +332,14 @@ function Table({ items, allItems, selected, setSelected, expandedIds, setExpande
         <table className="w-full min-w-[720px] lg:min-w-0 table-fixed rounded-2xl overflow-hidden">
           <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
             <tr>
-              <th className="w-3/5 p-2 pl-4 text-left">Name</th>
-              <th className="w-1/5 p-2 text-center">Status</th>
-              <th className="w-1/5 p-2 text-center relative">
-                <span>Duration</span>
-              </th>
+              <th className="w-2/5 p-2 pl-4 text-left cursor-pointer" onClick={() => onSort('title')}>Name {sort.key === 'title' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('kind')}>Type {sort.key === 'kind' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('size')}>Size {sort.key === 'size' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('status')}>Status {sort.key === 'status' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
             </tr>
           </thead>
           <tbody>
-            {!items.length && <tr><td colSpan={3} className="p-6 text-center text-slate-500">No items found</td></tr>}
+            {!items.length && <tr><td colSpan={4} className="p-6 text-center text-slate-500">No items found</td></tr>}
             {items.map(i => (
               <tr key={i.id} onClick={() => onRowClick(i)} className={classNames('border-t border-slate-200 dark:border-white/10 cursor-pointer', selected.includes(i.id) && 'bg-brand-50/70 dark:bg-brand-600/10')}>
                 <td className={classNames('p-2 pl-4 text-left', i.parentId && 'pl-8')}>
@@ -337,36 +360,51 @@ function Table({ items, allItems, selected, setSelected, expandedIds, setExpande
                     {!i.tags?.length && i.url && <div className="text-xs text-slate-500 truncate mt-1">{i.url}</div>}
                   </div>
                 </td>
+                <td className="p-2 text-center text-sm text-slate-600 dark:text-slate-300">
+                  {i.kind !== 'playlist' && (
+                    <div className="flex items-center justify-center gap-1">
+                      <Icon name={getKindIcon(i.kind)} size={14} />
+                      <span>{getKindLabel(i.kind)}</span>
+                    </div>
+                  )}
+                </td>
+                <td className="p-2 text-center text-sm text-slate-600 dark:text-slate-300">
+                  {i.kind !== 'playlist' && (i.size ? formatSize(i.size) : '-')}
+                </td>
                 <td className="p-2 text-center">
                   {i.kind !== 'playlist' && <StatusChip status={i.status} onClick={e => { if (i.status === STATUS.ERROR) { e.stopPropagation(); DV.bus.emit('ui:openError', i); } }} />}
-                </td>
-                <td className="p-2 text-sm text-center">
-                  {i.kind !== 'playlist' && (i.status === STATUS.EXTRACTING || i.status === STATUS.DISTILLING ? formatDuration(now - (i.startedAt || now)) : (i.durationMs ? formatDuration(i.durationMs) : '-'))}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </div >
   );
 }
 
-function SelectionDock({ count, anyActive, allSelected, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag, canView }) {
+function SelectionDock({ count, selectedItems, itemsCount, onView, onRetry, onDownload, onDelete, onStop, onSelectAll, onUnselectAll, onTag }) {
   if (!count) return null;
+
+  const canView = count === 1 && selectedItems[0]?.status === STATUS.COMPLETED;
+  const canStop = selectedItems.some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status));
+  const canRetry = selectedItems.some(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED);
+  const canDownload = selectedItems.some(i => i.status === STATUS.COMPLETED);
+  const allSelected = count === itemsCount;
+
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow">
-      <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar">
-        {canView && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="eye" /><span>View</span></button>}
-        <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="refresh-ccw" /><span>Retry</span></button>
-        {anyActive && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="square" /><span>Stop</span></button>}
-        <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="arrow-down-to-line" /><span>Download</span></button>
-        <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="tag" /><span>Tag</span></button>
-        <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800"><Icon name="trash" /><span>Delete</span></button>
-        <span className="mx-2 h-5 w-px bg-slate-300/60" />
-        <div className="text-sm font-medium">{count} selected</div>
-        {!allSelected && <button onClick={onSelectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30">Select all</button>}
-        <button onClick={onUnselectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30">Unselect all</button>
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow min-w-[280px] w-max max-w-[95vw]">
+      <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar w-full">
+        {canView && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="eye" /><span>View</span></button>}
+        {canRetry && <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="refresh-ccw" /><span>Retry</span></button>}
+        {canStop && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="square" /><span>Stop</span></button>}
+        {canDownload && <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="arrow-down-to-line" /><span>Download</span></button>}
+        <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="tag" /><span>Tag</span></button>
+        <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="trash" /><span>Delete</span></button>
+        <span className="mx-2 h-5 w-px bg-slate-300/60 shrink-0" />
+        <div className="text-sm font-medium shrink-0">{count} selected</div>
+        {!allSelected && <button onClick={onSelectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30 shrink-0">Select all</button>}
+        <button onClick={onUnselectAll} className="text-sm px-2 py-1 border rounded-md border-slate-400 dark:border-white/30 shrink-0">Unselect all</button>
       </div>
     </div>
   );
@@ -527,6 +565,16 @@ function App() {
   const [selected, setSelected] = useState([]);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState({ key: null, dir: null });
+
+  function handleSort(key) {
+    if (sort.key === key) {
+      if (sort.dir === 'asc') setSort({ key, dir: 'desc' });
+      else setSort({ key: null, dir: null });
+    } else {
+      setSort({ key, dir: 'asc' });
+    }
+  }
 
   const [theme, setThemeState] = useState(localStorage.getItem('dv.theme') || 'system');
   const [viewItem, setViewItem] = useState(null);
@@ -613,7 +661,27 @@ function App() {
       if (!q) return true;
       return i.title?.toLowerCase().includes(q) || i.url?.toLowerCase().includes(q);
     }).sort((a, b) => {
-      return (a.queueIndex || 0) - (b.queueIndex || 0);
+      if (!sort.key) return (a.queueIndex || 0) - (b.queueIndex || 0);
+
+      let valA, valB;
+      if (sort.key === 'title') {
+        valA = a.title || a.url || '';
+        valB = b.title || b.url || '';
+        return sort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      } else if (sort.key === 'kind') {
+        valA = getKindLabel(a.kind) || '';
+        valB = getKindLabel(b.kind) || '';
+        return sort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      } else if (sort.key === 'size') {
+        valA = a.size || 0;
+        valB = b.size || 0;
+        return sort.dir === 'asc' ? valA - valB : valB - valA;
+      } else if (sort.key === 'status') {
+        valA = a.status || '';
+        valB = b.status || '';
+        return sort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return 0;
     });
 
     const out = [];
@@ -625,7 +693,7 @@ function App() {
       }
     });
     return out;
-  }, [items, filter, tagFilter, search, expandedIds]);
+  }, [items, filter, tagFilter, search, sort, expandedIds]);
 
   const handleCapture = async (url, files) => {
     try {
@@ -791,13 +859,12 @@ function App() {
           const p = n => String(n).padStart(2, '0');
           saveBlob(await DV.db.exportAllToZip(), `DistyVault_export_${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}.zip`);
         }} onImport={async (f) => { await DV.db.importFromZip(f); DV.queue.loadQueue(); }} />
-        <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} expandedIds={expandedIds} setExpandedIds={setExpandedIds} />
+        <Table items={displayItems} allItems={items} selected={selected} setSelected={setSelected} expandedIds={expandedIds} setExpandedIds={setExpandedIds} sort={sort} onSort={handleSort} />
       </div>
       <SelectionDock
         count={selected.length}
-        anyActive={items.filter(i => selected.includes(i.id)).some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status))}
-        allSelected={selected.length === items.length}
-        canView={selected.length === 1 && items.find(i => i.id === selected[0])?.status === STATUS.COMPLETED}
+        selectedItems={items.filter(i => selected.includes(i.id))}
+        itemsCount={items.length}
         onView={() => setViewItem(items.find(i => i.id === selected[0]))}
         onRetry={async () => { await Promise.all(selected.map(id => DV.queue.resetItem(id))); setSelected([]); DV.queue.loadQueue(); }}
         onDownload={() => handleDownloadBulk(selected)}
