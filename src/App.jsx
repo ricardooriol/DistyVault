@@ -235,9 +235,6 @@ function CommandBar({ filter, setFilter, search, setSearch, onExport, onImport, 
               placeholder="Search..."
               className="h-9 flex-1 px-3 rounded-lg border border-slate-400 dark:border-white/30 bg-white dark:bg-slate-900 outline-none text-slate-900 dark:text-slate-100"
             />
-            <button onClick={() => { setExpanded(false); setSearch(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-              <Icon name="x" size={16} />
-            </button>
           </div>
         )}
 
@@ -332,10 +329,9 @@ function Table({ items, allItems, selected, setSelected, expandedIds, setExpande
         <table className="w-full min-w-[720px] lg:min-w-0 table-fixed rounded-2xl overflow-hidden">
           <thead className="bg-slate-100 dark:bg-slate-800/70 select-none">
             <tr>
-              <th className="w-2/5 p-2 pl-4 text-left cursor-pointer" onClick={() => onSort('title')}>Name {sort.key === 'title' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
-              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('kind')}>Type {sort.key === 'kind' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
-              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('size')}>Size {sort.key === 'size' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
-              <th className="w-1/5 p-2 text-center cursor-pointer" onClick={() => onSort('status')}>Status {sort.key === 'status' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/2 p-2 pl-4 text-left cursor-pointer" onClick={() => onSort('title')}>Name {sort.key === 'title' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/4 p-2 text-center cursor-pointer" onClick={() => onSort('kind')}>Type {sort.key === 'kind' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
+              <th className="w-1/4 p-2 text-center cursor-pointer" onClick={() => onSort('status')}>Status {sort.key === 'status' && <Icon name={sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} className="ml-1 opacity-50 inline" />}</th>
             </tr>
           </thead>
           <tbody>
@@ -368,9 +364,6 @@ function Table({ items, allItems, selected, setSelected, expandedIds, setExpande
                     </div>
                   )}
                 </td>
-                <td className="p-2 text-center text-sm text-slate-600 dark:text-slate-300">
-                  {i.kind !== 'playlist' && (i.size ? formatSize(i.size) : '-')}
-                </td>
                 <td className="p-2 text-center">
                   {i.kind !== 'playlist' && <StatusChip status={i.status} onClick={e => { if (i.status === STATUS.ERROR) { e.stopPropagation(); DV.bus.emit('ui:openError', i); } }} />}
                 </td>
@@ -388,7 +381,6 @@ function SelectionDock({ count, selectedItems, itemsCount, onView, onRetry, onDo
 
   const canView = count === 1 && selectedItems[0]?.status === STATUS.COMPLETED;
   const canStop = selectedItems.some(i => [STATUS.PENDING, STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status));
-  const canRetry = selectedItems.some(i => i.status === STATUS.ERROR || i.status === STATUS.STOPPED);
   const canDownload = selectedItems.some(i => i.status === STATUS.COMPLETED);
   const allSelected = count === itemsCount;
 
@@ -396,7 +388,7 @@ function SelectionDock({ count, selectedItems, itemsCount, onView, onRetry, onDo
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow min-w-[280px] w-max max-w-[95vw]">
       <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar w-full">
         {canView && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="eye" /><span>View</span></button>}
-        {canRetry && <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="refresh-ccw" /><span>Retry</span></button>}
+        <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="refresh-ccw" /><span>Retry</span></button>
         {canStop && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="square" /><span>Stop</span></button>}
         {canDownload && <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="arrow-down-to-line" /><span>Download</span></button>}
         <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="tag" /><span>Tag</span></button>
@@ -899,6 +891,14 @@ function ContentModal({ item, onClose }) {
     if (item) DV.db.get('contents', item.id).then(c => setHtml(c?.html || ''));
   }, [item]);
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && item) onClose();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [item, onClose]);
+
   const onIframeLoad = (e) => {
     try {
       const win = e.target.contentWindow;
@@ -928,7 +928,10 @@ function ContentModal({ item, onClose }) {
 
   return (
     <Modal open={!!item} onClose={onClose} title={item?.title} hideHeader>
-      <div className="p-2 min-h-[400px]">
+      <div className="relative p-2 min-h-[400px]">
+        <button onClick={onClose} className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center shadow hover:bg-rose-600 z-50">
+          <Icon name="x" size={16} />
+        </button>
         {html ? (
           <iframe
             srcDoc={html}
