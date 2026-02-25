@@ -388,9 +388,9 @@ function SelectionDock({ count, selectedItems, itemsCount, onView, onRetry, onDo
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-full border border-slate-300 dark:border-white/20 bg-white/90 dark:bg-slate-800/80 glass shadow min-w-[280px] w-max max-w-[95vw]">
       <div className="flex items-center gap-2 whitespace-nowrap overflow-x-auto px-2 no-scrollbar w-full">
         {canView && <button onClick={onView} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="eye" /><span>View</span></button>}
+        {canDownload && <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="arrow-down-to-line" /><span>Download</span></button>}
         <button onClick={onRetry} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="refresh-ccw" /><span>Retry</span></button>
         {canStop && <button onClick={onStop} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="square" /><span>Stop</span></button>}
-        {canDownload && <button onClick={onDownload} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="arrow-down-to-line" /><span>Download</span></button>}
         <button onClick={onTag} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="tag" /><span>Tag</span></button>
         <button onClick={onDelete} className="px-2 py-1 text-sm rounded-md border border-slate-400 dark:border-white/30 flex items-center gap-1 bg-white dark:bg-slate-800 shrink-0"><Icon name="trash" /><span>Delete</span></button>
         <span className="mx-2 h-5 w-px bg-slate-300/60 shrink-0" />
@@ -856,13 +856,13 @@ function App() {
       <SelectionDock
         count={selected.length}
         selectedItems={items.filter(i => selected.includes(i.id))}
-        itemsCount={items.length}
+        itemsCount={displayItems.length}
         onView={() => setViewItem(items.find(i => i.id === selected[0]))}
         onRetry={async () => { await Promise.all(selected.map(id => DV.queue.resetItem(id))); setSelected([]); DV.queue.loadQueue(); }}
         onDownload={() => handleDownloadBulk(selected)}
         onDelete={async () => { if (confirm('Delete?')) { await Promise.all(selected.map(id => DV.db.del('items', id))); setSelected([]); DV.queue.loadQueue(); } }}
         onStop={() => selected.forEach(id => DV.queue.requestStop(id))}
-        onSelectAll={() => setSelected(items.map(i => i.id))}
+        onSelectAll={() => setSelected(displayItems.map(i => i.id))}
         onUnselectAll={() => setSelected([])}
         onTag={() => setTagEditorOpen(true)}
       />
@@ -928,8 +928,8 @@ function ContentModal({ item, onClose }) {
 
   return (
     <Modal open={!!item} onClose={onClose} title={item?.title} hideHeader>
-      <div className="relative p-2 min-h-[400px]">
-        <button onClick={onClose} className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center shadow hover:bg-rose-600 z-50">
+      <div className="relative p-2 pt-12 min-h-[400px]">
+        <button onClick={onClose} className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors z-50">
           <Icon name="x" size={16} />
         </button>
         {html ? (
