@@ -692,135 +692,31 @@ function App() {
   const handleDownloadBulk = async (ids) => {
     const targets = items.filter(i => ids.includes(i.id) && i.status === STATUS.COMPLETED);
     if (!targets.length) return;
-    const zip = targets.length > 1 ? new JSZip() : null;
 
+    DV.toast('Preparing PDF export...', { type: 'info' });
+    const contents = {};
     for (const it of targets) {
-      await yieldToBrowser();
-      const content = await DV.db.get('contents', it.id);
-      if (!content || !content.html) continue;
-
-      const doc = new jspdf.jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 20;
-      const wrapWidth = pageWidth - (margin * 2);
-      let y = 30;
-
-      const helper = new DOMParser().parseFromString(content.html, 'text/html');
-
-      const checkPage = (height) => {
-        if (y + height > pageHeight - 25) {
-          doc.addPage();
-          y = 25;
-          return true;
-        }
-        return false;
-      };
-
-      // 1. Title
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(24);
-      doc.setTextColor(15, 23, 42); // slate-900
-      const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
-      doc.text(titleLines, margin, y);
-      y += (titleLines.length * 10) + 4;
-
-      // 2. Metadata (Source & Date)
-      const sourceLabel = it.url || 'Universal Extraction';
-      const fullDate = content.meta?.dateText || new Date().toLocaleString();
-      const dateOnlyDate = fullDate.split(/[ ,]+/)[0];
-
-      doc.setFontSize(11);
-      doc.setTextColor(100, 116, 139); // slate-500
-
-      // Draw "Source:"
-      doc.setFont('Helvetica', 'bold');
-      doc.text('Source: ', margin, y);
-      let offset = doc.getTextWidth ? doc.getTextWidth('Source: ') : 15;
-      doc.setFont('Helvetica', 'normal');
-      const sl = doc.splitTextToSize(sourceLabel, wrapWidth - offset);
-      doc.text(sl, margin + offset, y);
-      y += (sl.length * 5) + 3;
-
-      // Draw "Date:"
-      doc.setFont('Helvetica', 'bold');
-      doc.text('Date: ', margin, y);
-      offset = doc.getTextWidth ? doc.getTextWidth('Date: ') : 11;
-      doc.setFont('Helvetica', 'normal');
-      doc.text(dateOnlyDate, margin + offset, y);
-      y += 10;
-
-      // 3. Divider Line
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 10;
-
-      // 4. Content Points
-      const points = helper.querySelectorAll('.dv-point, .dv-item, section');
-      if (points.length > 0) {
-        points.forEach(p => {
-          let headText = (p.querySelector('.dv-head, h2, h3, b, strong')?.textContent || '').trim();
-          let pTags = Array.from(p.querySelectorAll('.dv-body p'));
-          let bodyText = pTags.length > 0 ? pTags.map(el => el.textContent.trim()).join('\n\n') : (p.querySelector('.dv-body')?.textContent || '').trim();
-
-          if (!headText && !bodyText) return;
-
-          // Header
-          if (headText) {
-            doc.setFont('Helvetica', 'bold');
-            doc.setFontSize(14);
-            doc.setTextColor(15, 23, 42);
-            const hl = doc.splitTextToSize(headText, wrapWidth);
-            checkPage(hl.length * 7 + 8);
-            doc.text(hl, margin, y);
-            y += (hl.length * 6) + 3;
-          }
-
-          // Body
-          if (bodyText) {
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(12);
-            doc.setTextColor(51, 65, 85); // slate-700
-            const bl = doc.splitTextToSize(bodyText, wrapWidth);
-            checkPage(bl.length * 6 + 10);
-            doc.text(bl, margin, y);
-            y += (bl.length * 6) + 8;
-          }
-        });
-      } else {
-        // Fallback for simple text/HTML
-        const raw = helper.body.textContent || '';
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(12);
-        doc.setTextColor(51, 65, 85);
-        const rl = doc.splitTextToSize(raw.trim(), wrapWidth);
-        rl.forEach(line => {
-          checkPage(8);
-          doc.text(line, margin, y);
-          y += 6;
-        });
-      }
-
-      // Add professional Footer on every page
-      const totalPages = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-
-        // Brand & Page Numbers
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(148, 163, 184); // slate-400
-
-        doc.text('DistyVault', margin, pageHeight - 10);
-        doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
-      }
-
-      const b = doc.output('blob');
-      if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
-      else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
+      contents[it.id] = await DV.db.get('contents', it.id);
     }
-    if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
+
+    const worker = new Worker('src/workers/pdf.worker.js');
+
+    worker.onmessage = (e) => {
+      const { type, blob, title, error } = e.data;
+      if (error) {
+        DV.toast(error, { type: 'error' });
+      } else if (type === 'zip') {
+        saveBlob(blob, 'distyvault_export.zip');
+        DV.toast('Export complete', { type: 'success' });
+      } else if (type === 'single') {
+        const fn = (title || 'export').replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.pdf';
+        saveBlob(blob, fn);
+        DV.toast('Export complete', { type: 'success' });
+      }
+      worker.terminate();
+    };
+
+    worker.postMessage({ id: Date.now(), targets, contents });
   };
 
   return (

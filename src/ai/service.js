@@ -160,35 +160,35 @@
       Example: TAGS: Psychology, Habit Formation, Productivity
     `;
 
-    const CHUNK_SIZE = 10000;
-    const CHUNK_OVERLAP = 500;
+    let worker = null;
+    let jobCounter = 0;
+    const jobs = new Map();
 
-    /**
-     * Split text at paragraph boundaries into chunks of roughly CHUNK_SIZE chars,
-     * with CHUNK_OVERLAP overlap between adjacent chunks.
-     */
-    function chunkText(text) {
-      if (!text) return [];
-      if (text.length <= CHUNK_SIZE) return [text];
-      const chunks = [];
-      let start = 0;
-      while (start < text.length) {
-        let end = start + CHUNK_SIZE;
-        if (end >= text.length) {
-          chunks.push(text.slice(start));
-          break;
-        }
-        // Find paragraph break near the boundary
-        const regionStart = Math.max(0, end - 300);
-        const searchRegion = text.slice(regionStart, end + 300);
-        const breakIdx = searchRegion.lastIndexOf('\n\n');
-        if (breakIdx !== -1) {
-          end = regionStart + breakIdx;
-        }
-        chunks.push(text.slice(start, end));
-        start = Math.max(start + 1, end - CHUNK_OVERLAP);
+    function getWorker() {
+      if (!worker) {
+        worker = new Worker('src/workers/distill.worker.js');
+        worker.onmessage = (e) => {
+          const { id, chunks, formatted } = e.data;
+          if (jobs.has(id)) {
+            jobs.get(id).resolve({ chunks, formatted });
+            jobs.delete(id);
+          }
+        };
       }
-      return chunks;
+      return worker;
+    }
+
+    function doWorkerJob(type, payload) {
+      const id = ++jobCounter;
+      return new Promise((resolve) => {
+        jobs.set(id, { resolve });
+        getWorker().postMessage({ id, type, payload });
+      });
+    }
+
+    async function chunkText(text) {
+      const res = await doWorkerJob('chunk', { text });
+      return res.chunks;
     }
 
     async function distillSingle(text, partNote) {

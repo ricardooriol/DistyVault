@@ -79,10 +79,19 @@
 
     const doc = new DOMParser().parseFromString(body, 'text/html');
     DV.utils.cleanHtml(doc);
-    const node = DV.utils.pickMainNode(doc);
     const title = metaTitle(doc, finalUrl);
-    const main = node?.innerText || doc.body?.innerText || '';
-    const text = DV.utils.normalizeText(main);
+
+    // Use Readability from CDN to get pure signal
+    let text = '';
+    if (window.Readability) {
+      const clone = doc.cloneNode(true);
+      const reader = new window.Readability(clone);
+      const article = reader.parse();
+      text = DV.utils.normalizeText(article?.textContent || doc.body?.innerText || '');
+    } else {
+      const node = DV.utils.pickMainNode(doc);
+      text = DV.utils.normalizeText(node?.innerText || doc.body?.innerText || '');
+    }
 
     if (!text) throw new Error('No readable text found');
     return { kind: 'url', url: finalUrl, title, text };
