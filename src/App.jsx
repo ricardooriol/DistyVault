@@ -577,48 +577,31 @@ function App() {
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState(new Set());
 
-  const refreshTimeoutRef = useRef(null);
-  const pendingRefresh = useRef(false);
+  const handleItemAdded = useCallback((record) => {
+    setItems(prev => {
+      if (prev.some(i => i.id === record.id)) return prev;
+      return [...prev, record];
+    });
+  }, []);
 
-  const refresh = useCallback(() => {
-    if (refreshTimeoutRef.current) {
-      pendingRefresh.current = true;
-      return;
-    }
-
-    const execute = async () => {
-      try {
-        const all = await DV.db.getAll('items');
-        setItems(all);
-      } finally {
-        if (pendingRefresh.current) {
-          pendingRefresh.current = false;
-          refreshTimeoutRef.current = setTimeout(execute, 20);
-        } else {
-          refreshTimeoutRef.current = null;
-        }
-      }
-    };
-
-    refreshTimeoutRef.current = setTimeout(execute, 20);
+  const handleItemUpdated = useCallback((updated) => {
+    setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
   }, []);
 
   // Init & Events
   useEffect(() => {
-    const offAdd = DV.bus.on('items:added', refresh);
-    const offUpd = DV.bus.on('items:updated', refresh);
+    const offAdd = DV.bus.on('items:added', handleItemAdded);
+    const offUpd = DV.bus.on('items:updated', handleItemUpdated);
     const offLoad = DV.bus.on('items:loaded', (i) => setItems(i));
     const offErr = DV.bus.on('ui:openError', setErrorItem);
-    const offProgress = DV.bus.on('queue:progress', refresh);
 
     DV.queue.loadSettings().then(() => setSettings(DV.queue.getSettings()));
     DV.queue.loadQueue();
 
     return () => {
-      offAdd(); offUpd(); offLoad(); offErr(); offProgress();
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+      offAdd(); offUpd(); offLoad(); offErr();
     };
-  }, [refresh]);
+  }, [handleItemAdded, handleItemUpdated]);
 
   const setTheme = (t) => {
     setThemeState(t);
