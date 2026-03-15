@@ -29,6 +29,9 @@
     url = normalizeUrl(url);
     if (!url) throw new Error('No URL');
 
+    const isTwitter = /^(https?:\/\/)?(www\.)?(twitter|x)\.com\//i.test(url);
+    let fetchUrl = isTwitter ? 'https://r.jina.ai/' + url : url;
+
     let res = null;
     const timeout = 30000;
 
@@ -42,18 +45,18 @@
 
     // Attempt 1: Local API Proxy (Our most powerful steering, universally applied to prevent browser CORS errors)
     try {
-      res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
+      res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(fetchUrl), { redirect: 'follow' }, timeout);
     } catch (e) { res = null; }
 
     // Attempt 2: Public Proxy (Last resort)
-    if (!res || !res.ok) {
+    if (!isTwitter && (!res || !res.ok)) {
       try {
-        res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), { redirect: 'follow' }, timeout);
+        res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(fetchUrl), { redirect: 'follow' }, timeout);
       } catch (e) { res = null; }
     }
 
-    if (!res || !res.ok) {
-      const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    if (!isTwitter && (!res || !res.ok)) {
+      const ao = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}`;
       try {
         res = await DV.utils.fetchWithTimeout(ao, { redirect: 'follow' }, timeout);
       } catch (e) { res = null; }
@@ -73,8 +76,12 @@
 
     if (ctype.includes('text/plain') || !/html/.test(ctype)) {
       const text = DV.utils.normalizeText(body);
-      const title = finalUrl;
-      return { kind: 'url', url: finalUrl, title, text };
+      let title = isTwitter ? url : finalUrl;
+      if (isTwitter) {
+        const titleMatch = body.match(/^Title:\s*(.+)$/m);
+        if (titleMatch) title = titleMatch[1].trim();
+      }
+      return { kind: 'url', url: isTwitter ? url : finalUrl, title, text };
     }
 
     const doc = new DOMParser().parseFromString(body, 'text/html');
@@ -106,16 +113,27 @@
     if (!url) return null;
     let res = null;
 
-    try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+    const isTwitter = /^(https?:\/\/)?(www\.)?(twitter|x)\.com\//i.test(url);
+    const fetchUrl = isTwitter ? 'https://r.jina.ai/' + url : url;
 
-    if (!res || !res.ok) {
-      try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(url), {}, 8000); } catch { res = null; }
+    try { res = await DV.utils.fetchWithTimeout('/api/fetch?url=' + encodeURIComponent(fetchUrl), {}, 8000); } catch { res = null; }
+
+    if (!isTwitter && (!res || !res.ok)) {
+      try { res = await DV.utils.fetchWithTimeout('https://corsproxy.io/?' + encodeURIComponent(fetchUrl), {}, 8000); } catch { res = null; }
     }
     if (!res || !res.ok) return null;
+
     const finalUrl = res.headers.get('x-final-url') || res.url || url;
     const ctype = (res.headers.get('content-type') || '').toLowerCase();
-    if (!/html/.test(ctype)) return { url: finalUrl, title: finalUrl };
     const body = await res.text();
+
+    if (isTwitter) {
+      const titleMatch = body.match(/^Title:\s*(.+)$/m);
+      if (titleMatch) return { url, title: titleMatch[1].trim() };
+      return { url, title: url };
+    }
+
+    if (!/html/.test(ctype)) return { url: finalUrl, title: finalUrl };
     try {
       const doc = new DOMParser().parseFromString(body, 'text/html');
       const title = metaTitle(doc, finalUrl);
