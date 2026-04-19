@@ -41,3 +41,4 @@ DistyVault is a zero-build Single Page Application (SPA). It serves directly fro
 ## License
 
 Copyright 2026. All rights reserved.
+ 
