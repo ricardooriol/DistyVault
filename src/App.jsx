@@ -528,7 +528,7 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
           <div>
             <div className="text-sm font-medium mb-1">API Key</div>
             <div className="flex gap-2">
-              <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} className="flex-1 h-10 px-3 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none" placeholder="sk-..." />
+              <input type="password" value={local.ai.apiKey} onChange={e => setLocal({ ...local, ai: { ...local.ai, apiKey: e.target.value } })} className="flex-1 h-10 px-3 border border-slate-400 dark:border-white/20 bg-white dark:bg-slate-900 rounded-lg outline-none" placeholder="API key goes here" />
               <button
                 onClick={testKey}
                 disabled={testing || !local.ai.apiKey}
@@ -727,7 +727,7 @@ function App() {
       doc.setTextColor(15, 23, 42); // slate-900
       const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
       doc.text(titleLines, margin, y);
-      y += (titleLines.length * 10) + 4;
+      y += (titleLines.length * 9) + 2;
 
       // 2. Metadata (Source & Date)
       const sourceLabel = it.url || 'Universal Extraction';
@@ -744,7 +744,7 @@ function App() {
       doc.setFont('Helvetica', 'normal');
       const sl = doc.splitTextToSize(sourceLabel, wrapWidth - offset);
       doc.text(sl, margin + offset, y);
-      y += (sl.length * 5) + 3;
+      y += (sl.length * 5) + 2;
 
       // Draw "Date:"
       doc.setFont('Helvetica', 'bold');
@@ -766,7 +766,7 @@ function App() {
         points.forEach(p => {
           let headText = (p.querySelector('.dv-head, h2, h3, b, strong')?.textContent || '').trim();
           let pTags = Array.from(p.querySelectorAll('.dv-body p'));
-          let bodyText = pTags.length > 0 ? pTags.map(el => el.textContent.trim()).join('\n\n') : (p.querySelector('.dv-body')?.textContent || '').trim();
+          let bodyText = pTags.length > 0 ? pTags.map(el => el.textContent.trim()).join('\n') : (p.querySelector('.dv-body')?.textContent || '').trim();
 
           if (!headText && !bodyText) return;
 
@@ -778,7 +778,7 @@ function App() {
             const hl = doc.splitTextToSize(headText, wrapWidth);
             checkPage(hl.length * 7 + 8);
             doc.text(hl, margin, y);
-            y += (hl.length * 6) + 3;
+            y += (hl.length * 6) + 2;
           }
 
           // Body
@@ -789,7 +789,7 @@ function App() {
             const bl = doc.splitTextToSize(bodyText, wrapWidth);
             checkPage(bl.length * 6 + 10);
             doc.text(bl, margin, y);
-            y += (bl.length * 6) + 3;
+            y += (bl.length * 6) + 2;
           }
         });
       } else {
@@ -916,7 +916,7 @@ function ContentModal({ item, onClose }) {
 
   return (
     <Modal open={!!item} onClose={onClose} title={item?.title} hideHeader>
-      <div className="relative p-2 pt-12 min-h-[400px]">
+      <div className="relative p-2 pt-6 min-h-[400px]">
         <button onClick={onClose} className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors z-50">
           <Icon name="x" size={16} />
         </button>

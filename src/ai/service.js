@@ -321,7 +321,7 @@
         const head = escapeHtml(`${pt.n}. ${pt.head}`);
         const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
         return `
-<section class="dv-point" style="margin: 8px 0 20px 0;">
+<section class="dv-point" style="margin: 0 0 16px 0;">
   <div class="dv-head" style="font-weight:700;">${head}</div>
   <div style="height: 10px;"></div>
   <div class="dv-body" style="font-weight:400;">${paras}</div>
@@ -371,9 +371,9 @@
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title><style>
 :root{color-scheme: light dark}
 html,body{height:100%;margin:0;padding:0}
-body{font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.65;padding:24px;color:#1e293b;background:#ffffff;transition: background-color 0.2s, color 0.2s}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.65;padding:16px 24px;color:#1e293b;background:#ffffff;transition: background-color 0.2s, color 0.2s}
 .dark body{color:#f1f5f9;background:#0f172a}
-h1,h2,h3{margin:24px 0 8px;line-height:1.2}
+h1,h2,h3{margin:8px 0 8px;line-height:1.2}
 h1{font-size:1.75rem;font-weight:800;letter-spacing:-0.025em}
 p{margin:12px 0}
 .dv-head{font-size:1.1rem;color:#0f172a}

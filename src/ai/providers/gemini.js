@@ -6,7 +6,8 @@
    */
   function endpoint(model) {
     const m = ['gemini-3.1-pro', 'gemini-3-flash', 'gemini-3.1-flash-lite'].includes(model) ? model : 'gemini-3.1-pro';
-    return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`;
+    const apiModel = m.endsWith('-preview') ? m : `${m}-preview`;
+    return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(apiModel)}:generateContent`;
   }
 
   /**
@@ -94,8 +95,9 @@
   async function testGemini(settings) {
     const apiKey = settings?.apiKey;
     const model = ['gemini-3.1-pro', 'gemini-3-flash', 'gemini-3.1-flash-lite'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro';
+    const apiModel = model.endsWith('-preview') ? model : `${model}-preview`;
     if (!apiKey) throw new Error('Gemini API key required');
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(apiModel)}?key=${encodeURIComponent(apiKey)}`);
     if (!res.ok) throw new Error('API key invalid or model not accessible');
     return true;
   }
