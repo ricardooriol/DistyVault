@@ -78,8 +78,47 @@ module.exports = async (req, res) => {
       }
     }
 
-    const response = await fetch(targetUrlParsed.toString(), fetchOptions);
+    let response = await fetch(targetUrlParsed.toString(), fetchOptions);
 
+    // 4. Intelligent Fallback System (The "Bypass Anything" Engine)
+    // Check if the response is a typical anti-bot block (403, 503, or small HTML with block keywords)
+    let needsFallback = !response.ok;
+    let originalBuffer = null;
+
+    if (response.ok) {
+      const ctype = (response.headers.get('content-type') || '').toLowerCase();
+      if (ctype.includes('text/html')) {
+        originalBuffer = await response.arrayBuffer();
+        const bodyText = Buffer.from(originalBuffer).toString('utf-8').toLowerCase();
+        if ((bodyText.includes('just a moment') || bodyText.includes('enable javascript') || bodyText.includes('access denied') || bodyText.includes('cloudflare')) && bodyText.length < 50000) {
+          needsFallback = true;
+        }
+      } else {
+        originalBuffer = await response.arrayBuffer();
+      }
+    }
+
+    if (needsFallback && req.method === 'GET') {
+      console.log(`[Proxy] Direct fetch failed or blocked for ${targetUrlParsed.toString()}. Engaging Jina Reader fallback...`);
+      // Jina Reader acts as a headless browser and bypasses most captchas
+      const jinaUrl = 'https://r.jina.ai/' + targetUrlParsed.toString();
+      const jinaRes = await fetch(jinaUrl, {
+        headers: {
+          'Accept': 'text/plain',
+          'X-Return-Format': 'markdown'
+        }
+      });
+
+      if (jinaRes.ok) {
+        const markdown = await jinaRes.text();
+        res.setHeader('content-type', 'text/plain; charset=utf-8');
+        res.setHeader('x-final-url', jinaRes.url || targetUrlParsed.toString());
+        res.statusCode = 200;
+        return res.end(markdown);
+      }
+    }
+
+    // 5. Return Original Response (If fallback wasn't needed or failed)
     response.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
       if (['content-encoding', 'transfer-encoding', 'content-length', 'content-security-policy', 'x-frame-options'].includes(lowerKey)) return;
@@ -89,8 +128,12 @@ module.exports = async (req, res) => {
     res.setHeader('x-final-url', response.url || targetUrlParsed.toString());
     res.statusCode = response.status;
 
-    const arrayBuf = await response.arrayBuffer();
-    return res.end(Buffer.from(arrayBuf));
+    if (originalBuffer) {
+      return res.end(Buffer.from(originalBuffer));
+    } else {
+      const arrayBuf = await response.arrayBuffer();
+      return res.end(Buffer.from(arrayBuf));
+    }
 
   } catch (e) {
     const msg = String(e?.message || e);

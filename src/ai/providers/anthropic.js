@@ -10,7 +10,7 @@
   function buildPayload(settings) {
     const prepared = settings?.__prepared || {};
     return {
-      model: ['claude-opus-4.6', 'claude-sonnet-4.6'].includes(settings?.model) ? settings.model : 'claude-opus-4.6',
+      model: ['claude-opus-4.7', 'claude-sonnet-4.6'].includes(settings?.model) ? settings.model : 'claude-opus-4.7',
       max_tokens: 16384,
       system: prepared.messages?.[0]?.content || '',
       messages: [

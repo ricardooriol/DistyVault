@@ -9,7 +9,7 @@
    */
   async function distillGrok(extracted, settings) {
     const apiKey = settings?.apiKey;
-    const model = ['grok-4.1-fast', 'grok-4.1-fast-non-reasoning'].includes(settings?.model) ? settings.model : 'grok-4.1-fast';
+    const model = ['grok-4.3-beta', 'grok-4.20', 'grok-4.20-reasoning'].includes(settings?.model) ? settings.model : 'grok-4.3-beta';
     if (!apiKey) throw new Error('Grok API key required');
     const prepared = settings?.__prepared;
     const res = await fetch(API_URL, {

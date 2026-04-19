@@ -15,7 +15,7 @@
    */
   async function distillOpenAI(extracted, settings) {
     const { apiKey } = settings || {};
-    const model = ['gpt-5.2', 'gpt-5.2-pro'].includes(settings?.model) ? settings.model : 'gpt-5.2';
+    const model = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'].includes(settings?.model) ? settings.model : 'gpt-5.4';
     if (!apiKey) throw new Error('OpenAI API key required');
 
     const prepared = settings?.__prepared;

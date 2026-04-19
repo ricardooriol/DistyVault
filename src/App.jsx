@@ -481,11 +481,11 @@ function SettingsDrawer({ open, onClose, settings, setSettings }) {
   const [testing, setTesting] = useState(false);
 
   const providers = [
-    { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-5.2', l: 'GPT-5.2' }, { v: 'gpt-5.2-pro', l: 'GPT-5.2 Pro' }] },
-    { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-opus-4.6', l: 'Claude Opus 4.6' }, { v: 'claude-sonnet-4.6', l: 'Claude Sonnet 4.6' }] },
-    { id: 'gemini', name: 'Gemini', models: [{ v: 'gemini-3.1-pro-preview', l: 'Gemini 3.1 Pro' }, { v: 'gemini-3-flash-preview', l: 'Gemini 3 Flash' }] },
-    { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek-V3' }, { v: 'deepseek-reasoner', l: 'DeepSeek-R1' }] },
-    { id: 'grok', name: 'Grok', models: [{ v: 'grok-4.1-fast', l: 'Grok 4.1 Fast' }, { v: 'grok-4.1-fast-non-reasoning', l: 'Grok 4.1 Fast (Non-Reasoning)' }] }
+    { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-5.4', l: 'GPT-5.4' }, { v: 'gpt-5.4-mini', l: 'GPT-5.4 Mini' }, { v: 'gpt-5.4-nano', l: 'GPT-5.4 Nano' }] },
+    { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-opus-4.7', l: 'Claude Opus 4.7' }, { v: 'claude-sonnet-4.6', l: 'Claude Sonnet 4.6' }] },
+    { id: 'gemini', name: 'Gemini', models: [{ v: 'gemini-3.1-pro', l: 'Gemini 3.1 Pro' }, { v: 'gemini-3-flash', l: 'Gemini 3 Flash' }, { v: 'gemini-3.1-flash-lite', l: 'Gemini 3.1 Flash-Lite' }] },
+    { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek V3.2 Chat' }, { v: 'deepseek-reasoner', l: 'DeepSeek V3.2 Reasoner' }] },
+    { id: 'grok', name: 'Grok', models: [{ v: 'grok-4.3-beta', l: 'Grok 4.3 Beta' }, { v: 'grok-4.20', l: 'Grok 4.20' }, { v: 'grok-4.20-reasoning', l: 'Grok 4.20 Reasoning' }] }
   ];
 
   async function testKey() {
@@ -694,6 +694,10 @@ function App() {
     if (!targets.length) return;
     const zip = targets.length > 1 ? new JSZip() : null;
 
+    const logoImg = new Image();
+    logoImg.src = 'logos/logo_no_bg_b.png';
+    await new Promise(r => { logoImg.onload = r; logoImg.onerror = r; });
+
     for (const it of targets) {
       await yieldToBrowser();
       const content = await DV.db.get('contents', it.id);
@@ -785,7 +789,7 @@ function App() {
             const bl = doc.splitTextToSize(bodyText, wrapWidth);
             checkPage(bl.length * 6 + 10);
             doc.text(bl, margin, y);
-            y += (bl.length * 6) + 8;
+            y += (bl.length * 6) + 3;
           }
         });
       } else {
@@ -812,7 +816,8 @@ function App() {
         doc.setFontSize(11);
         doc.setTextColor(148, 163, 184); // slate-400
 
-        doc.text('DistyVault', margin, pageHeight - 10);
+        try { doc.addImage(logoImg, 'PNG', margin, pageHeight - 14, 5, 5); } catch(e) {}
+        doc.text('DistyVault', margin + 7, pageHeight - 10);
         doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
       }
 
