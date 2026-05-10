@@ -90,19 +90,25 @@ function Sidebar({ collapsed, setCollapsed, view, setView }) {
     <aside className={classNames('shrink-0 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950 flex flex-col transition-all duration-200', collapsed ? 'w-[60px]' : 'w-[200px]')}>
       {/* Header: logo + collapse toggle */}
       <div className={classNames('h-14 flex items-center border-b border-slate-200 dark:border-white/5 shrink-0', collapsed ? 'justify-center' : 'px-4 justify-between')}>
-        <div className={classNames('flex items-center gap-2.5 min-w-0', collapsed && 'cursor-pointer')} onClick={collapsed ? () => setCollapsed(false) : undefined}>
-          <img src={logoSrc} alt="DistyVault" className="w-6 h-6 shrink-0" />
-          {!collapsed && <span className="font-semibold text-[14px] tracking-tight text-slate-900 dark:text-white truncate">DistyVault</span>}
-        </div>
-        {!collapsed && (
-          <button onClick={() => setCollapsed(true)} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors shrink-0">
-            <Icon name="panel-left-close" size={16} />
+        {collapsed ? (
+          <button onClick={() => setCollapsed(false)} className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" title="Expand Sidebar">
+            <Icon name="panel-left-open" size={18} />
           </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img src={logoSrc} alt="DistyVault" className="w-6 h-6 shrink-0" />
+              <span className="font-semibold text-[14px] tracking-tight text-slate-900 dark:text-white truncate">DistyVault</span>
+            </div>
+            <button onClick={() => setCollapsed(true)} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors shrink-0" title="Collapse Sidebar">
+              <Icon name="panel-left-close" size={16} />
+            </button>
+          </>
         )}
       </div>
       {/* Nav */}
       <nav className="flex-1 p-2 space-y-0.5">
-        <NavItem icon="vault" label="Vault" active={view === 'vault'} onClick={() => setView('vault')} />
+        <NavItem icon="database" label="Vault" active={view === 'vault'} onClick={() => setView('vault')} />
       </nav>
       {/* Settings button at bottom */}
       <div className="p-2 border-t border-slate-200 dark:border-white/5">
@@ -463,8 +469,8 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
       openai: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" fill="currentColor"/></svg>,
       anthropic: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.257 0h3.604L16.744 20.48h-3.603L7.57 7.468 4.112 20.48H.508L6.57 3.52z" fill="currentColor"/></svg>,
       gemini: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M12 24A14.304 14.304 0 0 0 0 12 14.304 14.304 0 0 0 12 0a14.305 14.305 0 0 0 12 12 14.305 14.305 0 0 0-12 12z" fill="currentColor"/></svg>,
-      deepseek: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1.5 5.5a2 2 0 0 1 3.9.5c0 1.5-2.1 1.8-2.1 3.5h-1.5c0-2.5 2.1-2.2 2.1-3.5a.5.5 0 0 0-1 0h-1.4zM12 17.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" fill="currentColor"/></svg>,
-      grok: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M3.005 6.3l7.494 11.4L3 22.5h1.7l6.56-4.2L17 22.5H21l-7.8-11.9L20.1 1.5h-1.7L12 5.3 6.995 1.5H3.005zm2.5 1.2l5 7.5-5.5 3.5h1.2L12 14.8l5.8 3.7h1.2l-5.5-3.5 5-7.5H17.3L12 12.2 6.7 7.5h-1.2z" fill="currentColor"/></svg>
+      deepseek: <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg>,
+      grok: <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M14.998 3.5h3.003L7.001 20.5H3.998L14.998 3.5z" /></svg>
     };
     return logos[id] || null;
   };
@@ -519,7 +525,7 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
             <div className="p-4">
               <div className="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-2">Model</div>
               <select value={local.ai.model} onChange={e => updateLocal({ ...local, ai: { ...local.ai, model: e.target.value } })} className={inputCls}>
-                <option value="">Default ({selectedProvider.name})</option>
+                <option value="" disabled>Select a model</option>
                 {selectedProvider.models.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
               </select>
             </div>
@@ -565,14 +571,30 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
               <div className="text-[13px] font-medium text-slate-700 dark:text-slate-300">Export Vault</div>
               <div className="text-[12px] text-slate-400 dark:text-slate-500 mt-0.5">Download all data as a ZIP archive</div>
             </div>
-            <button onClick={onExport} className="h-8 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5"><Icon name="download" size={14} />Export</button>
+            <button onClick={onExport} className="h-8 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5"><Icon name="upload" size={14} />Export</button>
           </div>
           <div className="p-4 flex items-center justify-between">
             <div>
               <div className="text-[13px] font-medium text-slate-700 dark:text-slate-300">Import Vault</div>
               <div className="text-[12px] text-slate-400 dark:text-slate-500 mt-0.5">Restore from a previously exported archive</div>
             </div>
-            <button onClick={onImport} className="h-8 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5"><Icon name="upload" size={14} />Import</button>
+            <button onClick={onImport} className="h-8 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5"><Icon name="download" size={14} />Import</button>
+          </div>
+        </div>
+      </section>
+
+      {/* Danger Zone */}
+      <section className="mb-8">
+        <div className="text-[11px] uppercase font-semibold text-rose-400 tracking-wider mb-3">Danger Zone</div>
+        <div className="border border-rose-200 dark:border-rose-900/50 rounded-xl p-4 bg-rose-50 dark:bg-rose-950/20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-[14px] font-semibold text-rose-700 dark:text-rose-400 mb-1">Delete All Data</div>
+              <div className="text-[12px] text-rose-600 dark:text-rose-500">Permanently erase all items, distilled content, and settings. This cannot be undone.</div>
+            </div>
+            <button onClick={() => { if (confirm('WARNING: Are you absolutely sure you want to delete ALL data? This cannot be undone.')) { DV.db.clear('items').then(() => DV.db.clear('contents')).then(() => DV.db.clear('settings')).then(() => window.location.reload()); } }} className="shrink-0 h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-medium transition-colors">
+              Delete Everything
+            </button>
           </div>
         </div>
       </section>
@@ -620,6 +642,12 @@ function App() {
   const importInputRef = useRef(null);
 
   const toggleSidebar = (v) => { setSidebarCollapsed(v); localStorage.setItem('dv.sidebar', v ? 'collapsed' : 'expanded'); };
+
+  useEffect(() => {
+    if (appView === 'settings') {
+      toggleSidebar(true);
+    }
+  }, [appView]);
 
   const handleItemAdded = useCallback((record) => {
     setItems(prev => {

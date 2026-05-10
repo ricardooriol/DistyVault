@@ -6,7 +6,7 @@
    * the main thread.
    */
   const DB_NAME = 'distyvault';
-  const DB_VER = 1;
+  const DB_VER = 10;
 
   let dbPromise;
 
