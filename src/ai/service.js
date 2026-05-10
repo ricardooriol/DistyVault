@@ -63,104 +63,37 @@
     const fullText = (extracted.text || '').trim();
     if (!fullText) throw new Error('No text content available to distill.');
 
-    // High-specificity system directive that enforces the output format for downstream parsing
-    const directive = dedent`
-      SYSTEM DIRECTIVE: MUST FOLLOW ALL RULES EXACTLY, DEVIATION IS STRICTLY NOT PERMITTED
-
-
-      1. ROLE & GOAL (YOUR PURPOSE AND IDENTITY)
-      You are a world-class research assistant and knowledge distiller
-      Your paramount purpose is to produce high-quality, profoundly insightful content and teach core principles with unparalleled clarity and depth
-      Your mission is to fully detail a topic, distill core knowledge, eliminate all fluff, and enrich text with profound research and insights
-
-
-      2. CORE PROCESS (IMPORTANT AND CRUCIAL)
-      When I provide a text to analyze, your task is to perform three critical steps:
-
-      1. Knowledge Distillation (Deep Dive & Enrichment)
-      Action: Meticulously distill essential knowledge from the provided text
-      Goal: Go beyond summarizing. Identify core concepts, underlying principles, and critical information
-      Process:
-      - Eliminate all superficiality and extraneous details
-      - Enrich by deconstructing complex ideas into simplest components
-      - Ensure concepts are fully understood, deeply explained, and truly memorable
-      - Prepare knowledge for comprehensive elaboration
-
-      2. Expert Research (Comprehensive Gap Analysis & Augmentation)
-      Action: Critically assess distilled knowledge for gaps, ambiguities, or areas needing more depth
-      Goal: Identify and fill all knowledge gaps, ambiguities, and areas needing deeper context to ensure a complete and authoritative understanding
-      Process:
-      - Conduct a comprehensive, authoritative research process.
-      - Use diverse, top-tier sources: peer-reviewed scientific journals, reputable academic publications, established news organizations, expert analyses
-      - Synthesize most crucial, accurate, and up-to-date information
-      - Augment and validate distilled knowledge for a complete, authoritative understanding
-
-      3. Synthesis & Cohesion (Unified, Exhaustive Explanation)
-      Action: Integrate all information (distillation + research) into one unified, cohesive, exhaustive speech
-      Goal: Seamlessly weave together validated knowledge, presenting a holistic and deeply integrated understanding of the topic
-      Process:
-      - Seamlessly weave together all validated knowledge
-      - Present a holistic and deeply integrated understanding of the topic
-
-
-      3. CRUCIAL OUTPUT STYLE & TONE (NON-NEGOTIABLE AND BULLETPROOF)
-      Tone: Direct, profoundly insightful, strictly neutral
-      Precision: Be exceptionally precise, confident, and authoritative
-      Uncertainty: Admit only if data is genuinely inconclusive or definitive sources are demonstrably unavailable
-      Language: Absolutely avoid jargon, technical buzzwords, or colloquialisms
-      Explanation: Explain all concepts with clarity and depth for a highly intelligent, curious learner to achieve profound and lasting understanding
-      Primary Goal: Absolute, deep comprehension of all topics and concepts, even if the input is long, if necessay output more than 20 points
-
-
-      4. MANDATORY OUTPUT FORMAT (ABSOLUTE RULE: FOLLOW THIS STRUCTURE 100% OF THE TIME)
-
-      START IMMEDIATELY: Begin your entire response directly with the first point of the numbered list
-      NO CONVERSATIONAL INTROS: Absolutely NO conversational introductions, preambles, or any text outside this strict format: deviations are UNACCEPTABLE
-      STRUCTURE: Present your response as an incremental numbered list
-
-      EACH POINT'S STRUCTURE: Every point MUST follow this precise structure, presenting your entire response organizing the main body of your response as an incremental numbered list:
-      1. Core idea sentence
-      Start with a short, concise, single, memorable sentence that captures one complete, fundamental idea from your research. This sentence should be comprehensive and stand on its own as a key takeaway
-      Following that sentence, write one or two detailed paragraphs to elaborate on this core idea. Deconstruct the concept, explain its nuances and implications, and provide necessary context to eliminate any knowledge gaps. Use analogies or simple examples where they can aid understanding. The purpose of this section is to cement the idea, explaining not just what it is, but why it matters and how it works based on your research
-
-      2. Next single, short, concise, memorable, core idea sentence
-      This follows the same pattern as the first point: a single, impactful sentence summarizing the next fundamental concept
-      Follow up with one or two paragraphs of in-depth explanation, connecting this idea to previous points if it helps build a more cohesive mental model for the reader
-
-
-      COVERAGE: Continue this rigorous pattern for as many points as are absolutely necessary to cover ALL essential knowledge on the topic with the required depth and detail. No point should be left unexplored or superficial.
-
-
-      CRITICAL FORMATTING REQUIREMENTS (NON-NEGOTIABLE):
-      - Format: "1. Main sentence here\\nElaboration here\\n\\n2. Next main sentence here\\nElaboration here"
-      - Start with "1." (period and space, nothing else)
-      - Continue sequentially: 1., 2., 3., 4., etc.
-      - NEVER use: 1), (1), 1:, 1-, or any other format
-      - NEVER repeat numbers (no multiple "1." entries)
-      - NEVER skip numbers in sequence
-      - Main sentence comes IMMEDIATELY after "1. " on the same line
-      - Elaboration starts on the next line
-      - Double line break between numbered points
-
-
-      EXAMPLE OF PERFECT FORMAT:
-      1. The core concept drives the entire system architecture
-
-      This fundamental principle shapes how all components interact and determines the scalability limits of the platform. Understanding this relationship is crucial because it affects both performance optimization strategies and future development decisions.
-
-
-      2. Implementation details reveal critical trade-offs
-
-      The specific technical choices made here demonstrate the balance between speed and reliability. These decisions have cascading effects throughout the system and explain why certain limitations exist in the current design.
-
-
-      5. TAGS SECTION (MANDATORY)
-      At the very end of your response, after the last numbered point, providing ONE line starting exactly with "TAGS: " followed by 3 to 5 high-quality, relevant categorization tags separated by commas.
-      CRITICAL: Output absolutely NOTHING after the TAGS line. No signatures, no summaries, no "Here are your tags", and NO HTML tags.
-      Example: TAGS: Psychology, Habit Formation, Productivity
+    // Deep Analysis Directive (Pass 1)
+    const analysisDirective = dedent`
+      SYSTEM DIRECTIVE: You are a world-class research assistant and knowledge extractor.
+      Your mission is to perform a DEEP ANALYSIS and EXHAUSTIVE BRAIN DUMP of the provided text.
+      
+      CORE PROCESS:
+      - Extract every core concept, critical nuance, and actionable insight.
+      - Do NOT worry about formatting, length limits, or structure. Just dump all valuable knowledge.
+      - Eliminate all fluff, but keep all high-value information.
+      - If the input is long, your analysis MUST be correspondingly massive. Do not stop early.
+      
+      Output ONLY your raw analysis.
     `;
 
-    const CHUNK_SIZE = 10000;
+    // Formatting Directive (Pass 2)
+    const formatDirective = dedent`
+      SYSTEM DIRECTIVE: You are an elite editor and information architect.
+      Your task is to take a raw, exhaustive analysis and synthesize it into a beautifully structured, comprehensive Markdown document.
+      
+      OUTPUT FORMAT:
+      - Use ONLY standard, elegant Markdown (e.g., #, ##, -, *, **).
+      - Do NOT use HTML tags. Do NOT wrap your response in markdown code blocks.
+      - Organize the knowledge logically with clear headings, bullet points, and paragraphs.
+      - Do NOT drop or summarize away any of the deep insights from the raw analysis.
+      
+      TAGS SECTION:
+      At the very end of your response, add a section exactly like this:
+      TAGS: tag1, tag2, tag3
+    `;
+
+    const CHUNK_SIZE = 100000;
     const CHUNK_OVERLAP = 500;
 
     /**
@@ -192,14 +125,29 @@
     }
 
     async function distillSingle(text, partNote) {
-      const userContent = `${partNote}Here is the text to distill:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
-      const prepared = {
+      // Pass 1: Deep Analysis
+      const analysisContent = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
+      const analysisPrepared = {
         title,
-        prompt: `${directive}\n\n${userContent}`,
-        messages: [{ role: 'system', content: directive }, { role: 'user', content: userContent }]
+        prompt: `${analysisDirective}\n\n${analysisContent}`,
+        messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: analysisContent }]
       };
-      const settingsWithPrepared = { ...aiSettings, __prepared: prepared };
-      return await provider.distill(extracted, settingsWithPrepared);
+      const rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: analysisPrepared });
+
+      // Pass 2: Markdown Formatting
+      try {
+        const formatContent = `Here is the raw analysis to format into a beautiful Markdown document:\n\n${rawAnalysis}`;
+        const formatPrepared = {
+          title,
+          prompt: `${formatDirective}\n\n${formatContent}`,
+          messages: [{ role: 'system', content: formatDirective }, { role: 'user', content: formatContent }]
+        };
+        const finalMarkdown = await provider.distill(extracted, { ...aiSettings, __prepared: formatPrepared });
+        return finalMarkdown;
+      } catch (err) {
+        console.warn('Formatting pass failed, falling back to raw analysis:', err);
+        return rawAnalysis;
+      }
     }
 
     let rawHtml;
@@ -221,22 +169,18 @@
       } else {
         // Synthesis pass: merge all chunk distillations
         const mergeDirective = dedent`
-          SYSTEM DIRECTIVE: You are a world-class knowledge synthesizer.
-          You have been given multiple partial distillations of a longer document.
-          Your task is to merge them into ONE cohesive, unified, complete distillation.
-          Remove all redundancies and overlapping points.
-          Maintain the same numbered-list output format as the original distillation.
-          Re-number all points sequentially starting from 1.
-          Preserve all unique insights and do not lose any information.
-          Output ONLY the merged numbered list — no introductions, no commentary.
+          SYSTEM DIRECTIVE: You are a world-class knowledge synthesizer and editor.
+          You have been given multiple partial Markdown distillations of a massive document.
+          Your task is to cleanly merge them into ONE cohesive, unified, beautifully structured Markdown document.
+          Remove redundant overlaps between parts, but DO NOT lose any detailed insights.
+          Output ONLY standard Markdown. No HTML tags. No markdown code blocks wrappers.
           
-          CRITICAL: TAGS SECTION (MANDATORY)
-          At the very end of your response, after the last numbered point, you MUST provide ONE line starting exactly with "TAGS: " followed by 3 to 5 high-quality, relevant categorization tags separated by commas.
-          Output absolutely NOTHING after the TAGS line.
-          Example: TAGS: Psychology, Habit Formation, Productivity
+          TAGS SECTION:
+          At the very end of your response, add a section exactly like this:
+          TAGS: tag1, tag2, tag3
         `;
         const mergeContent = chunkResults.map((r, i) => `--- Part ${i + 1} ---\n${r}`).join('\n\n');
-        const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified document:\n\n${mergeContent}`;
+        const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified Markdown document:\n\n${mergeContent}`;
         const mergePrepared = {
           title: title + ' (merged)',
           prompt: `${mergeDirective}\n\n${mergeUserContent}`,
@@ -282,79 +226,48 @@
    * @returns {string[]}
    */
   function parseTags(text = '') {
-    // Match "TAGS:", "Tags:", "**TAGS**:", "TAGS - " etc.
-    const m = text.match(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi);
-    if (!m) return [];
-    // Aggressively clean up the tags string
-    const raw = m[1]
-      .replace(/<\/?[^>]+(>|$)/g, '') // Remove any HTML tags
-      .replace(/["'\[\]\{\}]/g, '')   // Remove quotes/brackets
-      .trim();
-
+    const fallback = text.match(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi);
+    let raw = fallback ? fallback[1] : '';
+    if (!raw) {
+      // Fallback to legacy hidden div parsing just in case
+      const match = text.match(/<div[^>]*id=["']dv-tags["'][^>]*>(.*?)<\/div>/i);
+      if (match) raw = match[1];
+    }
+    
+    if (!raw) return [];
+    
+    raw = raw.replace(/<\/?[^>]+(>|$)/g, '').replace(/["'\[\]\{\}]/g, '').trim();
     return raw.split(/[,;|]/).map(s => {
-      return s.trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9#\s-]/g, '') // Only allow alphanumeric, spaces, hashes, dashes
-        .trim();
+      return s.trim().toLowerCase().replace(/[^a-z0-9#\s-]/g, '').trim();
     }).filter(s => s && s.length >= 2 && s.length < 30);
   }
 
   window.DV = window.DV || {};
   window.DV.ai = { distill, test };
   /**
-   * Try to parse a strict numbered-list response and transform it into a structured
-   * HTML document with consistent styling and metadata. Falls back to the original
-   * provider HTML if parsing fails.
+   * Cleans the AI output of any wrappers/tag blocks and injects into standard template.
    * @param {string} html Raw provider HTML/string
    * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
    * @returns {string}
    */
-  function reformatDistilled(html = '', meta) {
+  function reformatDistilled(markdown = '', meta) {
     try {
-      // Strip the raw TAGS: line from the display body
-      const cleanHtml = html.replace(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi, '').trim();
-      const doc = new DOMParser().parseFromString(cleanHtml || '', 'text/html');
-      const rawText = (doc.body?.innerText || '').trim();
-      const points = parseNumberedList(rawText);
-      if (!points.length) return cleanHtml;
-      const body = points.map(pt => {
-        const head = escapeHtml(`${pt.n}. ${pt.head}`);
-        const paras = pt.body.split(/\n{2,}/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
-        return `
-<section class="dv-point" style="margin: 0 0 16px 0;">
-  <div class="dv-head" style="font-weight:700;">${head}</div>
-  <div style="height: 10px;"></div>
-  <div class="dv-body" style="font-weight:400;">${paras}</div>
-</section>`;
-      }).join('\n\n');
-      return standardWrapHtml(body, meta);
-    } catch {
-      return html;
+      // Strip out the tags line and any markdown codeblock wrappers the model might have added
+      let cleanMd = markdown
+        .replace(/^```(markdown|md|html)\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .replace(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi, '')
+        .trim();
+        
+      // Render to HTML securely
+      const rawHtml = window.marked ? window.marked.parse(cleanMd) : '<p>' + escapeHtml(cleanMd).replace(/\n/g, '<br/>') + '</p>';
+      const safeHtml = window.DOMPurify ? window.DOMPurify.sanitize(rawHtml) : rawHtml;
+        
+      return standardWrapHtml(safeHtml, meta);
+    } catch (err) {
+      console.error('Render error', err);
+      return markdown;
     }
-  }
-
-  /**
-   * Parse a strict 1., 2., ... numbered list from plain text into a structured array.
-   * Lines that do not start a new point are appended to the current point's body.
-   * @param {string} [text]
-   * @returns {Array<{n:number, head:string, body:string}>}
-   */
-  function parseNumberedList(text = '') {
-    const lines = text.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').split('\n');
-    const pts = [];
-    let current = null;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const m = line.match(/^(\d+)\.\s+(.+)/);
-      if (m) {
-        if (current) pts.push(current);
-        current = { n: Number(m[1]), head: m[2].trim(), body: '' };
-      } else if (current) {
-        current.body += (current.body ? '\n' : '') + line;
-      }
-    }
-    if (current) pts.push(current);
-    return pts;
   }
 
   /**
@@ -369,41 +282,57 @@
     const srcLabel = meta?.sourceUrl ? `<a href="${escapeHtml(meta.sourceUrl)}" target="_blank" rel="noopener" class="dv-link">${escapeHtml(meta.sourceUrl)}</a>` : `<span>${escapeHtml(meta?.sourceName || '')}</span>`;
     const dateText = escapeHtml(meta?.dateText || '');
     return `<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title><style>
-:root{color-scheme: light dark}
-html,body{height:100%;margin:0;padding:0}
-body{font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.65;padding:16px 24px;color:#1e293b;background:#ffffff;transition: background-color 0.2s, color 0.2s}
-.dark body{color:#f1f5f9;background:#0f172a}
-h1,h2,h3{margin:8px 0 8px;line-height:1.2}
-h1{font-size:1.75rem;font-weight:800;letter-spacing:-0.025em}
-p{margin:12px 0}
-.dv-head{font-size:1.1rem;color:#0f172a}
-.dark .dv-head{color:#ffffff}
-.dv-body p{margin:12px 0}
-.dv-meta{color:#64748b;font-size:0.875rem;margin-top:8px}
-.dark .dv-meta{color:#94a3b8}
-.dv-link{color:#4f46e5;text-decoration:none;border-bottom:1px solid rgba(79,70,229,0.3)}
-.dv-link:hover{border-bottom-color:#4f46e5}
-.dark .dv-link{color:#818cf8;border-bottom-color:rgba(129,140,248,0.3)}
-.dark .dv-link:hover{border-bottom-color:#818cf8}
-hr{border:none;border-top:1px solid #e2e8f0;margin:24px 0}
-.dark hr{border-top-color:#1e293b}
-footer.dv-footer{margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:0.75rem;text-align:center}
-.dark footer.dv-footer{border-top-color:#1e293b;color:#475569}
+:root { color-scheme: light dark; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.75;
+  padding: 32px 24px;
+  color: #334155;
+  background: #f8fafc;
+  transition: background-color 0.2s, color 0.2s;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.dark body { color: #e2e8f0; background: #0f172a; }
+
+header { margin-bottom: 40px; }
+h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 16px; line-height: 1.2; color: #0f172a; }
+.dark h1 { color: #f8fafc; }
+
+.dv-meta { color: #64748b; font-size: 0.95rem; margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+.dark .dv-meta { color: #94a3b8; }
+
+.dv-link { color: #6366f1; text-decoration: none; border-bottom: 1px solid rgba(99,102,241,0.3); transition: border-color 0.2s; }
+.dv-link:hover { border-bottom-color: #6366f1; }
+.dark .dv-link { color: #818cf8; border-bottom-color: rgba(129,140,248,0.3); }
+.dark .dv-link:hover { border-bottom-color: #818cf8; }
+
+hr { border: none; height: 1px; background: linear-gradient(to right, transparent, #cbd5e1, transparent); margin: 32px 0; }
+.dark hr { background: linear-gradient(to right, transparent, #334155, transparent); }
+
+main h1, main h2, main h3 { color: #0f172a; font-weight: 700; letter-spacing: -0.01em; margin: 32px 0 16px 0; }
+.dark main h1, .dark main h2, .dark main h3 { color: #f1f5f9; }
+main h1 { font-size: 1.8rem; }
+main h2 { font-size: 1.5rem; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+.dark main h2 { border-bottom-color: #334155; }
+main h3 { font-size: 1.25rem; }
+main p { margin: 0 0 16px 0; }
+main ul, main ol { margin: 0 0 16px 0; padding-left: 24px; }
+main li { margin-bottom: 8px; }
+main blockquote { border-left: 4px solid #cbd5e1; margin: 0 0 16px 0; padding: 4px 0 4px 16px; color: #475569; font-style: italic; }
+.dark main blockquote { border-left-color: #475569; color: #94a3b8; }
+main code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: monospace; }
+.dark main code { background: #334155; }
+
+footer.dv-footer { margin-top: 64px; padding-top: 32px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 0.85rem; text-align: center; font-weight: 500; }
+.dark footer.dv-footer { border-top-color: #1e293b; color: #475569; }
 </style></head><body>
 <script>
   (function(){
-    function updateTheme(isDark) {
-      document.documentElement.classList.toggle('dark', isDark);
-    }
-    window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'dv-theme') updateTheme(e.data.isDark);
-    });
-    // Initial check
-    try {
-      if (parent && parent.document && parent.document.documentElement.classList.contains('dark')) {
-        updateTheme(true);
-      }
-    } catch(e){}
+    function updateTheme(isDark) { document.documentElement.classList.toggle('dark', isDark); }
+    window.addEventListener('message', function(e) { if (e.data && e.data.type === 'dv-theme') updateTheme(e.data.isDark); });
+    try { if (parent && parent.document && parent.document.documentElement.classList.contains('dark')) updateTheme(true); } catch(e){}
   })();
 </script>
 <header>

@@ -24,8 +24,7 @@
     }
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content || '';
-    const title = extracted.title || extracted.fileName || extracted.url || 'Distilled';
-    return DV.utils.wrapHtml(content, title);
+    return content;
   }
 
   /**

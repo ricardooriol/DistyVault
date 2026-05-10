@@ -42,7 +42,7 @@
 
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content || '';
-    return DV.utils.wrapHtml(content, title);
+    return content;
   }
 
   window.DV = window.DV || {};

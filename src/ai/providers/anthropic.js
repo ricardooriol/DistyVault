@@ -48,8 +48,7 @@
     }
     const data = await res.json();
     const text = (data.content?.[0]?.text) || '';
-    const title = extracted.title || extracted.fileName || extracted.url || 'Distilled';
-    return DV.utils.wrapHtml(text, title);
+    return text;
   }
 
   /**

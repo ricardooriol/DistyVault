@@ -65,7 +65,7 @@
         const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
         if (!text) throw new Error('Gemini API returned an empty response or was blocked by safety filters.');
 
-        return DV.utils.wrapHtml(text, extracted.title || 'Distilled');
+        return text;
 
       } catch (err) {
         clearTimeout(timeoutId);
