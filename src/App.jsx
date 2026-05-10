@@ -89,10 +89,11 @@ function Sidebar({ collapsed, setCollapsed, view, setView }) {
   return (
     <aside className={classNames('shrink-0 h-full border-r border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-950 flex flex-col transition-all duration-200', collapsed ? 'w-[60px]' : 'w-[200px]')}>
       {/* Header: logo + collapse toggle */}
-      <div className={classNames('h-14 flex items-center border-b border-slate-200 dark:border-white/5 shrink-0', collapsed ? 'justify-center' : 'px-4 justify-between')}>
+      <div className={classNames('h-14 flex items-center border-b border-slate-200 dark:border-white/5 shrink-0 px-4 justify-between', collapsed ? 'justify-center relative' : '')}>
         {collapsed ? (
-          <button onClick={() => setCollapsed(false)} className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" title="Expand Sidebar">
-            <Icon name="panel-left-open" size={18} />
+          <button onClick={() => setCollapsed(false)} className="w-full h-full flex items-center justify-center group" title="Expand Sidebar">
+            <img src={logoSrc} alt="DistyVault" className="w-6 h-6 group-hover:opacity-0 transition-opacity absolute" />
+            <Icon name="panel-left-open" size={20} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity absolute" />
           </button>
         ) : (
           <>
@@ -130,7 +131,7 @@ function ContentHeader({ openCmd, theme, setTheme }) {
         <button onClick={openCmd} className="flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
           <Icon name="search" size={15} />
           <span className="hidden sm:inline">Search or paste URL...</span>
-          <kbd className="ml-1 text-[11px] border border-slate-200 dark:border-white/10 rounded px-1.5 py-0.5 font-medium">⌘K</kbd>
+          <kbd className="ml-1 text-[11px] border border-slate-200 dark:border-white/10 rounded px-1.5 py-0.5 font-medium">⌘ K</kbd>
         </button>
         <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
           <Icon name={isDark ? 'moon' : 'sun'} size={18} />
@@ -317,7 +318,7 @@ function ItemList({ items, allItems, selected, setSelected, expandedIds, setExpa
       <div className="max-w-5xl mx-auto px-5 py-24 text-center">
         <div className="text-slate-300 dark:text-slate-600 mb-4"><Icon name="inbox" size={48} className="mx-auto" /></div>
         <div className="text-lg font-medium text-slate-400 dark:text-slate-500">Your vault is empty</div>
-        <div className="text-sm text-slate-400 dark:text-slate-500 mt-1">Press <kbd className="text-[11px] border border-slate-200 dark:border-white/10 rounded px-1.5 py-0.5 font-medium mx-0.5">⌘K</kbd> to start distilling</div>
+        <div className="text-sm text-slate-400 dark:text-slate-500 mt-1">Press <kbd className="text-[11px] border border-slate-200 dark:border-white/10 rounded px-1.5 py-0.5 font-medium mx-0.5">⌘ K</kbd> to start distilling</div>
       </div>
     );
   }
@@ -459,6 +460,7 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
   useEffect(() => { setLocal(settings); }, [settings]);
   const [testing, setTesting] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const updateLocal = (u) => { setLocal(u); setDirty(true); };
 
@@ -470,7 +472,7 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
       anthropic: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.257 0h3.604L16.744 20.48h-3.603L7.57 7.468 4.112 20.48H.508L6.57 3.52z" fill="currentColor"/></svg>,
       gemini: <svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M12 24A14.304 14.304 0 0 0 0 12 14.304 14.304 0 0 0 12 0a14.305 14.305 0 0 0 12 12 14.305 14.305 0 0 0-12 12z" fill="currentColor"/></svg>,
       deepseek: <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg>,
-      grok: <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M14.998 3.5h3.003L7.001 20.5H3.998L14.998 3.5z" /></svg>
+      grok: <svg width={s} height={s} viewBox="0 0 34 34" fill="currentColor"><path d="M13.237 21.041L24.319 12.85c.543-.401 1.32-.245 1.578.379 1.363 3.289.754 7.242-1.957 9.956-2.71 2.714-6.482 3.309-9.929 1.953l-3.766 1.746c5.401 3.696 11.96 2.782 16.059-1.324 3.251-3.255 4.258-7.692 3.316-11.693l.009.009c-1.365-5.878.336-8.227 3.82-13.032.083-.114.165-.228.248-.344l-4.585 4.59v-.014l-15.875 15.967zm-2.287 1.99c-3.877-3.708-3.208-9.446.1-12.755 2.446-2.449 6.454-3.448 9.952-1.979l3.757-1.737c-.677-.49-1.545-1.017-2.54-1.387-4.5-1.854-9.887-.931-13.545 2.728-3.518 3.523-4.625 8.94-2.725 13.561 1.419 3.454-1.007 5.898-3.351 8.364-.83.874-1.664 1.749-2.335 2.674l10.584-9.469z" /></svg>
     };
     return logos[id] || null;
   };
@@ -592,8 +594,15 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
               <div className="text-[14px] font-semibold text-rose-700 dark:text-rose-400 mb-1">Delete All Data</div>
               <div className="text-[12px] text-rose-600 dark:text-rose-500">Permanently erase all items, distilled content, and settings. This cannot be undone.</div>
             </div>
-            <button onClick={() => { if (confirm('WARNING: Are you absolutely sure you want to delete ALL data? This cannot be undone.')) { DV.db.clear('items').then(() => DV.db.clear('contents')).then(() => DV.db.clear('settings')).then(() => window.location.reload()); } }} className="shrink-0 h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-medium transition-colors">
-              Delete Everything
+            <button onClick={() => { 
+              if (confirmDelete) { 
+                DV.db.clear('items').then(() => DV.db.clear('contents')).then(() => DV.db.clear('settings')).then(() => window.location.reload()); 
+              } else { 
+                setConfirmDelete(true); 
+                setTimeout(() => setConfirmDelete(false), 3000); 
+              } 
+            }} className="shrink-0 h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-medium transition-colors">
+              {confirmDelete ? 'Are you sure? Click again' : 'Delete Everything'}
             </button>
           </div>
         </div>
@@ -765,6 +774,10 @@ function App() {
   const handleFileDrop = async (files) => { for (const f of files) await DV.queue.addItem({ kind: 'file', title: f.name, file: f }); if (files.length) DV.toast('Files added'); };
 
   const handleExport = async () => {
+    if (items.length === 0) {
+      DV.toast("Vault is empty. Nothing to export.");
+      return;
+    }
     const d = new Date(); const p = n => String(n).padStart(2, '0');
     saveBlob(await DV.db.exportAllToZip(), `DistyVault_export_${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}.zip`);
   };
@@ -790,50 +803,36 @@ function App() {
       const margin = 24;
       const wrapWidth = pageWidth - (margin * 2);
 
-      // --- COVER PAGE ---
-      const centerX = pageWidth / 2;
-      let cy = pageHeight * 0.32;
+      let y = 30;
 
-      // Logo
-      try { doc.addImage(logoImg, 'PNG', centerX - 8, cy - 20, 16, 16); } catch(e) {}
-      cy += 8;
+      // --- BRANDING & HEADER ---
+      doc.setFont('Helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(15, 23, 42);
+      const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
+      doc.text(titleLines, margin, y);
+      y += titleLines.length * 8 + 4;
 
-      // Title
-      doc.setFont('Helvetica', 'bold'); doc.setFontSize(28); doc.setTextColor(15, 23, 42);
-      const coverTitle = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth - 20);
-      doc.text(coverTitle, centerX, cy, { align: 'center' });
-      cy += coverTitle.length * 11 + 8;
+      doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
+      const sourceUrl = doc.splitTextToSize(it.url || 'Universal Extraction', wrapWidth)[0];
+      if (it.url) {
+        doc.setTextColor(37, 99, 235);
+        try { doc.textWithLink(sourceUrl, margin, y, { url: it.url }); } catch(e) { doc.text(sourceUrl, margin, y); }
+      } else {
+        doc.setTextColor(100, 116, 139);
+        doc.text(sourceUrl, margin, y);
+      }
+      y += 6;
+
+      doc.setTextColor(148, 163, 184);
+      const fullDate = content.meta?.dateText || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.text(`Distilled on ${fullDate}`, margin, y);
+      y += 12;
 
       // Divider
       doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
-      doc.line(centerX - 30, cy, centerX + 30, cy);
-      cy += 14;
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 12;
 
-      // Source
-      doc.setFont('Helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(100, 116, 139);
-      const sourceLabel = it.url || 'Universal Extraction';
-      const sourceLines = doc.splitTextToSize(sourceLabel, wrapWidth - 40);
-      doc.text(sourceLines, centerX, cy, { align: 'center' });
-      cy += sourceLines.length * 5 + 6;
-
-      // Date
-      const fullDate = content.meta?.dateText || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      doc.text(fullDate, centerX, cy, { align: 'center' });
-      cy += 20;
-
-      // Tags
-      if (it.tags?.length) {
-        doc.setFontSize(10); doc.setTextColor(148, 163, 184);
-        doc.text(it.tags.map(t => '#' + t).join('  '), centerX, cy, { align: 'center' });
-      }
-
-      // Cover footer
-      doc.setFontSize(9); doc.setTextColor(203, 213, 225);
-      doc.text('Generated by DistyVault', centerX, pageHeight - 20, { align: 'center' });
-
-      // --- CONTENT PAGES ---
-      doc.addPage();
-      let y = 30;
+      // --- CONTENT ---
       const helper = new DOMParser().parseFromString(content.html, 'text/html');
 
       const checkPage = (height) => {
@@ -899,13 +898,14 @@ function App() {
         rl.forEach(line => { checkPage(7); doc.text(line, margin, y); y += 5.5; });
       }
 
-      // Footer on all pages (skip cover)
+      // Footer on all pages
       const totalPages = doc.internal.getNumberOfPages();
-      for (let i = 2; i <= totalPages; i++) {
+      for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(180, 190, 200);
         try { doc.addImage(logoImg, 'PNG', margin, pageHeight - 14, 4, 4); } catch(e) {}
         doc.text('DistyVault', margin + 6, pageHeight - 11);
-        doc.text(`${i - 1} / ${totalPages - 1}`, pageWidth - margin, pageHeight - 11, { align: 'right' });
+        doc.setFont('Helvetica', 'bold'); doc.setTextColor(148, 163, 184);
+        doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 11, { align: 'right' });
       }
 
       const b = doc.output('blob');

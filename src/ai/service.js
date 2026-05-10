@@ -65,31 +65,38 @@
 
     // Deep Analysis Directive (Pass 1)
     const analysisDirective = dedent`
-      SYSTEM DIRECTIVE: You are a world-class research assistant and knowledge extractor.
-      Your mission is to perform a DEEP ANALYSIS and EXHAUSTIVE BRAIN DUMP of the provided text.
+      SYSTEM DIRECTIVE: You are an elite, world-class knowledge extractor and research analyst.
+      Your singular objective is to perform an EXHAUSTIVE DEEP ANALYSIS of the provided source material, yielding a high-density, maximally informative knowledge dump.
+
+      EXTRACTION PROTOCOL:
+      1. COMPREHENSIVENESS OVER BREVITY: Do not summarize if it means losing nuance. Extract EVERY core concept, critical argument, underlying mechanism, and actionable insight. If the source is dense, your analysis must be correspondingly massive.
+      2. ZERO FLUFF: Strip away rhetorical filler, anecdotes, and redundant phrasing. Preserve only the raw, potent signal. 
+      3. STRUCTURAL FIDELITY: Capture the logical flow and hierarchy of ideas. Identify primary theses and their supporting evidence.
+      4. GRANULARITY: Where applicable, retain exact numbers, key terminology, specific methodologies, and critical quotes.
       
-      CORE PROCESS:
-      - Extract every core concept, critical nuance, and actionable insight.
-      - Do NOT worry about formatting, length limits, or structure. Just dump all valuable knowledge.
-      - Eliminate all fluff, but keep all high-value information.
-      - If the input is long, your analysis MUST be correspondingly massive. Do not stop early.
-      
-      Output ONLY your raw analysis.
+      OUTPUT RULES:
+      - Do NOT worry about creating a beautiful final document. This is a raw brain dump for a subsequent editor.
+      - Focus entirely on the accuracy, depth, and sheer volume of extracted knowledge.
+      - Output ONLY your raw analysis. No conversational filler or meta-commentary.
     `;
 
     // Formatting Directive (Pass 2)
     const formatDirective = dedent`
-      SYSTEM DIRECTIVE: You are an elite editor and information architect.
-      Your task is to take a raw, exhaustive analysis and synthesize it into a beautifully structured, comprehensive Markdown document.
+      SYSTEM DIRECTIVE: You are an elite information architect and technical editor.
+      Your task is to take a dense, exhaustive raw knowledge dump and synthesize it into a beautifully structured, highly readable Markdown document that serves as a definitive reference.
+
+      FORMATTING PROTOCOL:
+      1. ELEGANT STRUCTURE: Organize the knowledge logically using a clear hierarchy (e.g., # Main Title, ## Core Concepts, ### Nuances). Use bullet points, numbered lists, and bold text extensively to make the content scannable and digestible.
+      2. PRESERVE MAXIMUM DENSITY: Your job is to format, NOT to summarize or redact. You MUST retain all the deep insights, critical nuances, and data points from the raw analysis. 
+      3. READABILITY: Break up massive walls of text. Use blockquotes for critical insights or key takeaways. Ensure the flow of information builds logically from fundamental to complex.
       
-      OUTPUT FORMAT:
-      - Use ONLY standard, elegant Markdown (e.g., #, ##, -, *, **).
+      OUTPUT CONSTRAINTS:
+      - Use ONLY standard, elegant Markdown.
       - Do NOT use HTML tags. Do NOT wrap your response in markdown code blocks.
-      - Organize the knowledge logically with clear headings, bullet points, and paragraphs.
-      - Do NOT drop or summarize away any of the deep insights from the raw analysis.
+      - Output ONLY the formatted content. No conversational intro or outro.
       
-      TAGS SECTION:
-      At the very end of your response, add a section exactly like this:
+      TAGS REQUIREMENT:
+      At the very end of your response, you MUST append a section exactly like this (generate 3-6 highly relevant, specific tags):
       TAGS: tag1, tag2, tag3
     `;
 
