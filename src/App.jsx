@@ -126,8 +126,8 @@ function ContentHeader({ openCmd, theme, setTheme }) {
   const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
   return (
-    <div className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm border-b border-slate-200 dark:border-white/5">
-      <div className="w-full px-5 h-14 flex items-center justify-between">
+    <div className="sticky top-0 z-30 h-14 flex flex-col justify-center bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm border-b border-slate-200 dark:border-white/5">
+      <div className="w-full px-5 flex items-center justify-between">
         <button onClick={openCmd} className="flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
           <Icon name="search" size={15} />
           <span className="hidden sm:inline">Search or paste URL...</span>
@@ -327,24 +327,24 @@ function ItemList({ items, allItems, selected, setSelected, expandedIds, setExpa
     <div className="max-w-5xl mx-auto px-5 pb-24">
       <div className="border border-slate-200 dark:border-white/5 rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-white/5">
         {items.map(i => (
-          <div key={i.id} onClick={e => onRowClick(e, i)} onDoubleClick={() => onDblClick(i)} className={classNames('flex items-start sm:items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 sm:py-3.5 cursor-pointer transition-colors', selected.includes(i.id) ? 'bg-slate-100 dark:bg-white/5' : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]', i.parentId && 'pl-8 sm:pl-10')}>
+          <div key={i.id} onClick={e => onRowClick(e, i)} onDoubleClick={() => onDblClick(i)} className={classNames('flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 cursor-pointer transition-colors h-[64px]', selected.includes(i.id) ? 'bg-slate-100 dark:bg-white/5' : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]', i.parentId && 'pl-8 sm:pl-10')}>
             {i.kind === 'playlist' && (
-              <button className="p-0.5 mt-0.5 sm:mt-0 text-slate-400 hover:text-slate-600 dark:hover:text-white shrink-0" onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}>
+              <button className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-white shrink-0" onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}>
                 <span className={classNames('transition-transform inline-block', expandedIds.has(i.id) && 'rotate-90')}><Icon name="chevron-right" size={14} /></span>
               </button>
             )}
-            {i.kind !== 'playlist' && <Icon name={getKindIcon(i.kind)} size={16} className="text-slate-400 shrink-0 mt-0.5 sm:mt-0" />}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-900 dark:text-white leading-snug break-words sm:truncate mb-1 sm:mb-0.5">{i.title || i.url}</div>
-              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                {i.tags?.length > 0 && i.tags.map(t => <span key={t} className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 px-1.5 py-0.5 rounded truncate max-w-full">#{t}</span>)}
+            {i.kind !== 'playlist' && <Icon name={getKindIcon(i.kind)} size={16} className="text-slate-400 shrink-0" />}
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <div className="text-sm font-medium text-slate-900 dark:text-white truncate">{i.title || i.url}</div>
+              <div className="flex items-center gap-1.5 mt-0.5 min-w-0 overflow-hidden whitespace-nowrap">
+                {i.tags?.length > 0 && i.tags.map(t => <span key={t} className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 px-1.5 py-0.5 rounded shrink-0">#{t}</span>)}
                 {!i.tags?.length && i.url && <span className="text-[11px] sm:text-[12px] text-slate-400 dark:text-slate-500 truncate block w-full">{i.url}</span>}
               </div>
             </div>
             {i.kind !== 'playlist' && (
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 sm:gap-3 shrink-0 ml-2 mt-1 sm:mt-0">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
                 {[STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status) && i.startedAt && (
-                  <span className="text-[10px] sm:text-[11px] text-slate-400 tabular-nums">{formatDuration(now - i.startedAt)}</span>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 tabular-nums hidden sm:block">{formatDuration(now - i.startedAt)}</span>
                 )}
                 <StatusDot status={i.status} />
               </div>
@@ -822,10 +822,14 @@ function App() {
         </div>
       `;
 
-      printContainer.style.position = 'absolute';
-      printContainer.style.left = '-9999px';
+      printContainer.style.position = 'fixed';
+      printContainer.style.left = '0';
       printContainer.style.top = '0';
+      printContainer.style.zIndex = '-9999';
       document.body.appendChild(printContainer);
+
+      // Force layout calculation
+      await new Promise(r => setTimeout(r, 100));
 
       const opt = {
         margin:       [10, 0, 10, 0],
@@ -836,11 +840,12 @@ function App() {
       };
 
       try {
+        const worker = window.html2pdf().set(opt).from(printContainer);
         if (zip) {
-          const pdfBlob = await window.html2pdf().set(opt).from(printContainer).output('blob');
+          const pdfBlob = await worker.output('blob');
           zip.file(sanitizeFilename(it.title) + '.pdf', pdfBlob);
         } else {
-          await window.html2pdf().set(opt).from(printContainer).save();
+          await worker.save();
         }
       } catch(e) {
         console.error("PDF generation failed", e);
