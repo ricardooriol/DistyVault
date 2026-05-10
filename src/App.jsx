@@ -327,24 +327,24 @@ function ItemList({ items, allItems, selected, setSelected, expandedIds, setExpa
     <div className="max-w-5xl mx-auto px-5 pb-24">
       <div className="border border-slate-200 dark:border-white/5 rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-white/5">
         {items.map(i => (
-          <div key={i.id} onClick={e => onRowClick(e, i)} onDoubleClick={() => onDblClick(i)} className={classNames('flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-colors', selected.includes(i.id) ? 'bg-slate-100 dark:bg-white/5' : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]', i.parentId && 'pl-10')}>
+          <div key={i.id} onClick={e => onRowClick(e, i)} onDoubleClick={() => onDblClick(i)} className={classNames('flex items-start sm:items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 sm:py-3.5 cursor-pointer transition-colors', selected.includes(i.id) ? 'bg-slate-100 dark:bg-white/5' : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]', i.parentId && 'pl-8 sm:pl-10')}>
             {i.kind === 'playlist' && (
-              <button className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-white shrink-0" onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}>
+              <button className="p-0.5 mt-0.5 sm:mt-0 text-slate-400 hover:text-slate-600 dark:hover:text-white shrink-0" onClick={e => { e.stopPropagation(); setExpandedIds(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; }); }}>
                 <span className={classNames('transition-transform inline-block', expandedIds.has(i.id) && 'rotate-90')}><Icon name="chevron-right" size={14} /></span>
               </button>
             )}
-            {i.kind !== 'playlist' && <Icon name={getKindIcon(i.kind)} size={16} className="text-slate-400 shrink-0" />}
+            {i.kind !== 'playlist' && <Icon name={getKindIcon(i.kind)} size={16} className="text-slate-400 shrink-0 mt-0.5 sm:mt-0" />}
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-900 dark:text-white truncate">{i.title || i.url}</div>
-              <div className="flex items-center gap-2 mt-0.5">
-                {i.tags?.length > 0 && i.tags.map(t => <span key={t} className="text-[11px] text-slate-400 dark:text-slate-500">#{t}</span>)}
-                {!i.tags?.length && i.url && <span className="text-[12px] text-slate-400 dark:text-slate-500 truncate">{i.url}</span>}
+              <div className="text-sm font-medium text-slate-900 dark:text-white leading-snug break-words sm:truncate mb-1 sm:mb-0.5">{i.title || i.url}</div>
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                {i.tags?.length > 0 && i.tags.map(t => <span key={t} className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 px-1.5 py-0.5 rounded truncate max-w-full">#{t}</span>)}
+                {!i.tags?.length && i.url && <span className="text-[11px] sm:text-[12px] text-slate-400 dark:text-slate-500 truncate block w-full">{i.url}</span>}
               </div>
             </div>
             {i.kind !== 'playlist' && (
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 sm:gap-3 shrink-0 ml-2 mt-1 sm:mt-0">
                 {[STATUS.EXTRACTING, STATUS.DISTILLING].includes(i.status) && i.startedAt && (
-                  <span className="text-[11px] text-slate-400 tabular-nums">{formatDuration(now - i.startedAt)}</span>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 tabular-nums">{formatDuration(now - i.startedAt)}</span>
                 )}
                 <StatusDot status={i.status} />
               </div>
