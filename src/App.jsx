@@ -127,7 +127,7 @@ function ContentHeader({ openCmd, theme, setTheme }) {
   const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
   return (
     <div className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm border-b border-slate-200 dark:border-white/5">
-      <div className="max-w-5xl mx-auto px-5 h-12 flex items-center justify-between">
+      <div className="w-full px-5 h-14 flex items-center justify-between">
         <button onClick={openCmd} className="flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
           <Icon name="search" size={15} />
           <span className="hidden sm:inline">Search or paste URL...</span>
@@ -786,131 +786,63 @@ function App() {
   const handleDownloadBulk = async (ids) => {
     const targets = items.filter(i => ids.includes(i.id) && i.status === STATUS.COMPLETED);
     if (!targets.length) return;
-    const zip = targets.length > 1 ? new JSZip() : null;
 
-    const logoImg = new Image();
-    logoImg.src = 'logos/logo_no_bg_b.png';
-    await new Promise(r => { logoImg.onload = r; logoImg.onerror = r; });
+    let zip;
+    if (targets.length > 1 && window.JSZip) zip = new window.JSZip();
+
+    const convertToMarkdown = (node) => {
+      let md = '';
+      const walk = (n) => {
+        if (n.nodeType === 3) { md += n.textContent; return; }
+        if (n.nodeType !== 1) return;
+        const tag = n.tagName.toLowerCase();
+        
+        if (tag === 'h1') md += '\n# ';
+        else if (tag === 'h2') md += '\n## ';
+        else if (tag === 'h3') md += '\n### ';
+        else if (tag === 'h4') md += '\n#### ';
+        else if (tag === 'strong' || tag === 'b') md += '**';
+        else if (tag === 'em' || tag === 'i') md += '*';
+        else if (tag === 'li') md += '\n- ';
+        else if (tag === 'blockquote') md += '\n> ';
+        else if (tag === 'br') md += '\n';
+        else if (tag === 'pre') md += '\n```\n';
+        else if (tag === 'a') {
+          const href = n.getAttribute('href');
+          md += '[';
+          n.childNodes.forEach(walk);
+          md += '](' + href + ')';
+          return;
+        }
+        
+        n.childNodes.forEach(walk);
+        
+        if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'p' || tag === 'ul' || tag === 'ol' || tag === 'blockquote') md += '\n\n';
+        else if (tag === 'strong' || tag === 'b') md += '**';
+        else if (tag === 'em' || tag === 'i') md += '*';
+        else if (tag === 'pre') md += '\n```\n\n';
+      };
+      walk(node);
+      return md.replace(/\n{3,}/g, '\n\n').trim();
+    };
 
     for (const it of targets) {
       await yieldToBrowser();
       const content = await DV.db.get('contents', it.id);
       if (!content || !content.html) continue;
 
-      const doc = new jspdf.jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 24;
-      const wrapWidth = pageWidth - (margin * 2);
-
-      let y = 30;
-
-      // --- BRANDING & HEADER ---
-      doc.setFont('Helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(15, 23, 42);
-      const titleLines = doc.splitTextToSize(it.title || 'Distilled Content', wrapWidth);
-      doc.text(titleLines, margin, y);
-      y += titleLines.length * 8 + 4;
-
-      doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
-      const sourceUrl = doc.splitTextToSize(it.url || 'Universal Extraction', wrapWidth)[0];
-      if (it.url) {
-        doc.setTextColor(37, 99, 235);
-        try { doc.textWithLink(sourceUrl, margin, y, { url: it.url }); } catch(e) { doc.text(sourceUrl, margin, y); }
-      } else {
-        doc.setTextColor(100, 116, 139);
-        doc.text(sourceUrl, margin, y);
-      }
-      y += 6;
-
-      doc.setTextColor(148, 163, 184);
-      const fullDate = content.meta?.dateText || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      doc.text(`Distilled on ${fullDate}`, margin, y);
-      y += 12;
-
-      // Divider
-      doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 12;
-
-      // --- CONTENT ---
       const helper = new DOMParser().parseFromString(content.html, 'text/html');
-
-      const checkPage = (height) => {
-        if (y + height > pageHeight - 30) { doc.addPage(); y = 30; return true; }
-        return false;
-      };
-
-      const mainNode = helper.querySelector('main') || helper.body;
-      const elements = Array.from(mainNode.querySelectorAll('h1, h2, h3, h4, p, ul, ol, blockquote'));
-      if (elements.length > 0) {
-        elements.forEach(el => {
-          const tag = el.tagName.toLowerCase();
-          let text = el.textContent.trim();
-          if (!text) return;
-          if (tag === 'ul' || tag === 'ol') {
-            const listItems = Array.from(el.querySelectorAll('li'));
-            listItems.forEach((li, idx) => {
-              const bullet = tag === 'ol' ? `${idx + 1}.` : '•';
-              const liText = li.textContent.trim();
-              doc.setFont('Helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(51, 65, 85);
-              const lines = doc.splitTextToSize(liText, wrapWidth - 12);
-              checkPage(lines.length * 5.5 + 2);
-              doc.text(bullet, margin + 2, y);
-              doc.text(lines, margin + 10, y);
-              y += (lines.length * 5.5) + 2;
-            });
-            y += 3;
-            return;
-          }
-          if (tag.startsWith('h')) {
-            doc.setFont('Helvetica', 'bold');
-            if (tag === 'h1') { doc.setFontSize(20); y += 6; }
-            else if (tag === 'h2') { doc.setFontSize(16); y += 5; }
-            else if (tag === 'h3') { doc.setFontSize(13); y += 4; }
-            else { doc.setFontSize(12); y += 3; }
-            doc.setTextColor(15, 23, 42);
-            const lines = doc.splitTextToSize(text, wrapWidth); checkPage(lines.length * 7 + 8);
-            doc.text(lines, margin, y); y += (lines.length * 6.5) + 3;
-            if (tag === 'h2') {
-              doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3);
-              doc.line(margin, y, pageWidth - margin, y); y += 5;
-            }
-            return;
-          }
-          if (tag === 'blockquote') {
-            doc.setFont('Helvetica', 'italic'); doc.setFontSize(11); doc.setTextColor(100, 116, 139);
-            const lines = doc.splitTextToSize(text, wrapWidth - 16); checkPage(lines.length * 5.5 + 6);
-            doc.setDrawColor(203, 213, 225); doc.setLineWidth(1.5);
-            doc.line(margin + 2, y - 1, margin + 2, y + lines.length * 5.5 + 1);
-            doc.text(lines, margin + 10, y); y += (lines.length * 5.5) + 5;
-            return;
-          }
-          if (tag === 'p') {
-            doc.setFont('Helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(51, 65, 85);
-            const lines = doc.splitTextToSize(text, wrapWidth); checkPage(lines.length * 5.5 + 4);
-            doc.text(lines, margin, y); y += (lines.length * 5.5) + 4;
-          }
-        });
-      } else {
-        const raw = helper.body.textContent || '';
-        doc.setFont('Helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(51, 65, 85);
-        const rl = doc.splitTextToSize(raw.trim(), wrapWidth);
-        rl.forEach(line => { checkPage(7); doc.text(line, margin, y); y += 5.5; });
-      }
-
-      // Footer on all pages
-      const totalPages = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(180, 190, 200);
-        try { doc.addImage(logoImg, 'PNG', margin, pageHeight - 14, 4, 4); } catch(e) {}
-        doc.text('DistyVault', margin + 6, pageHeight - 11);
-        doc.setFont('Helvetica', 'bold'); doc.setTextColor(148, 163, 184);
-        doc.text(`${i} / ${totalPages}`, pageWidth - margin, pageHeight - 11, { align: 'right' });
-      }
-
-      const b = doc.output('blob');
-      if (zip) zip.file(sanitizeFilename(it.title) + '.pdf', b);
-      else return saveBlob(b, sanitizeFilename(it.title) + '.pdf');
+      let mdContent = convertToMarkdown(helper.body);
+      
+      const fullDate = content.meta?.dateText || new Date().toLocaleDateString();
+      const sourceUrl = it.url || 'Universal Extraction';
+      
+      const header = `# ${it.title || 'Distilled Content'}\n\n**Source:** ${sourceUrl}\n**Date:** ${fullDate}\n\n---\n\n`;
+      const finalMd = header + mdContent + '\n\n---\n*Generated by DistyVault*';
+      
+      const b = new Blob([finalMd], { type: 'text/markdown;charset=utf-8' });
+      if (zip) zip.file(sanitizeFilename(it.title) + '.md', b);
+      else return saveBlob(b, sanitizeFilename(it.title) + '.md');
     }
     if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
   };
