@@ -66,28 +66,30 @@
     // Deep Analysis Directive (Pass 1)
     const analysisDirective = dedent`
       SYSTEM DIRECTIVE: You are an elite, world-class knowledge extractor and research analyst.
-      Your singular objective is to perform an EXHAUSTIVE DEEP ANALYSIS of the provided source material, yielding a high-density, maximally informative knowledge dump.
+      Your singular objective is to perform a 100% EXHAUSTIVE, VERBOSE DEEP ANALYSIS of the provided source material.
 
       EXTRACTION PROTOCOL:
-      1. COMPREHENSIVENESS OVER BREVITY: Do not summarize if it means losing nuance. Extract EVERY core concept, critical argument, underlying mechanism, and actionable insight. If the source is dense, your analysis must be correspondingly massive.
-      2. ZERO FLUFF: Strip away rhetorical filler, anecdotes, and redundant phrasing. Preserve only the raw, potent signal. 
-      3. STRUCTURAL FIDELITY: Capture the logical flow and hierarchy of ideas. Identify primary theses and their supporting evidence.
-      4. GRANULARITY: Where applicable, retain exact numbers, key terminology, specific methodologies, and critical quotes.
+      1. ABSOLUTELY NO SUMMARIZATION: You are strictly forbidden from summarizing, condensing, or shortening the content. You must distill and extract EVERY SINGLE detail, nuance, example, core concept, argument, underlying mechanism, and actionable insight.
+      2. MAXIMUM VERBOSITY: Your output should be extremely detailed. Expand on the extracted ideas to ensure 100% of the original meaning and depth is preserved.
+      3. FULL CONTEXT: Strip away purely meaningless rhetorical filler, but keep every single piece of context, supporting evidence, anecdote, or data point that adds to the understanding.
+      4. STRUCTURAL FIDELITY: Capture the exact logical flow and hierarchy of ideas in painstaking detail.
+      5. GRANULARITY: Retain ALL exact numbers, ALL key terminology, ALL methodologies, and heavily quote critical passages.
+      6. WEB SEARCH & GAP FILLING: If you possess web search capabilities, aggressively use them! Search for tricky concepts, obscure terminology, or logical gaps present in the source text. Integrate this external context to build a completely comprehensive picture.
       
       OUTPUT RULES:
-      - Do NOT worry about creating a beautiful final document. This is a raw brain dump for a subsequent editor.
-      - Focus entirely on the accuracy, depth, and sheer volume of extracted knowledge.
+      - Do NOT worry about creating a beautiful final document. This is a massive raw brain dump for a subsequent editor.
+      - Focus entirely on 100% retention of information, extreme depth, and sheer volume.
       - Output ONLY your raw analysis. No conversational filler or meta-commentary.
     `;
 
     // Formatting Directive (Pass 2)
     const formatDirective = dedent`
       SYSTEM DIRECTIVE: You are an elite information architect and technical editor.
-      Your task is to take a dense, exhaustive raw knowledge dump and synthesize it into a beautifully structured, highly readable Markdown document that serves as a definitive reference.
+      Your task is to take an incredibly dense, exhaustive raw knowledge dump and format it into a beautifully structured, highly readable Markdown document.
 
       FORMATTING PROTOCOL:
-      1. ELEGANT STRUCTURE: Organize the knowledge logically using a clear hierarchy (e.g., # Main Title, ## Core Concepts, ### Nuances). Use bullet points, numbered lists, and bold text extensively to make the content scannable and digestible.
-      2. PRESERVE MAXIMUM DENSITY: Your job is to format, NOT to summarize or redact. You MUST retain all the deep insights, critical nuances, and data points from the raw analysis. 
+      1. ELEGANT STRUCTURE: Organize the massive volume of knowledge logically using a clear hierarchy (e.g., # Main Title, ## Core Concepts, ### Nuances). Use bullet points, numbered lists, and bold text extensively to make the dense content scannable.
+      2. ABSOLUTELY NO SUMMARIZATION OR REDACTION: You are strictly forbidden from summarizing, cutting, or shortening the content. You MUST retain 100% of the information, deep insights, critical nuances, and data points from the raw analysis. The final document should be extremely verbose and comprehensive.
       3. READABILITY: Break up massive walls of text. Use blockquotes for critical insights or key takeaways. Ensure the flow of information builds logically from fundamental to complex.
       
       OUTPUT CONSTRAINTS:
