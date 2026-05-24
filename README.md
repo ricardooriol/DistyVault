@@ -23,7 +23,7 @@ DistyVault employs a "Bring Your Own Key" (BYOK) model, enabling you to power th
 
 Natively integrated providers include:
 
-- **Google Gemini** (Gemini 3 Flash, Gemini 3 Pro)
+- **Google Gemini** (Gemini 3.5 Flash, Gemini 3 Pro)
 - **OpenAI** (GPT-4o, GPT-5 Mini)
 - **Anthropic Claude** (Claude Sonnet 4.5)
 - **DeepSeek** (DeepSeek Chat)

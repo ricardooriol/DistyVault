@@ -5,8 +5,8 @@
    * @returns {string}
    */
   function endpoint(model) {
-    const m = ['gemini-3.1-pro', 'gemini-3-flash', 'gemini-3.1-flash-lite'].includes(model) ? model : 'gemini-3.1-pro';
-    const apiModel = m.endsWith('-preview') ? m : `${m}-preview`;
+    const m = ['gemini-3.1-pro', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].includes(model) ? model : 'gemini-3.1-pro';
+    const apiModel = m === 'gemini-3.1-pro' ? 'gemini-3.1-pro-preview' : m;
     return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(apiModel)}:generateContent`;
   }
 
@@ -30,7 +30,7 @@
    */
   async function distillGemini(extracted, settings) {
     const apiKey = settings?.apiKey;
-    const model = ['gemini-3.1-pro', 'gemini-3-flash', 'gemini-3.1-flash-lite'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro';
+    const model = ['gemini-3.1-pro', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro';
     if (!apiKey) throw new Error('Gemini API key required');
 
     let attempts = 0;
@@ -94,8 +94,8 @@
    */
   async function testGemini(settings) {
     const apiKey = settings?.apiKey;
-    const model = ['gemini-3.1-pro', 'gemini-3-flash', 'gemini-3.1-flash-lite'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro';
-    const apiModel = model.endsWith('-preview') ? model : `${model}-preview`;
+    const model = ['gemini-3.1-pro', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].includes(settings?.model) ? settings.model : 'gemini-3.1-pro';
+    const apiModel = model === 'gemini-3.1-pro' ? 'gemini-3.1-pro-preview' : model;
     if (!apiKey) throw new Error('Gemini API key required');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(apiModel)}?key=${encodeURIComponent(apiKey)}`);
     if (!res.ok) throw new Error('API key invalid or model not accessible');
