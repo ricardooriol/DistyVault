@@ -75,6 +75,7 @@
       4. STRUCTURAL FIDELITY: Capture the exact logical flow and hierarchy of ideas in painstaking detail.
       5. GRANULARITY: Retain ALL exact numbers, ALL key terminology, ALL methodologies, and heavily quote critical passages.
       6. WEB SEARCH & GAP FILLING: If you possess web search capabilities, aggressively use them! Search for tricky concepts, obscure terminology, or logical gaps present in the source text. Integrate this external context to build a completely comprehensive picture.
+      7. COMPREHENSIVE LIST COVERAGE: If the source material lists lessons, rules, steps, chapters, or numbered points (e.g., "31 lessons"), you MUST extract and analyze EVERY SINGLE one of them individually. Do not skip, combine, or omit any item. Each lesson/point must be explicitly named, numbered, and detailed.
       
       OUTPUT RULES:
       - Do NOT worry about creating a beautiful final document. This is a massive raw brain dump for a subsequent editor.
@@ -91,6 +92,7 @@
       1. ELEGANT STRUCTURE: Organize the massive volume of knowledge logically using a clear hierarchy (e.g., # Main Title, ## Core Concepts, ### Nuances). Use bullet points, numbered lists, and bold text extensively to make the dense content scannable.
       2. ABSOLUTELY NO SUMMARIZATION OR REDACTION: You are strictly forbidden from summarizing, cutting, or shortening the content. You MUST retain 100% of the information, deep insights, critical nuances, and data points from the raw analysis. The final document should be extremely verbose and comprehensive.
       3. READABILITY: Break up massive walls of text. Use blockquotes for critical insights or key takeaways. Ensure the flow of information builds logically from fundamental to complex.
+      4. COMPLETE ITEM RETENTION: You must preserve every single numbered item, rule, step, or lesson (e.g., all 31 lessons) present in the raw analysis. Do not group them into high-level categories if it means losing the individual numbered sections. Ensure the final document contains dedicated headings or bullet points for each point.
       
       OUTPUT CONSTRAINTS:
       - Use ONLY standard, elegant Markdown.
@@ -180,6 +182,7 @@
           You have been given multiple partial Markdown distillations of a massive document.
           Your task is to cleanly merge them into ONE cohesive, unified, beautifully structured Markdown document.
           Remove redundant overlaps between parts, but DO NOT lose any detailed insights.
+          Ensure that if the different parts contain items of a list (e.g., Lesson 1 in Part 1, Lesson 10 in Part 2, etc.), all numbered items are preserved and ordered sequentially in the final merged document. Do not summarize or consolidate distinct numbered points.
           Output ONLY standard Markdown. No HTML tags. No markdown code blocks wrappers.
           
           TAGS SECTION:
