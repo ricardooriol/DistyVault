@@ -135,73 +135,51 @@
       return chunks;
     }
 
-    async function distillSingle(text, partNote) {
-      // Pass 1: Deep Analysis
-      const analysisContent = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${text}`;
-      const analysisPrepared = {
+    // --- STEP 1: DEEP ANALYSIS (Pass 1) ---
+    // If content is short, analyze in a single call. If long, analyze chunks in parallel.
+    let rawAnalysis = '';
+    const chunks = chunkText(fullText);
+
+    if (chunks.length === 1) {
+      const content = `Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunks[0]}`;
+      const prepared = {
         title,
-        prompt: `${analysisDirective}\n\n${analysisContent}`,
-        messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: analysisContent }]
+        prompt: `${analysisDirective}\n\n${content}`,
+        messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
       };
-      const rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: analysisPrepared });
-
-      // Pass 2: Markdown Formatting
-      try {
-        const formatContent = `Here is the raw analysis to format into a beautiful Markdown document:\n\n${rawAnalysis}`;
-        const formatPrepared = {
-          title,
-          prompt: `${formatDirective}\n\n${formatContent}`,
-          messages: [{ role: 'system', content: formatDirective }, { role: 'user', content: formatContent }]
-        };
-        const finalMarkdown = await provider.distill(extracted, { ...aiSettings, __prepared: formatPrepared });
-        return finalMarkdown;
-      } catch (err) {
-        console.warn('Formatting pass failed, falling back to raw analysis:', err);
-        return rawAnalysis;
-      }
-    }
-
-    let rawHtml;
-    if (fullText.length <= CHUNK_SIZE) {
-      // Short content: single-pass distillation (existing behavior)
-      rawHtml = await distillSingle(fullText, '');
+      rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: prepared });
     } else {
-      // Chunked distillation for long content processed in parallel
-      const chunks = chunkText(fullText);
-      const chunkResults = await Promise.all(chunks.map((chunk, i) => {
-        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill this part thoroughly.]\n\n`;
-        return distillSingle(chunk, partNote);
-      }));
-
-      if (chunkResults.length === 1) {
-        rawHtml = chunkResults[0];
-      } else {
-        // Synthesis pass: merge all chunk distillations
-        const mergeDirective = dedent`
-          SYSTEM DIRECTIVE: You are a world-class knowledge synthesizer and editor.
-          You have been given multiple partial Markdown distillations of a massive document.
-          Your task is to cleanly merge them into ONE cohesive, unified, beautifully structured Markdown document.
-          Remove redundant overlaps between parts, but DO NOT lose any detailed insights.
-          Ensure that if the different parts contain items of a list (e.g., Lesson 1 in Part 1, Lesson 10 in Part 2, etc.), all numbered items are preserved and ordered sequentially in the final merged document. Do not summarize or consolidate distinct numbered points.
-          Output ONLY standard Markdown. No HTML tags. No markdown code blocks wrappers.
-          
-          TAGS SECTION:
-          At the very end of your response, add a section exactly like this:
-          TAGS: tag1, tag2, tag3
-        `;
-        const mergeContent = chunkResults.map((r, i) => `--- Part ${i + 1} ---\n${r}`).join('\n\n');
-        const mergeUserContent = `Merge the following ${chunkResults.length} partial distillations of "${title}" into one unified Markdown document:\n\n${mergeContent}`;
-        const mergePrepared = {
-          title: title + ' (merged)',
-          prompt: `${mergeDirective}\n\n${mergeUserContent}`,
-          messages: [{ role: 'system', content: mergeDirective }, { role: 'user', content: mergeUserContent }]
+      const analysisParts = await Promise.all(chunks.map((chunk, i) => {
+        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Analyze this part thoroughly.]\n\n`;
+        const content = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunk}`;
+        const prepared = {
+          title,
+          prompt: `${analysisDirective}\n\n${content}`,
+          messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
         };
-        const mergeSettings = { ...aiSettings, __prepared: mergePrepared };
-        rawHtml = await provider.distill(extracted, mergeSettings);
-      }
+        return provider.distill(extracted, { ...aiSettings, __prepared: prepared });
+      }));
+      // Join the analysis results
+      rawAnalysis = analysisParts.map((part, i) => `--- Part ${i + 1} Analysis ---\n${part}`).join('\n\n');
     }
 
-    const tags = parseTags(rawHtml);
+    // --- STEP 2: MARKDOWN FORMATTING (Pass 2) ---
+    // Format the combined raw analysis into structured Markdown.
+    let finalMarkdown = '';
+    try {
+      const formatContent = `Here is the raw analysis to format into a beautiful Markdown document:\n\n${rawAnalysis}`;
+      const formatPrepared = {
+        title,
+        prompt: `${formatDirective}\n\n${formatContent}`,
+        messages: [{ role: 'system', content: formatDirective }, { role: 'user', content: formatContent }]
+      };
+      finalMarkdown = await provider.distill(extracted, { ...aiSettings, __prepared: formatPrepared });
+    } catch (err) {
+      console.warn('Formatting pass failed, falling back to raw analysis:', err);
+      finalMarkdown = rawAnalysis;
+    }
+
+    const tags = parseTags(finalMarkdown);
     const now = new Date();
     const meta = {
       title,
@@ -209,7 +187,7 @@
       sourceName: extracted.fileName || extracted.url || title,
       dateText: (typeof dayjs === 'function' ? dayjs(now).format('DD/MM/YYYY HH:mm') : now.toLocaleString())
     };
-    const formatted = reformatDistilled(rawHtml, meta);
+    const formatted = reformatDistilled(finalMarkdown, meta);
     return { html: formatted, tags };
   }
 
