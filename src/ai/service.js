@@ -136,31 +136,41 @@
     }
 
     // --- STEP 1: DEEP ANALYSIS (Pass 1) ---
-    // If content is short, analyze in a single call. If long, analyze chunks in parallel.
+    // Check if we already have cached analysis from an interrupted session
     let rawAnalysis = '';
-    const chunks = chunkText(fullText);
-
-    if (chunks.length === 1) {
-      const content = `Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunks[0]}`;
-      const prepared = {
-        title,
-        prompt: `${analysisDirective}\n\n${content}`,
-        messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
-      };
-      rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: prepared });
+    const cached = extracted.id ? await DV.db.get('contents', extracted.id) : null;
+    if (cached && cached.rawAnalysis) {
+      // Resume from cached deep analysis
+      rawAnalysis = cached.rawAnalysis;
     } else {
-      const analysisParts = await Promise.all(chunks.map((chunk, i) => {
-        const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Analyze this part thoroughly.]\n\n`;
-        const content = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunk}`;
+      const chunks = chunkText(fullText);
+      if (chunks.length === 1) {
+        const content = `Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunks[0]}`;
         const prepared = {
           title,
           prompt: `${analysisDirective}\n\n${content}`,
           messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
         };
-        return provider.distill(extracted, { ...aiSettings, __prepared: prepared });
-      }));
-      // Join the analysis results
-      rawAnalysis = analysisParts.map((part, i) => `--- Part ${i + 1} Analysis ---\n${part}`).join('\n\n');
+        rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: prepared });
+      } else {
+        const analysisParts = await Promise.all(chunks.map((chunk, i) => {
+          const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Analyze this part thoroughly.]\n\n`;
+          const content = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunk}`;
+          const prepared = {
+            title,
+            prompt: `${analysisDirective}\n\n${content}`,
+            messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
+          };
+          return provider.distill(extracted, { ...aiSettings, __prepared: prepared });
+        }));
+        // Join the analysis results
+        rawAnalysis = analysisParts.map((part, i) => `--- Part ${i + 1} Analysis ---\n${part}`).join('\n\n');
+      }
+
+      // Cache raw analysis and raw extracted state together so we can skip this step on reload
+      if (extracted.id) {
+        await DV.db.put('contents', { id: extracted.id, rawExtracted: extracted, rawAnalysis });
+      }
     }
 
     // --- STEP 2: MARKDOWN FORMATTING (Pass 2) ---

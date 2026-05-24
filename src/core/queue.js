@@ -217,27 +217,35 @@
 
     try {
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
-      item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start });
 
-      const extracted = await DV.extractors.extract(item);
+      let extracted;
+      const cached = await DV.db.get('contents', id);
+      if (cached && cached.rawExtracted) {
+        // Skip extraction, load cached state
+        extracted = cached.rawExtracted;
+      } else {
+        item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start });
+        extracted = await DV.extractors.extract(item);
+        extracted.id = id; // Inject id for downstream caching
 
-      // Validation: Ensure we actually got content. 
-      // For web URLs, we're strict because proxies often return empty bloat.
-      // For YouTube, we allow the "No captions" placeholder through so distillation can 
-      // handle it (or explicitly fail there).
-      if (item.kind === 'url' && (!extracted?.text || extracted.text.length < 200)) {
-        throw new Error('Insufficient content extracted. The source might be blocking extraction or requires JavaScript.');
-      } else if (!extracted?.text) {
-        throw new Error('Extraction failed to return any content.');
-      }
-
-      try {
-        const newTitle = extracted?.title || item.title;
-        const newUrl = extracted?.url || item.url;
-        if (newTitle !== item.title || newUrl !== item.url) {
-          item = await updateItem(id, { title: newTitle, url: newUrl });
+        // Validation: Ensure we actually got content. 
+        if (item.kind === 'url' && (!extracted?.text || extracted.text.length < 200)) {
+          throw new Error('Insufficient content extracted. The source might be blocking extraction or requires JavaScript.');
+        } else if (!extracted?.text) {
+          throw new Error('Extraction failed to return any content.');
         }
-      } catch (_) { /* non-blocking */ }
+
+        try {
+          const newTitle = extracted?.title || item.title;
+          const newUrl = extracted?.url || item.url;
+          if (newTitle !== item.title || newUrl !== item.url) {
+            item = await updateItem(id, { title: newTitle, url: newUrl });
+          }
+        } catch (_) { /* non-blocking */ }
+
+        // Cache extraction result immediately so we don't have to re-extract on reload
+        await DV.db.put('contents', { id, rawExtracted: extracted });
+      }
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
