@@ -807,7 +807,8 @@ function App() {
 
       const styleBlock = `
         <style>
-          .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; width: 800px; box-sizing: border-box; padding: 0 45px; color: #0f172a; background: #ffffff; }
+          .html2pdf__container { width: 595px !important; min-width: 595px !important; max-width: 595px !important; }
+          .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; width: 595px; box-sizing: border-box; padding: 0 45px; color: #0f172a; background: #ffffff; }
           .pdf-wrapper h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; line-height: 1.25; color: #0f172a; border: none; }
           .pdf-wrapper h2 { font-size: 20px; font-weight: 600; margin: 24px 0 12px; line-height: 1.3; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
           .pdf-wrapper h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: #0f172a; }
@@ -830,7 +831,7 @@ function App() {
       `;
 
       const htmlString = `
-        <div style="width: 800px; min-width: 800px; max-width: 800px; box-sizing: border-box; background: #ffffff; margin: 0; padding: 0;">
+        <div style="width: 595px; min-width: 595px; max-width: 595px; box-sizing: border-box; background: #ffffff; margin: 0; padding: 0;">
           ${styleBlock}
           <div class="pdf-wrapper">
             <div style="margin-bottom: 40px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
@@ -844,11 +845,11 @@ function App() {
       `;
 
       const opt = {
-        margin:       [15, 0, 20, 0],
+        margin:       [30, 0, 35, 0],
         filename:     sanitizeFilename(it.title) + '.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, windowWidth: 800 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, windowWidth: 595 },
+        jsPDF:        { unit: 'pt', format: 'a4', orientation: 'portrait' },
         pagebreak:    { mode: ['css', 'legacy'] }
       };
 
@@ -869,13 +870,13 @@ function App() {
             pdf.setTextColor(148, 163, 184); // slate-400
             
             try {
-              pdf.addImage(logoImg, 'PNG', 15, pageHeight - 14, 4, 4);
+              pdf.addImage(logoImg, 'PNG', 42, pageHeight - 40, 11, 11);
             } catch(e) {}
-            pdf.text('DistyVault', 21, pageHeight - 11);
+            pdf.text('DistyVault', 59, pageHeight - 31);
             
             pdf.setFont('Helvetica', 'bold');
             pdf.setTextColor(100, 116, 139); // slate-500
-            pdf.text(`${i} / ${totalPages}`, pageWidth - 15, pageHeight - 11, { align: 'right' });
+            pdf.text(`${i} / ${totalPages}`, pageWidth - 42, pageHeight - 31, { align: 'right' });
           }
         });
 
