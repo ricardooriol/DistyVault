@@ -758,7 +758,7 @@ function App() {
         if (DV.extractors.isYouTubePlaylist?.(url)) {
           const pl = await DV.extractors.extractYouTubePlaylist(url);
           const pr = await DV.queue.addItem({ kind: 'playlist', url, title: pl.title });
-          for (const it of pl.items) await DV.queue.addItem({ ...it, kind: 'youtube', parentId: pr.id });
+          await Promise.all(pl.items.map(it => DV.queue.addItem({ ...it, kind: 'youtube', parentId: pr.id })));
         } else {
           const kind = DV.extractors.isYouTube?.(url) ? 'youtube' : 'url';
           const r = await DV.queue.addItem({ kind, url, title: 'Loading...' });
@@ -766,12 +766,15 @@ function App() {
           if (peek?.title) await DV.queue.updateItem(r.id, { title: peek.title });
         }
       }
-      for (const f of files) await DV.queue.addItem({ kind: 'file', title: f.name, file: f });
+      await Promise.all(files.map(f => DV.queue.addItem({ kind: 'file', title: f.name, file: f })));
       if (url || files.length) DV.toast('Items processing');
     } catch (e) { DV.toast(e.message, { type: 'error' }); }
   };
 
-  const handleFileDrop = async (files) => { for (const f of files) await DV.queue.addItem({ kind: 'file', title: f.name, file: f }); if (files.length) DV.toast('Files added'); };
+  const handleFileDrop = async (files) => {
+    await Promise.all(Array.from(files).map(f => DV.queue.addItem({ kind: 'file', title: f.name, file: f })));
+    if (files.length) DV.toast('Files added');
+  };
 
   const handleExport = async () => {
     if (items.length === 0) {
@@ -804,7 +807,7 @@ function App() {
 
       const styleBlock = `
         <style>
-          .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; padding: 0 45px; color: #0f172a; background: #ffffff; }
+          .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; width: 800px; box-sizing: border-box; padding: 0 45px; color: #0f172a; background: #ffffff; }
           .pdf-wrapper h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; line-height: 1.25; color: #0f172a; border: none; }
           .pdf-wrapper h2 { font-size: 20px; font-weight: 600; margin: 24px 0 12px; line-height: 1.3; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
           .pdf-wrapper h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: #0f172a; }

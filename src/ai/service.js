@@ -164,14 +164,12 @@
       // Short content: single-pass distillation (existing behavior)
       rawHtml = await distillSingle(fullText, '');
     } else {
-      // Chunked distillation for long content
+      // Chunked distillation for long content processed in parallel
       const chunks = chunkText(fullText);
-      const chunkResults = [];
-      for (let i = 0; i < chunks.length; i++) {
+      const chunkResults = await Promise.all(chunks.map((chunk, i) => {
         const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Distill this part thoroughly.]\n\n`;
-        const result = await distillSingle(chunks[i], partNote);
-        chunkResults.push(result);
-      }
+        return distillSingle(chunk, partNote);
+      }));
 
       if (chunkResults.length === 1) {
         rawHtml = chunkResults[0];

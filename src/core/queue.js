@@ -312,15 +312,16 @@
     let items = await DV.db.getAll('items');
 
     // Resolve "Zombies": Items stuck in active states from previous sessions
+    const zombies = items.filter(i => i.status === STATUS.EXTRACTING || i.status === STATUS.DISTILLING);
     let modified = false;
-    for (const item of items) {
-      if (item.status === STATUS.EXTRACTING || item.status === STATUS.DISTILLING) {
+    if (zombies.length > 0) {
+      await Promise.all(zombies.map(async (item) => {
         item.status = STATUS.PENDING;
         item.error = null;
         item.durationMs = 0;
         await DV.db.put('items', item);
-        modified = true;
-      }
+      }));
+      modified = true;
     }
 
     if (modified) {
