@@ -790,107 +790,119 @@ function App() {
     const targets = items.filter(i => ids.includes(i.id) && i.status === STATUS.COMPLETED);
     if (!targets.length) return;
 
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    window.scrollTo(0, 0);
+    // Wait for scroll rendering to settle
+    await new Promise(r => setTimeout(r, 50));
+
     let zip;
     if (targets.length > 1 && window.JSZip) zip = new window.JSZip();
 
-    for (const it of targets) {
-      await yieldToBrowser();
-      const content = await DV.db.get('contents', it.id);
-      if (!content || !content.html) continue;
+    try {
+      for (const it of targets) {
+        await yieldToBrowser();
+        const content = await DV.db.get('contents', it.id);
+        if (!content || !content.html) continue;
 
-      const helper = new DOMParser().parseFromString(content.html, 'text/html');
-      const innerHtml = helper.querySelector('main')?.innerHTML || helper.body.innerHTML;
+        const helper = new DOMParser().parseFromString(content.html, 'text/html');
+        const innerHtml = helper.querySelector('main')?.innerHTML || helper.body.innerHTML;
 
-      const fullDate = content.meta?.dateText || new Date().toLocaleDateString();
-      const sourceUrl = it.url || 'Universal Extraction';
-      const escapeH = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
+        const fullDate = content.meta?.dateText || new Date().toLocaleDateString();
+        const sourceUrl = it.url || 'Universal Extraction';
+        const escapeH = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 
-      const styleBlock = `
-        <style>
-          .html2pdf__container { width: 595px !important; min-width: 595px !important; max-width: 595px !important; }
-          .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; width: 595px; box-sizing: border-box; padding: 0 45px; color: #0f172a; background: #ffffff; }
-          .pdf-wrapper h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; line-height: 1.25; color: #0f172a; border: none; }
-          .pdf-wrapper h2 { font-size: 20px; font-weight: 600; margin: 24px 0 12px; line-height: 1.3; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
-          .pdf-wrapper h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: #0f172a; }
-          .pdf-wrapper p { margin: 12px 0; color: #334155; line-height: 1.6; }
-          .pdf-wrapper ul, .pdf-wrapper ol { margin: 12px 0; padding-left: 24px; color: #334155; line-height: 1.6; }
-          .pdf-wrapper li { margin: 6px 0; }
-          .pdf-wrapper blockquote { border-left: 3px solid #cbd5e1; padding: 8px 16px; margin: 16px 0; color: #64748b; font-style: italic; background: #f8fafc; border-radius: 0 4px 4px 0; }
-          .pdf-wrapper code { font-family: monospace; font-size: 13px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #1e293b; }
-          .pdf-wrapper pre { background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0; overflow-x: hidden; white-space: pre-wrap; word-wrap: break-word; }
-          .pdf-wrapper pre code { background: none; padding: 0; }
-          .pdf-wrapper a { color: #2563eb; text-decoration: none; }
-          .pdf-wrapper strong, .pdf-wrapper b { font-weight: 600; color: #0f172a; }
-          .pdf-wrapper table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; table-layout: fixed; }
-          .pdf-wrapper th, .pdf-wrapper td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; word-break: break-word; }
-          .pdf-wrapper th { background: #f8fafc; font-weight: 600; color: #0f172a; }
-          .pdf-wrapper img { max-width: 100%; height: auto; }
-          .pdf-wrapper p, .pdf-wrapper li, .pdf-wrapper pre, .pdf-wrapper blockquote, .pdf-wrapper h1, .pdf-wrapper h2, .pdf-wrapper h3, .pdf-wrapper h4, .pdf-wrapper tr { page-break-inside: avoid; }
-          .pdf-wrapper *:last-child { margin-bottom: 0 !important; }
-        </style>
-      `;
+        const styleBlock = `
+          <style>
+            .html2pdf__container { width: 595px !important; min-width: 595px !important; max-width: 595px !important; }
+            .pdf-wrapper { font-family: 'Inter', system-ui, sans-serif; width: 595px; box-sizing: border-box; padding: 0 45px; color: #0f172a; background: #ffffff; }
+            .pdf-wrapper h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; line-height: 1.25; color: #0f172a; border: none; }
+            .pdf-wrapper h2 { font-size: 20px; font-weight: 600; margin: 24px 0 12px; line-height: 1.3; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+            .pdf-wrapper h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: #0f172a; }
+            .pdf-wrapper p { margin: 12px 0; color: #334155; line-height: 1.6; }
+            .pdf-wrapper ul, .pdf-wrapper ol { margin: 12px 0; padding-left: 24px; color: #334155; line-height: 1.6; }
+            .pdf-wrapper li { margin: 6px 0; }
+            .pdf-wrapper blockquote { border-left: 3px solid #cbd5e1; padding: 8px 16px; margin: 16px 0; color: #64748b; font-style: italic; background: #f8fafc; border-radius: 0 4px 4px 0; }
+            .pdf-wrapper code { font-family: monospace; font-size: 13px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #1e293b; }
+            .pdf-wrapper pre { background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0; overflow-x: hidden; white-space: pre-wrap; word-wrap: break-word; }
+            .pdf-wrapper pre code { background: none; padding: 0; }
+            .pdf-wrapper a { color: #2563eb; text-decoration: none; }
+            .pdf-wrapper strong, .pdf-wrapper b { font-weight: 600; color: #0f172a; }
+            .pdf-wrapper table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; table-layout: fixed; }
+            .pdf-wrapper th, .pdf-wrapper td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; word-break: break-word; }
+            .pdf-wrapper th { background: #f8fafc; font-weight: 600; color: #0f172a; }
+            .pdf-wrapper img { max-width: 100%; height: auto; }
+            .pdf-wrapper p, .pdf-wrapper li, .pdf-wrapper pre, .pdf-wrapper blockquote, .pdf-wrapper h1, .pdf-wrapper h2, .pdf-wrapper h3, .pdf-wrapper h4, .pdf-wrapper tr { page-break-inside: avoid; break-inside: avoid; }
+            .pdf-wrapper *:last-child { margin-bottom: 0 !important; }
+          </style>
+        `;
 
-      const htmlString = `
-        <div style="width: 595px; min-width: 595px; max-width: 595px; box-sizing: border-box; background: #ffffff; margin: 0; padding: 0;">
-          ${styleBlock}
-          <div class="pdf-wrapper">
-            <div style="margin-bottom: 40px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
-              <h1 style="font-size: 32px; font-weight: 800; margin: 0 0 16px 0; color: #0f172a; line-height: 1.2; border: none;">${escapeH(it.title || 'Distilled Content')}</h1>
-              <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;"><strong>Source:</strong> <a href="${escapeH(it.url || '')}" style="color: #2563eb; text-decoration: none;">${escapeH(sourceUrl)}</a></div>
-              <div style="font-size: 14px; color: #64748b;"><strong>Date:</strong> ${escapeH(fullDate)}</div>
+        const htmlString = `
+          <div style="width: 595px; min-width: 595px; max-width: 595px; box-sizing: border-box; background: #ffffff; margin: 0; padding: 0;">
+            ${styleBlock}
+            <div class="pdf-wrapper">
+              <div style="margin-bottom: 40px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
+                <h1 style="font-size: 32px; font-weight: 800; margin: 0 0 16px 0; color: #0f172a; line-height: 1.2; border: none;">${escapeH(it.title || 'Distilled Content')}</h1>
+                <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;"><strong>Source:</strong> <a href="${escapeH(it.url || '')}" style="color: #2563eb; text-decoration: none;">${escapeH(sourceUrl)}</a></div>
+                <div style="font-size: 14px; color: #64748b;"><strong>Date:</strong> ${escapeH(fullDate)}</div>
+              </div>
+              <div>${innerHtml}</div>
             </div>
-            <div>${innerHtml}</div>
           </div>
-        </div>
-      `;
+        `;
 
-      const opt = {
-        margin:       [30, 0, 35, 0],
-        filename:     sanitizeFilename(it.title) + '.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, windowWidth: 595 },
-        jsPDF:        { unit: 'pt', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] }
-      };
+        const opt = {
+          margin:       [30, 0, 35, 0],
+          filename:     sanitizeFilename(it.title) + '.pdf',
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, windowWidth: 595, width: 595 },
+          jsPDF:        { unit: 'pt', format: 'a4', orientation: 'portrait' },
+          pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+        };
 
-      try {
-        const logoImg = new Image();
-        logoImg.src = 'logos/logo_no_bg_b.png';
-        await new Promise(r => { logoImg.onload = r; logoImg.onerror = r; });
+        try {
+          const logoImg = new Image();
+          logoImg.src = 'logos/logo_no_bg_b.png';
+          await new Promise(r => { logoImg.onload = r; logoImg.onerror = r; });
 
-        const worker = window.html2pdf().set(opt).from(htmlString).toPdf().get('pdf').then((pdf) => {
-          const totalPages = pdf.internal.getNumberOfPages();
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          
-          for (let i = 1; i <= totalPages; i++) {
-            pdf.setPage(i);
-            pdf.setFont('Helvetica', 'normal');
-            pdf.setFontSize(9);
-            pdf.setTextColor(148, 163, 184); // slate-400
+          const worker = window.html2pdf().set(opt).from(htmlString).toPdf().get('pdf').then((pdf) => {
+            const totalPages = pdf.internal.getNumberOfPages();
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
             
-            try {
-              pdf.addImage(logoImg, 'PNG', 42, pageHeight - 40, 11, 11);
-            } catch(e) {}
-            pdf.text('DistyVault', 59, pageHeight - 31);
-            
-            pdf.setFont('Helvetica', 'bold');
-            pdf.setTextColor(100, 116, 139); // slate-500
-            pdf.text(`${i} / ${totalPages}`, pageWidth - 42, pageHeight - 31, { align: 'right' });
+            for (let i = 1; i <= totalPages; i++) {
+              pdf.setPage(i);
+              pdf.setFont('Helvetica', 'normal');
+              pdf.setFontSize(9);
+              pdf.setTextColor(148, 163, 184); // slate-400
+              
+              try {
+                pdf.addImage(logoImg, 'PNG', 42, pageHeight - 40, 11, 11);
+              } catch(e) {}
+              pdf.text('DistyVault', 59, pageHeight - 31);
+              
+              pdf.setFont('Helvetica', 'bold');
+              pdf.setTextColor(100, 116, 139); // slate-500
+              pdf.text(`${i} / ${totalPages}`, pageWidth - 42, pageHeight - 31, { align: 'right' });
+            }
+          });
+
+          if (zip) {
+            const pdfBlob = await worker.output('blob');
+            zip.file(sanitizeFilename(it.title) + '.pdf', pdfBlob);
+          } else {
+            await worker.save();
           }
-        });
-
-        if (zip) {
-          const pdfBlob = await worker.output('blob');
-          zip.file(sanitizeFilename(it.title) + '.pdf', pdfBlob);
-        } else {
-          await worker.save();
+        } catch(e) {
+          console.error("PDF generation failed", e);
         }
-      } catch(e) {
-        console.error("PDF generation failed", e);
       }
+      if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
+    } catch (err) {
+      console.error("Bulk PDF process error", err);
+    } finally {
+      window.scrollTo(scrollX, scrollY);
     }
-    if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
   };
 
   return (
