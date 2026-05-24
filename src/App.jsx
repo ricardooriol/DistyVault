@@ -820,13 +820,17 @@ function App() {
           .pdf-wrapper pre code { background: none; padding: 0; }
           .pdf-wrapper a { color: #2563eb; text-decoration: none; }
           .pdf-wrapper strong, .pdf-wrapper b { font-weight: 600; color: #0f172a; }
+          .pdf-wrapper table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; table-layout: fixed; }
+          .pdf-wrapper th, .pdf-wrapper td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; word-break: break-word; }
+          .pdf-wrapper th { background: #f8fafc; font-weight: 600; color: #0f172a; }
+          .pdf-wrapper img { max-width: 100%; height: auto; }
           .pdf-wrapper p, .pdf-wrapper li, .pdf-wrapper pre, .pdf-wrapper blockquote, .pdf-wrapper h1, .pdf-wrapper h2, .pdf-wrapper h3, .pdf-wrapper h4, .pdf-wrapper tr { page-break-inside: avoid; }
           .pdf-wrapper *:last-child { margin-bottom: 0 !important; }
         </style>
       `;
 
       const htmlString = `
-        <div>
+        <div style="width: 800px; min-width: 800px; max-width: 800px; box-sizing: border-box; background: #ffffff; margin: 0; padding: 0;">
           ${styleBlock}
           <div class="pdf-wrapper">
             <div style="margin-bottom: 40px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
