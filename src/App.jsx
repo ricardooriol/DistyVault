@@ -481,7 +481,7 @@ function SettingsView({ settings, setSettings, onExport, onImport, items }) {
     { id: 'openai', name: 'OpenAI', models: [{ v: 'gpt-5.4', l: 'GPT-5.4' }, { v: 'gpt-5.4-mini', l: 'GPT-5.4 Mini' }, { v: 'gpt-5.4-nano', l: 'GPT-5.4 Nano' }] },
     { id: 'anthropic', name: 'Anthropic', models: [{ v: 'claude-opus-4.7', l: 'Claude Opus 4.7' }, { v: 'claude-sonnet-4.6', l: 'Claude Sonnet 4.6' }] },
     { id: 'gemini', name: 'Google', models: [{ v: 'gemini-3.1-pro', l: 'Gemini 3.1 Pro' }, { v: 'gemini-3.5-flash', l: 'Gemini 3.5 Flash' }, { v: 'gemini-3.1-flash-lite', l: 'Gemini 3.1 Flash-Lite' }] },
-    { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-chat', l: 'DeepSeek V3.2 Chat' }, { v: 'deepseek-reasoner', l: 'DeepSeek V3.2 Reasoner' }] },
+    { id: 'deepseek', name: 'DeepSeek', models: [{ v: 'deepseek-v4-flash', l: 'DeepSeek V4 Flash' }, { v: 'deepseek-v4-pro', l: 'DeepSeek V4 Pro' }] },
     { id: 'grok', name: 'xAI', models: [{ v: 'grok-4.3-beta', l: 'Grok 4.3 Beta' }, { v: 'grok-4.20', l: 'Grok 4.20' }, { v: 'grok-4.20-reasoning', l: 'Grok 4.20 Reasoning' }] }
   ];
 

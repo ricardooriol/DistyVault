@@ -9,13 +9,32 @@
    */
   async function distillDeepseek(extracted, settings) {
     const apiKey = settings?.apiKey;
-    const model = ['deepseek-chat', 'deepseek-reasoner'].includes(settings?.model) ? settings.model : 'deepseek-chat';
     if (!apiKey) throw new Error('Deepseek API key required');
+
+    let model = settings?.model || 'deepseek-v4-flash';
+    if (model === 'deepseek-chat') model = 'deepseek-v4-flash';
+    if (model === 'deepseek-reasoner') model = 'deepseek-v4-pro';
+
+    if (!['deepseek-v4-flash', 'deepseek-v4-pro'].includes(model)) {
+      model = 'deepseek-v4-flash';
+    }
+
     const prepared = settings?.__prepared;
+    const reqBody = {
+      model,
+      messages: prepared?.messages || []
+    };
+
+    if (model === 'deepseek-v4-pro') {
+      reqBody.thinking = { type: 'enabled' };
+    } else {
+      reqBody.temperature = 0.3;
+    }
+
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: prepared?.messages || [], ...(!/reasoner/i.test(model) && { temperature: 0.3 }) })
+      body: JSON.stringify(reqBody)
     });
     if (!res.ok) {
       let msg = `${res.status} ${res.statusText}`;
