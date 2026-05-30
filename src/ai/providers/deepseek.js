@@ -37,6 +37,9 @@
       body: JSON.stringify(reqBody)
     });
     if (!res.ok) {
+      if (res.status === 402) {
+        throw new Error('DeepSeek API error: 402 Payment Required (Insufficient Balance). Please top up your prepaid balance at https://platform.deepseek.com/');
+      }
       let msg = `${res.status} ${res.statusText}`;
       try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
       throw new Error('Deepseek API error: ' + msg);
@@ -55,7 +58,12 @@
     const { apiKey } = settings || {};
     if (!apiKey) throw new Error('Deepseek API key required');
     const res = await fetch('https://api.deepseek.com/models', { headers: { 'Authorization': `Bearer ${apiKey}` } });
-    if (!res.ok) throw new Error('API key invalid or model not accessible');
+    if (!res.ok) {
+      if (res.status === 402) {
+        throw new Error('DeepSeek API error: 402 Payment Required (Insufficient Balance). Please top up your prepaid balance at https://platform.deepseek.com/');
+      }
+      throw new Error('API key invalid or model not accessible');
+    }
     return true;
   }
 
