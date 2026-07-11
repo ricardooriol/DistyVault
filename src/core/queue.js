@@ -183,7 +183,6 @@
    */
   function requestStop(id) {
     state.stopRequested.add(id);
-    // Immediately update item status to STOPPED for UI feedback
     updateItem(id, { status: STATUS.STOPPED });
     DV.bus.emit('queue:progress');
   }
@@ -208,7 +207,6 @@
     if (state.processing.has(id)) return;
     state.processing.add(id);
 
-    // Immediate UI feedback that this item is being picked up
     DV.bus.emit('queue:progress');
 
     const start = Date.now();
@@ -221,14 +219,14 @@
       let extracted;
       const cached = await DV.db.get('contents', id);
       if (cached && cached.rawExtracted) {
-        // Skip extraction, load cached state
         extracted = cached.rawExtracted;
       } else {
         item = await updateItem(id, { status: STATUS.EXTRACTING, error: null, startedAt: start });
-        extracted = await DV.extractors.extract(item);
-        extracted.id = id; // Inject id for downstream caching
+        if (!item) throw new Error('Item was deleted before extraction could begin');
 
-        // Validation: Ensure we actually got content. 
+        extracted = await DV.extractors.extract(item);
+        extracted.id = id;
+
         if (item.kind === 'url' && (!extracted?.text || extracted.text.length < 200)) {
           throw new Error('Insufficient content extracted. The source might be blocking extraction or requires JavaScript.');
         } else if (!extracted?.text) {
@@ -239,16 +237,16 @@
           const newTitle = extracted?.title || item.title;
           const newUrl = extracted?.url || item.url;
           if (newTitle !== item.title || newUrl !== item.url) {
-            item = await updateItem(id, { title: newTitle, url: newUrl });
+            item = await updateItem(id, { title: newTitle, url: newUrl }) || item;
           }
         } catch (_) { /* non-blocking */ }
 
-        // Cache extraction result immediately so we don't have to re-extract on reload
         await DV.db.put('contents', { id, rawExtracted: extracted });
       }
 
       if (state.stopRequested.has(id)) throw new Error('Stopped by user');
       item = await updateItem(id, { status: STATUS.DISTILLING });
+      if (!item) throw new Error('Item was deleted mid-process');
 
       const res = await DV.ai.distill(extracted, state.settings.ai);
       const html = res.html;
@@ -256,8 +254,9 @@
 
       const durationMs = Date.now() - (item.startedAt || start);
 
-      // Merge tags safely by fetching latest from DB
       const current = await DV.db.get('items', id);
+      if (!current) throw new Error('Item was deleted before completion');
+
       const combinedTags = Array.from(new Set([
         ...(current?.tags || []),
         ...(aiTags || [])
@@ -271,8 +270,10 @@
       });
     } catch (err) {
       const current = await DV.db.get('items', id);
-      const durationMs = Date.now() - (current?.startedAt || start);
-      await updateItem(id, { status: state.stopRequested.has(id) ? STATUS.STOPPED : STATUS.ERROR, error: String(err?.message || err), durationMs });
+      if (current) {
+        const durationMs = Date.now() - (current?.startedAt || start);
+        await updateItem(id, { status: state.stopRequested.has(id) ? STATUS.STOPPED : STATUS.ERROR, error: String(err?.message || err), durationMs });
+      }
     } finally {
       state.processing.delete(id);
       state.stopRequested.delete(id);
@@ -299,7 +300,6 @@
         .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0));
 
       for (const itm of pending.slice(0, want)) {
-        // Double-check processing set inside the loop to catch overlaps
         if (!state.processing.has(itm.id)) {
           processOne(itm.id);
         }
@@ -308,7 +308,6 @@
       state.isTicking = false;
     }
 
-    // Refresh memory queue
     const all = await DV.db.getAll('items');
     state.queue = all.sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0)).map(i => i.id);
   }

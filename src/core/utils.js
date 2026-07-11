@@ -104,7 +104,7 @@
   }
 
   /**
-   * Fetch with an abort timeout; does not swallow non-timeout errors.
+   * Fetch with an abort timeout; returns precise diagnostic messages on timeout.
    * @param {string} url
    * @param {object} [opts]
    * @param {number} [ms=15000]
@@ -116,6 +116,11 @@
     try {
       const res = await fetch(url, { ...opts, signal: controller.signal });
       return res;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timed out after ${Math.round(ms / 1000)} seconds (${url}).`);
+      }
+      throw err;
     } finally {
       clearTimeout(t);
     }

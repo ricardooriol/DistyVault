@@ -17,10 +17,10 @@
       }
       if (url.searchParams.get('v')) return url.searchParams.get('v');
       const parts = url.pathname.split('/').filter(Boolean);
-      const idx = parts.findIndex(p => p === 'shorts' || p === 'live' || p === 'embed');
+      const idx = parts.findIndex(p => p === 'shorts' || p === 'live' || p === 'embed' || p === 'clip');
       if (idx >= 0 && parts[idx + 1]) return parts[idx + 1].slice(0, 11);
     } catch { }
-    const m = String(u).match(/(?:v=|\/shorts\/|\/live\/|youtu\.be\/)([\w-]{11})/);
+    const m = String(u).match(/(?:v=|\/shorts\/|\/live\/|\/embed\/|\/clip\/|youtu\.be\/)([\w-]{11})/);
     return m ? m[1] : '';
   }
 
@@ -91,7 +91,7 @@
     try { return JSON.parse(html.slice(html.indexOf(html[i === end - 1 ? i : idx], idx), end)); } catch {
       // Fallback for cases where it's JSON.parse('...')
       try {
-        const sub = html.slice(idx, idx + 500);
+        const sub = html.slice(idx, idx + 800);
         const m = sub.match(/JSON\.parse\("(.+?)"\)/);
         if (m) return JSON.parse(JSON.parse(`"${m[1]}"`));
       } catch { }

@@ -1,3 +1,25 @@
+const dns = require('dns').promises;
+const net = require('net');
+
+function isPrivateIP(ip) {
+  if (!net.isIP(ip)) return false;
+  if (net.isIPv4(ip)) {
+    const parts = ip.split('.').map(Number);
+    if (parts[0] === 10) return true; // 10.0.0.0/8
+    if (parts[0] === 127) return true; // 127.0.0.0/8 loopback
+    if (parts[0] === 169 && parts[1] === 254) return true; // 169.254.0.0/16 link-local
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
+    if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.0.0/16
+    if (parts[0] === 0) return true; // 0.0.0.0/8
+  } else if (net.isIPv6(ip)) {
+    const lower = ip.toLowerCase();
+    if (lower === '::1' || lower === '::') return true;
+    if (lower.startsWith('fe80:')) return true;
+    if (lower.startsWith('fc00:') || lower.startsWith('fd00:')) return true;
+  }
+  return false;
+}
+
 module.exports = async (req, res) => {
   // 1. Permissive CORS for all AI providers and sources
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,6 +44,25 @@ module.exports = async (req, res) => {
 
   try {
     const targetUrlParsed = new URL(u);
+    const hostname = targetUrlParsed.hostname;
+
+    // Strict SSRF protection: check localhost and perform DNS verification
+    if (hostname === 'localhost' || hostname.includes('127.0.0.1') || hostname.includes('::1')) {
+      res.statusCode = 403;
+      return res.end('Access denied: Localhost and loopback URLs are strictly forbidden (SSRF protection).');
+    }
+
+    try {
+      const lookupRes = await dns.lookup(hostname);
+      if (lookupRes && lookupRes.address && isPrivateIP(lookupRes.address)) {
+        res.statusCode = 403;
+        return res.end(`Access denied: Target host resolves to a private or loopback IP address (${lookupRes.address}) (SSRF protection).`);
+      }
+    } catch (dnsErr) {
+      res.statusCode = 502;
+      return res.end(`Proxy Error: DNS lookup failed for hostname ${hostname}`);
+    }
+
     const isYouTube = /youtube\.com|youtu\.be/.test(u);
 
     // 3. Forward the request parameters with "Human Mimicry"
@@ -61,10 +102,14 @@ module.exports = async (req, res) => {
       headers.set('Referer', 'https://www.google.com/');
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds timeout
+
     const fetchOptions = {
       method: req.method,
       headers,
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: controller.signal
     };
 
     // Forward body for state-mutating requests
@@ -78,10 +123,20 @@ module.exports = async (req, res) => {
       }
     }
 
-    let response = await fetch(targetUrlParsed.toString(), fetchOptions);
+    let response;
+    try {
+      response = await fetch(targetUrlParsed.toString(), fetchOptions);
+      clearTimeout(timeoutId);
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        res.statusCode = 504;
+        return res.end('Proxy Error: Direct fetch timed out after 25 seconds.');
+      }
+      throw fetchErr;
+    }
 
     // 4. Intelligent Fallback System (The "Bypass Anything" Engine)
-    // Check if the response is a typical anti-bot block (403, 503, or small HTML with block keywords)
     let needsFallback = !response.ok;
     let originalBuffer = null;
 
@@ -100,21 +155,30 @@ module.exports = async (req, res) => {
 
     if (needsFallback && req.method === 'GET') {
       console.log(`[Proxy] Direct fetch failed or blocked for ${targetUrlParsed.toString()}. Engaging Jina Reader fallback...`);
-      // Jina Reader acts as a headless browser and bypasses most captchas
       const jinaUrl = 'https://r.jina.ai/' + targetUrlParsed.toString();
-      const jinaRes = await fetch(jinaUrl, {
-        headers: {
-          'Accept': 'text/plain',
-          'X-Return-Format': 'markdown'
-        }
-      });
+      const jinaController = new AbortController();
+      const jinaTimeout = setTimeout(() => jinaController.abort(), 25000);
 
-      if (jinaRes.ok) {
-        const markdown = await jinaRes.text();
-        res.setHeader('content-type', 'text/plain; charset=utf-8');
-        res.setHeader('x-final-url', jinaRes.url || targetUrlParsed.toString());
-        res.statusCode = 200;
-        return res.end(markdown);
+      try {
+        const jinaRes = await fetch(jinaUrl, {
+          headers: {
+            'Accept': 'text/plain',
+            'X-Return-Format': 'markdown'
+          },
+          signal: jinaController.signal
+        });
+        clearTimeout(jinaTimeout);
+
+        if (jinaRes.ok) {
+          const markdown = await jinaRes.text();
+          res.setHeader('content-type', 'text/plain; charset=utf-8');
+          res.setHeader('x-final-url', jinaRes.url || targetUrlParsed.toString());
+          res.statusCode = 200;
+          return res.end(markdown);
+        }
+      } catch (jinaErr) {
+        clearTimeout(jinaTimeout);
+        console.error('[Proxy] Jina fallback failed:', jinaErr);
       }
     }
 

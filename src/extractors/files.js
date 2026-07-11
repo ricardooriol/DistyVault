@@ -12,24 +12,50 @@
   /**
    * Load an external script at most once, with an optional readiness check.
    * Resolves when the script loads, or immediately if `check()` returns true.
+   * Features automatic timeout and 3-attempt retry logic for spotty network connections.
    * @param {string} url
    * @param {() => boolean} [check]
    * @returns {Promise<void>}
    */
   function loadScriptOnce(url, check) {
-    return new Promise((resolve, reject) => {
-      try {
-        if (check && check()) return resolve();
-        if (_once[url]) return _once[url].then(resolve).catch(reject);
+    if (check && check()) return Promise.resolve();
+    if (_once[url]) return _once[url];
+
+    _once[url] = new Promise((resolve, reject) => {
+      let attempt = 0;
+      function tryLoad() {
+        attempt++;
         const s = document.createElement('script');
         s.src = url;
         s.async = true;
-        s.onload = () => resolve();
-        s.onerror = (e) => reject(new Error('Failed to load ' + url));
+        const timeoutId = setTimeout(() => {
+          s.remove();
+          if (attempt < 3) {
+            console.warn(`Timeout loading ${url}, retrying attempt ${attempt + 1}...`);
+            tryLoad();
+          } else {
+            delete _once[url];
+            reject(new Error('Timed out loading script after 3 attempts: ' + url));
+          }
+        }, 15000);
+
+        s.onload = () => { clearTimeout(timeoutId); resolve(); };
+        s.onerror = () => {
+          clearTimeout(timeoutId);
+          s.remove();
+          if (attempt < 3) {
+            console.warn(`Error loading ${url}, retrying attempt ${attempt + 1}...`);
+            tryLoad();
+          } else {
+            delete _once[url];
+            reject(new Error('Failed to load script after 3 attempts: ' + url));
+          }
+        };
         document.head.appendChild(s);
-        _once[url] = new Promise((res, rej) => { s.addEventListener('load', () => res()); s.addEventListener('error', () => rej()); });
-      } catch (e) { reject(e); }
+      }
+      tryLoad();
     });
+    return _once[url];
   }
 
   const OCR_MAX_PAGES = 50;
@@ -177,7 +203,7 @@
    * Entrypoint for file extraction, dispatching by mime/extension, with helpful
    * diagnostics for unsupported formats. Returns a normalized item object.
    * @param {File} file
-   * @returns {Promise<{kind:'file', title:string, fileName:string, fileType:string, size:number, text:string}>>}
+   * @returns {Promise<{kind:'file', title:string, fileName:string, fileType:string, size:number, text:string}>}
    */
   async function extractFromFile(file) {
     const ext = extOf(file.name);

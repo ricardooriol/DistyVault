@@ -20,6 +20,21 @@
       console.info = (...a) => isSlop(a[0]) ? null : info(...a);
     })();
   </script>
+  <script>
+    // Global error handlers to prevent white-screen crashes and provide user feedback
+    window.addEventListener('error', function(e) {
+      console.error('Global error caught:', e.error || e.message);
+      if (window.DV && window.DV.toast) {
+        window.DV.toast('An unexpected error occurred: ' + (e.message || 'Script error'), { type: 'error' });
+      }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('Unhandled promise rejection:', e.reason);
+      if (window.DV && window.DV.toast) {
+        window.DV.toast('Operation failed: ' + (e.reason?.message || e.reason || 'Promise rejected'), { type: 'error' });
+      }
+    });
+  </script>
   <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

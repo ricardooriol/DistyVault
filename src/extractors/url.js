@@ -36,7 +36,6 @@
     const isBlocked = (html) => {
       if (!html) return true;
       const h = html.toLowerCase();
-      // Added 'just a moment...' to catch general CloudFlare blocks universally
       return (h.includes('enable javascript') || h.includes('access denied') || h.includes('checking your browser') || h.includes('just a moment')) && h.length < 1500;
     };
 
@@ -60,7 +59,7 @@
     }
 
     if (!res || !res.ok) {
-      throw new Error(`Bypass Exhausted: ${url} is heavily protected. Copy/Paste the text manually into a .txt file and drag it here.`);
+      throw new Error(`Bypass Exhausted: ${url} is heavily protected or unreachable. All fallback proxy routes (Local Proxy, corsproxy.io, allorigins) failed. Please copy/paste the text manually into a .txt file and drag it into DistyVault.`);
     }
 
     const finalUrl = res.headers.get('x-final-url') || res.url || url;

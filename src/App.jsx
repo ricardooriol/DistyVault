@@ -4,14 +4,14 @@
  * This file is intentionally plain React (UMD) executed via Babel-in-browser.
  * It wires the UI to DV core modules available on window.DV (db, queue, bus, ai, extractors, toast).
  */
-const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const { useState, useEffect, useMemo, useRef, useCallback, memo } = React;
 const { classNames, yieldToBrowser, saveBlob, formatDuration, sanitizeFilename } = DV.utils;
 const STATUS = DV.queue.STATUS;
 
 /**
  * Icon — wrapper for lucide/feather UMD icon sets.
  */
-function Icon({ name, size = 20, className, strokeWidth = 2 }) {
+const Icon = memo(function Icon({ name, size = 20, className, strokeWidth = 2 }) {
   const wrapRef = useRef(null);
   useEffect(() => {
     try {
@@ -50,7 +50,7 @@ function Icon({ name, size = 20, className, strokeWidth = 2 }) {
     style: { width: size + 'px', height: size + 'px', display: 'inline-flex' },
     'aria-hidden': true
   });
-}
+});
 
 function formatSize(bytes) {
   if (!bytes) return '-';
@@ -76,7 +76,7 @@ function getKindIcon(kind) {
   return 'file';
 }
 
-function Sidebar({ collapsed, setCollapsed, view, setView }) {
+const Sidebar = memo(function Sidebar({ collapsed, setCollapsed, view, setView }) {
   const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = (localStorage.getItem('dv.theme') || 'system') === 'dark' || ((localStorage.getItem('dv.theme') || 'system') === 'system' && prefersDark);
   const logoSrc = isDark ? 'logos/logo_no_bg_w.png' : 'logos/logo_no_bg_b.png';
@@ -120,9 +120,9 @@ function Sidebar({ collapsed, setCollapsed, view, setView }) {
       </div>
     </aside>
   );
-}
+});
 
-function ContentHeader({ openCmd, theme, setTheme }) {
+const ContentHeader = memo(function ContentHeader({ openCmd, theme, setTheme }) {
   const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
   return (
@@ -139,7 +139,7 @@ function ContentHeader({ openCmd, theme, setTheme }) {
       </div>
     </div>
   );
-}
+});
 
 function CommandPalette({ open, onClose, query, setQuery, onDistill, onAttachFiles, onOpenSettings, onExport, onImport, onRetryFailed, onDownloadAll, onStopAll, items }) {
   const inputRef = useRef(null);
@@ -216,7 +216,7 @@ function CommandPalette({ open, onClose, query, setQuery, onDistill, onAttachFil
   );
 }
 
-function FilterBar({ filter, setFilter, tagFilter, setTagFilter, allTags, search, setSearch }) {
+const FilterBar = memo(function FilterBar({ filter, setFilter, tagFilter, setTagFilter, allTags, search, setSearch }) {
   const [tagsOpen, setTagsOpen] = useState(false);
   const tagsRef = useRef(null);
   useEffect(() => {
@@ -259,9 +259,9 @@ function FilterBar({ filter, setFilter, tagFilter, setTagFilter, allTags, search
       )}
     </div>
   );
-}
+});
 
-function StatusDot({ status }) {
+const StatusDot = memo(function StatusDot({ status }) {
   const colors = {
     [STATUS.PENDING]: 'bg-slate-300',
     [STATUS.EXTRACTING]: 'bg-amber-400 animate-pulse',
@@ -276,7 +276,7 @@ function StatusDot({ status }) {
       <span className="text-[12px] text-slate-400 capitalize">{status}</span>
     </div>
   );
-}
+});
 
 function ItemList({ items, allItems, selected, setSelected, expandedIds, setExpandedIds, onViewItem }) {
   const [now, setNow] = useState(Date.now());
@@ -877,7 +877,9 @@ function App() {
               pdf.setTextColor(148, 163, 184); // slate-400
               
               try {
-                pdf.addImage(logoImg, 'PNG', 42, pageHeight - 40, 11, 11);
+                if (logoImg.width > 0) {
+                  pdf.addImage(logoImg, 'PNG', 42, pageHeight - 40, 11, 11);
+                }
               } catch(e) {}
               pdf.text('DistyVault', 59, pageHeight - 31);
               
@@ -895,11 +897,13 @@ function App() {
           }
         } catch(e) {
           console.error("PDF generation failed", e);
+          DV.toast("PDF generation failed for " + it.title, { type: 'error' });
         }
       }
       if (zip) saveBlob(await zip.generateAsync({ type: 'blob' }), 'distyvault_export.zip');
     } catch (err) {
       console.error("Bulk PDF process error", err);
+      DV.toast("Bulk PDF download encountered an error", { type: 'error' });
     } finally {
       window.scrollTo(scrollX, scrollY);
     }

@@ -3,7 +3,7 @@
    * IndexedDB utility module providing a simple CRUD API and import/export helpers
    * for DistyVault data. Encapsulates database versioning, object stores, and
    * schema initialization. All methods return Promises and are safe to call from
-   * the main thread.
+   * the main thread. Includes defensive transaction error handling and null checks.
    */
   const DB_NAME = 'distyvault';
   const DB_VER = 10;
@@ -66,14 +66,23 @@
    * @returns {Promise<T>}
    */
   async function put(store, value) {
-    const t = await tx([store], 'readwrite');
-    await new Promise((res, rej) => {
-      const r = t.objectStore(store).put(value);
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
-    });
-    await new Promise(res => t.oncomplete = res);
-    return value;
+    try {
+      const t = await tx([store], 'readwrite');
+      await new Promise((res, rej) => {
+        const r = t.objectStore(store).put(value);
+        r.onsuccess = () => res();
+        r.onerror = () => rej(r.error);
+      });
+      await new Promise((res, rej) => {
+        t.oncomplete = res;
+        t.onerror = () => rej(t.error);
+        t.onabort = () => rej(new Error('Transaction aborted'));
+      });
+      return value;
+    } catch (err) {
+      console.error(`IndexedDB put error in store ${store}:`, err);
+      throw err;
+    }
   }
 
   /**
@@ -83,12 +92,17 @@
    * @returns {Promise<any|null>}
    */
   async function get(store, key) {
-    const t = await tx([store]);
-    return await new Promise((res, rej) => {
-      const r = t.objectStore(store).get(key);
-      r.onsuccess = () => res(r.result || null);
-      r.onerror = () => rej(r.error);
-    });
+    try {
+      const t = await tx([store]);
+      return await new Promise((res, rej) => {
+        const r = t.objectStore(store).get(key);
+        r.onsuccess = () => res(r.result || null);
+        r.onerror = () => rej(r.error);
+      });
+    } catch (err) {
+      console.error(`IndexedDB get error in store ${store}:`, err);
+      return null;
+    }
   }
 
   /**
@@ -99,13 +113,22 @@
    * @returns {Promise<void>}
    */
   async function del(store, key) {
-    const t = await tx([store], 'readwrite');
-    await new Promise((res, rej) => {
-      const r = t.objectStore(store).delete(key);
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
-    });
-    await new Promise(res => t.oncomplete = res);
+    try {
+      const t = await tx([store], 'readwrite');
+      await new Promise((res, rej) => {
+        const r = t.objectStore(store).delete(key);
+        r.onsuccess = () => res();
+        r.onerror = () => rej(r.error);
+      });
+      await new Promise((res, rej) => {
+        t.oncomplete = res;
+        t.onerror = () => rej(t.error);
+        t.onabort = () => rej(new Error('Transaction aborted'));
+      });
+    } catch (err) {
+      console.error(`IndexedDB del error in store ${store}:`, err);
+      throw err;
+    }
   }
 
   /**
@@ -115,13 +138,22 @@
    * @returns {Promise<void>}
    */
   async function clear(store) {
-    const t = await tx([store], 'readwrite');
-    await new Promise((res, rej) => {
-      const r = t.objectStore(store).clear();
-      r.onsuccess = () => res();
-      r.onerror = () => rej(r.error);
-    });
-    await new Promise(res => t.oncomplete = res);
+    try {
+      const t = await tx([store], 'readwrite');
+      await new Promise((res, rej) => {
+        const r = t.objectStore(store).clear();
+        r.onsuccess = () => res();
+        r.onerror = () => rej(r.error);
+      });
+      await new Promise((res, rej) => {
+        t.oncomplete = res;
+        t.onerror = () => rej(t.error);
+        t.onabort = () => rej(new Error('Transaction aborted'));
+      });
+    } catch (err) {
+      console.error(`IndexedDB clear error in store ${store}:`, err);
+      throw err;
+    }
   }
 
   /**
@@ -130,12 +162,17 @@
    * @returns {Promise<any[]>}
    */
   async function getAll(store) {
-    const t = await tx([store]);
-    return await new Promise((res, rej) => {
-      const r = t.objectStore(store).getAll();
-      r.onsuccess = () => res(r.result || []);
-      r.onerror = () => rej(r.error);
-    });
+    try {
+      const t = await tx([store]);
+      return await new Promise((res, rej) => {
+        const r = t.objectStore(store).getAll();
+        r.onsuccess = () => res(r.result || []);
+        r.onerror = () => rej(r.error);
+      });
+    } catch (err) {
+      console.error(`IndexedDB getAll error in store ${store}:`, err);
+      return [];
+    }
   }
 
   /**
@@ -201,7 +238,11 @@
     putAll('contents', contents);
     putAll('settings', settings);
     await Promise.all(promises);
-    await new Promise(res => t.oncomplete = res);
+    await new Promise((res, rej) => {
+      t.oncomplete = res;
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(new Error('Transaction aborted during import'));
+    });
   }
 
   /**

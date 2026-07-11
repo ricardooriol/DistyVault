@@ -1,19 +1,4 @@
 (function () {
-  /**
-   * Remove common leading indentation from template literals or strings while preserving
-   * embedded expressions. Useful for embedding large multi-line system prompts in code
-   * without carrying indentation noise into the final payload.
-   *
-   * Behavior:
-   * - Unwraps escaped newlines (\\\n) inserted by tagged templates.
-   * - Strips a single leading and trailing newline if present to allow neat code formatting.
-   * - Computes the minimal indent across non-empty lines and removes it from all lines.
-   * - Leaves relative indentation intact.
-   *
-   * @param {TemplateStringsArray|string} strings Raw template strings or string input
-   * @param {...any} values Interpolated values for template literals
-   * @returns {string} De-indented string
-   */
   function dedent(strings, ...values) {
     const raw = typeof strings === 'string' ? [strings] : strings.raw || strings;
     let result = '';
@@ -33,37 +18,15 @@
     return lines.map(l => l.slice(Math.min(min, l.length))).join('\n');
   }
 
-  /**
-   * Orchestrate AI-based distillation for extracted content using the selected provider.
-   * Prepares a rigorous system directive and user content, then delegates to the provider
-   * `distill` method. The provider returns HTML which is post-processed into a standardized
-   * document format for consistent display.
-   *
-   * Contract:
-   * - Input `extracted`: { title?, fileName?, url?, text? }.
-   * - Input `aiSettings`: { mode: 'openai'|'gemini'|'anthropic'|'deepseek'|'grok', apiKey?, model? }.
-   * - Output: HTML string with standardized wrapper and formatting.
-   * - Throws: when provider missing/unavailable or the downstream provider rejects.
-   *
-   * Notes:
-   * - Truncates input text to ~12,000 chars to avoid request size limits.
-   * - Injects `__prepared` into settings for providers to reuse the exact prompt/messages.
-   * - If a global `dayjs` exists, it is used for consistent date formatting.
-   *
-   * @param {{title?:string, fileName?:string, url?:string, text?:string}} extracted
-   * @param {{mode:string, apiKey?:string, model?:string, [k:string]:any}} aiSettings
-   * @returns {Promise<string>} Standardized HTML document containing the distilled content
-   */
   async function distill(extracted, aiSettings) {
     const key = (aiSettings?.mode || '').toLowerCase();
     if (!key) throw new Error('No AI provider selected. Open Settings and choose a provider.');
     const provider = window.DV?.aiProviders?.[key];
     if (!provider) throw new Error('AI provider not available: ' + key);
-    const title = extracted.title || extracted.fileName || extracted.url || 'Untitled';
-    const fullText = (extracted.text || '').trim();
+    const title = extracted?.title || extracted?.fileName || extracted?.url || 'Untitled';
+    const fullText = (extracted?.text || '').trim();
     if (!fullText) throw new Error('No text content available to distill.');
 
-    // Deep Analysis Directive (Pass 1)
     const analysisDirective = dedent`
       SYSTEM DIRECTIVE: You are an elite, world-class knowledge extractor and research analyst.
       Your singular objective is to perform a 100% EXHAUSTIVE, VERBOSE DEEP ANALYSIS of the provided source material.
@@ -83,7 +46,6 @@
       - Output ONLY your raw analysis. No conversational filler or meta-commentary.
     `;
 
-    // Formatting Directive (Pass 2)
     const formatDirective = dedent`
       SYSTEM DIRECTIVE: You are an elite information architect and technical editor.
       Your task is to take an incredibly dense, exhaustive raw knowledge dump and format it into a beautifully structured, highly readable Markdown document.
@@ -107,10 +69,6 @@
     const CHUNK_SIZE = 100000;
     const CHUNK_OVERLAP = 500;
 
-    /**
-     * Split text at paragraph boundaries into chunks of roughly CHUNK_SIZE chars,
-     * with CHUNK_OVERLAP overlap between adjacent chunks.
-     */
     function chunkText(text) {
       if (!text) return [];
       if (text.length <= CHUNK_SIZE) return [text];
@@ -122,7 +80,6 @@
           chunks.push(text.slice(start));
           break;
         }
-        // Find paragraph break near the boundary
         const regionStart = Math.max(0, end - 300);
         const searchRegion = text.slice(regionStart, end + 300);
         const breakIdx = searchRegion.lastIndexOf('\n\n');
@@ -135,12 +92,9 @@
       return chunks;
     }
 
-    // --- STEP 1: DEEP ANALYSIS (Pass 1) ---
-    // Check if we already have cached analysis from an interrupted session
     let rawAnalysis = '';
-    const cached = extracted.id ? await DV.db.get('contents', extracted.id) : null;
+    const cached = extracted?.id ? await DV.db.get('contents', extracted.id).catch(() => null) : null;
     if (cached && cached.rawAnalysis) {
-      // Resume from cached deep analysis
       rawAnalysis = cached.rawAnalysis;
     } else {
       const chunks = chunkText(fullText);
@@ -163,18 +117,14 @@
           };
           return provider.distill(extracted, { ...aiSettings, __prepared: prepared });
         }));
-        // Join the analysis results
         rawAnalysis = analysisParts.map((part, i) => `--- Part ${i + 1} Analysis ---\n${part}`).join('\n\n');
       }
 
-      // Cache raw analysis and raw extracted state together so we can skip this step on reload
-      if (extracted.id) {
-        await DV.db.put('contents', { id: extracted.id, rawExtracted: extracted, rawAnalysis });
+      if (extracted?.id) {
+        await DV.db.put('contents', { id: extracted.id, rawExtracted: extracted, rawAnalysis }).catch(e => console.warn('Failed to cache analysis', e));
       }
     }
 
-    // --- STEP 2: MARKDOWN FORMATTING (Pass 2) ---
-    // Format the combined raw analysis into structured Markdown.
     let finalMarkdown = '';
     try {
       const formatContent = `Here is the raw analysis to format into a beautiful Markdown document:\n\n${rawAnalysis}`;
@@ -201,13 +151,6 @@
     return { html: formatted, tags };
   }
 
-  /**
-   * Lightweight connectivity test for selected provider.
-   * Uses provider-specific `test` if available; otherwise attempts a minimal `distill` call
-   * to validate credentials and reachability.
-   * @param {{mode:string, apiKey?:string, model?:string}} aiSettings
-   * @returns {Promise<boolean>} true if the provider is reachable/authorized
-   */
   async function test(aiSettings) {
     const key = (aiSettings?.mode || '').toLowerCase();
     if (!key) throw new Error('No AI provider selected.');
@@ -218,17 +161,11 @@
     return true;
   }
 
-  /**
-   * Parse a comma-separated list of tags from a string starting with "TAGS:".
-   * @param {string} text
-   * @returns {string[]}
-   */
   function parseTags(text = '') {
-    const fallback = text.match(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi);
+    const fallback = String(text || '').match(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi);
     let raw = fallback ? fallback[1] : '';
     if (!raw) {
-      // Fallback to legacy hidden div parsing just in case
-      const match = text.match(/<div[^>]*id=["']dv-tags["'][^>]*>(.*?)<\/div>/i);
+      const match = String(text || '').match(/<div[^>]*id=["']dv-tags["'][^>]*>(.*?)<\/div>/i);
       if (match) raw = match[1];
     }
     
@@ -242,39 +179,26 @@
 
   window.DV = window.DV || {};
   window.DV.ai = { distill, test };
-  /**
-   * Cleans the AI output of any wrappers/tag blocks and injects into standard template.
-   * @param {string} html Raw provider HTML/string
-   * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
-   * @returns {string}
-   */
+
   function reformatDistilled(markdown = '', meta) {
     try {
-      // Strip out the tags line and any markdown codeblock wrappers the model might have added
-      let cleanMd = markdown
+      if (!markdown) return standardWrapHtml('<p>No content available.</p>', meta);
+      let cleanMd = String(markdown)
         .replace(/^```(markdown|md|html)\s*/i, '')
         .replace(/```\s*$/i, '')
         .replace(/\*?\*?\btags?\b\*?\*?[\s:-]*(.+)$/mi, '')
         .trim();
         
-      // Render to HTML securely
       const rawHtml = window.marked ? window.marked.parse(cleanMd) : '<p>' + escapeHtml(cleanMd).replace(/\n/g, '<br/>') + '</p>';
       const safeHtml = window.DOMPurify ? window.DOMPurify.sanitize(rawHtml) : rawHtml;
         
       return standardWrapHtml(safeHtml, meta);
     } catch (err) {
       console.error('Render error', err);
-      return markdown;
+      return standardWrapHtml('<p>' + escapeHtml(String(markdown)) + '</p>', meta);
     }
   }
 
-  /**
-   * Wrap the distilled inner HTML with a minimal, self-contained page shell and metadata.
-   * Provides light/dark support via parent document class probing.
-   * @param {string} inner
-   * @param {{title?:string, sourceUrl?:string, sourceName?:string, dateText?:string}} meta
-   * @returns {string}
-   */
   function standardWrapHtml(inner, meta) {
     const title = escapeHtml(meta?.title || 'Distilled');
     const srcLabel = meta?.sourceUrl ? `<a href="${escapeHtml(meta.sourceUrl)}" target="_blank" rel="noopener" class="dv-link">${escapeHtml(meta.sourceUrl)}</a>` : `<span>${escapeHtml(meta?.sourceName || '')}</span>`;
@@ -344,12 +268,7 @@ footer.dv-footer { margin-top: 64px; padding-top: 32px; border-top: 1px solid #e
 </body></html>`;
   }
 
-  /**
-   * Escape a string for safe inclusion in HTML text nodes or attributes.
-   * @param {string} [s]
-   * @returns {string}
-   */
   function escapeHtml(s = '') {
-    return s.replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return String(s || '').replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
 })();
