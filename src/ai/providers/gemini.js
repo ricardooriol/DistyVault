@@ -1,5 +1,5 @@
 (function () {
-  window.__geminiCooldownUntil = 0;
+  let geminiGlobalMutex = Promise.resolve();
 
   /**
    * Build the Gemini generateContent endpoint for a given model.
@@ -25,10 +25,8 @@
 
   /**
    * Call Gemini generateContent API with the prepared user prompt.
-   * Enables google_search tool; uses a modest temperature for stability.
-   * @param {object} extracted
-   * @param {{apiKey?:string, model?:string, __prepared?:any}} settings
-   * @returns {Promise<string>}
+   * Uses a global Promise-based mutex to strictly enforce Google's 15 RPM
+   * free-tier limit by ensuring 4.5 seconds between ALL requests.
    */
   async function distillGemini(extracted, settings) {
     const apiKey = settings?.apiKey;
@@ -41,25 +39,44 @@
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute max per chunk
 
-      if (Date.now() < window.__geminiCooldownUntil) {
-        await new Promise(r => setTimeout(r, window.__geminiCooldownUntil - Date.now() + Math.random() * 500));
-      }
-
+      let res;
       try {
-        const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
-            generationConfig: { temperature: 0.3 }
-          }),
-          signal: controller.signal
-        });
+        // Wait in line for our turn (strict serialization across the entire app)
+        await geminiGlobalMutex;
+        
+        let releaseMutex;
+        geminiGlobalMutex = new Promise(r => { releaseMutex = r; });
+
+        try {
+          const lastReq = parseInt(localStorage.getItem('dv.geminiLastReq') || '0', 10);
+          const delay = Math.max(0, 4500 - (Date.now() - lastReq));
+          if (delay > 0) {
+            await new Promise(r => setTimeout(r, delay));
+          }
+
+          // Mark our execution time
+          localStorage.setItem('dv.geminiLastReq', String(Date.now()));
+
+          res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: buildInput(extracted, settings) }] }],
+              generationConfig: { temperature: 0.3 }
+            }),
+            signal: controller.signal
+          });
+        } finally {
+          releaseMutex();
+        }
 
         clearTimeout(timeoutId);
 
         if (!res.ok) {
-          if (res.status === 429) window.__geminiCooldownUntil = Date.now() + 16000;
+          // If we hit a hard 429, enforce a 60-second global timeout
+          if (res.status === 429) {
+            localStorage.setItem('dv.geminiLastReq', String(Date.now() + 60000));
+          }
           let msg = `${res.status} ${res.statusText}`;
           try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
           const err = new Error('Gemini API error: ' + msg);
@@ -78,12 +95,11 @@
         const isRetryable = err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
 
         if (isRetryable && attempts < 5) {
-          // Exponential backoff: 4s, 8s, 16s, 32s
-          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 2000 + Math.random() * 1000));
+          // Exponential backoff multiplier if the global 4.5s lock isn't enough
+          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 1000 + Math.random() * 500));
           continue;
         }
 
-        // Give a descriptive error message on final failure
         if (err.name === 'AbortError') throw new Error('Gemini API timed out after 5 minutes.');
         throw err;
       }
