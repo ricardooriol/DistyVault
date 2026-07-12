@@ -34,10 +34,10 @@
     if (!apiKey) throw new Error('Gemini API key required');
 
     let attempts = 0;
-    while (attempts < 5) {
+    while (attempts < 8) {
       attempts++;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute max per chunk
+      const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 minute max per chunk
 
       let res;
       try {
@@ -73,9 +73,9 @@
         clearTimeout(timeoutId);
 
         if (!res.ok) {
-          // If we hit a hard 429, enforce a 30-second global timeout
+          // If we hit a hard 429, enforce a 65-second global timeout to completely clear Google's 1-minute sliding window limit
           if (res.status === 429) {
-            localStorage.setItem('dv.geminiLastReq', String(Date.now() + 30000));
+            localStorage.setItem('dv.geminiLastReq', String(Date.now() + 65000));
           }
           let msg = `${res.status} ${res.statusText}`;
           try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
@@ -97,17 +97,17 @@
         const isNetworkOrCorsError = err.name === 'TypeError' && /Failed to fetch/i.test(err.message);
         const isRetryable = isNetworkOrCorsError || err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
 
-        if (isRetryable && attempts < 5) {
-          // If we suspect a hard 429 hidden behind a CORS error, apply a heavy 30s penalty
+        if (isRetryable && attempts < 8) {
+          // If we suspect a hard 429 hidden behind a CORS error, apply a heavy 65s penalty
           if (isNetworkOrCorsError || err.status === 429) {
-             localStorage.setItem('dv.geminiLastReq', String(Date.now() + 30000));
+             localStorage.setItem('dv.geminiLastReq', String(Date.now() + 65000));
           }
           // Exponential backoff multiplier
-          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 1500 + Math.random() * 500));
+          await new Promise(r => setTimeout(r, Math.pow(1.5, attempts) * 2000 + Math.random() * 1000));
           continue;
         }
 
-        if (err.name === 'AbortError') throw new Error('Gemini API timed out after 5 minutes.');
+        if (err.name === 'AbortError') throw new Error('Gemini API timed out after 15 minutes.');
         // Provide a clearer error if it failed due to hidden 429 CORS issues after 5 retries
         if (isNetworkOrCorsError) throw new Error('Gemini API unreachable or heavily rate-limited (CORS blocked the response).');
         throw err;
