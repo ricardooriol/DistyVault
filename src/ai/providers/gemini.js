@@ -1,4 +1,6 @@
 (function () {
+  window.__geminiCooldownUntil = 0;
+
   /**
    * Build the Gemini generateContent endpoint for a given model.
    * @param {string} model
@@ -39,6 +41,10 @@
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute max per chunk
 
+      if (Date.now() < window.__geminiCooldownUntil) {
+        await new Promise(r => setTimeout(r, window.__geminiCooldownUntil - Date.now() + Math.random() * 500));
+      }
+
       try {
         const res = await fetch(endpoint(model) + `?key=${encodeURIComponent(apiKey)}`, {
           method: 'POST',
@@ -53,6 +59,7 @@
         clearTimeout(timeoutId);
 
         if (!res.ok) {
+          if (res.status === 429) window.__geminiCooldownUntil = Date.now() + 16000;
           let msg = `${res.status} ${res.statusText}`;
           try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
           const err = new Error('Gemini API error: ' + msg);
