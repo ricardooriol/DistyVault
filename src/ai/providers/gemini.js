@@ -34,7 +34,7 @@
     if (!apiKey) throw new Error('Gemini API key required');
 
     let attempts = 0;
-    while (attempts < 3) {
+    while (attempts < 5) {
       attempts++;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute max per chunk
@@ -70,9 +70,9 @@
         clearTimeout(timeoutId);
         const isRetryable = err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
 
-        if (isRetryable && attempts < 3) {
-          // Exponential backoff: 2s, 4s...
-          await new Promise(r => setTimeout(r, attempts * 2000));
+        if (isRetryable && attempts < 5) {
+          // Exponential backoff: 4s, 8s, 16s, 32s
+          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 2000 + Math.random() * 1000));
           continue;
         }
 
