@@ -73,9 +73,9 @@
         clearTimeout(timeoutId);
 
         if (!res.ok) {
-          // If we hit a hard 429, enforce a 60-second global timeout
+          // If we hit a hard 429, enforce a 30-second global timeout
           if (res.status === 429) {
-            localStorage.setItem('dv.geminiLastReq', String(Date.now() + 60000));
+            localStorage.setItem('dv.geminiLastReq', String(Date.now() + 30000));
           }
           let msg = `${res.status} ${res.statusText}`;
           try { const j = await res.json(); msg += ` - ${j.error?.message || ''}`; } catch { }
@@ -92,15 +92,24 @@
 
       } catch (err) {
         clearTimeout(timeoutId);
-        const isRetryable = err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
+        
+        // Google's API Gateway drops CORS headers on 429 or 500 errors, causing a generic "Failed to fetch" TypeError.
+        const isNetworkOrCorsError = err.name === 'TypeError' && /Failed to fetch/i.test(err.message);
+        const isRetryable = isNetworkOrCorsError || err.name === 'AbortError' || err.status === 503 || err.status === 429 || /503|429|Service Unavailable|Rate Limit|timeout/i.test(err.message);
 
         if (isRetryable && attempts < 5) {
-          // Exponential backoff multiplier if the global 4.5s lock isn't enough
-          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 1000 + Math.random() * 500));
+          // If we suspect a hard 429 hidden behind a CORS error, apply a heavy 30s penalty
+          if (isNetworkOrCorsError || err.status === 429) {
+             localStorage.setItem('dv.geminiLastReq', String(Date.now() + 30000));
+          }
+          // Exponential backoff multiplier
+          await new Promise(r => setTimeout(r, Math.pow(2, attempts) * 1500 + Math.random() * 500));
           continue;
         }
 
         if (err.name === 'AbortError') throw new Error('Gemini API timed out after 5 minutes.');
+        // Provide a clearer error if it failed due to hidden 429 CORS issues after 5 retries
+        if (isNetworkOrCorsError) throw new Error('Gemini API unreachable or heavily rate-limited (CORS blocked the response).');
         throw err;
       }
     }
