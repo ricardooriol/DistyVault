@@ -107,9 +107,7 @@
         };
         rawAnalysis = await provider.distill(extracted, { ...aiSettings, __prepared: prepared });
       } else {
-        const analysisParts = [];
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
+        const analysisParts = await Promise.all(chunks.map(async (chunk, i) => {
           const partNote = `[This is part ${i + 1} of ${chunks.length} of a longer document. Analyze this part thoroughly.]\n\n`;
           const content = `${partNote}Here is the text to analyze:\n\nTitle: ${title}\nURL: ${extracted.url || ''}\n\nContent:\n${chunk}`;
           const prepared = {
@@ -117,8 +115,8 @@
             prompt: `${analysisDirective}\n\n${content}`,
             messages: [{ role: 'system', content: analysisDirective }, { role: 'user', content: content }]
           };
-          analysisParts.push(await provider.distill(extracted, { ...aiSettings, __prepared: prepared }));
-        }
+          return provider.distill(extracted, { ...aiSettings, __prepared: prepared });
+        }));
         rawAnalysis = analysisParts.map((part, i) => `--- Part ${i + 1} Analysis ---\n${part}`).join('\n\n');
       }
 
